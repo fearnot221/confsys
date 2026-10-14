@@ -1,3 +1,9 @@
+import type {
+  NotificationAudience,
+  NotificationAudiencePreview,
+  NotificationBatchOptions,
+  NotificationTemplateDraft,
+} from "@confsys/contracts";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -12,8 +18,18 @@ export function useNotificationBatches() {
     request = useRef<AbortController | null>(null),
     epoch = useRef(0),
     retryAttempts = useRef(new Map<string, { reason: string; key: string }>()),
+    templateAttempt = useRef<{ payload: string; key: string } | null>(null),
     attempt = useRef<{ payload: string; key: string } | null>(null);
-  const [offset, setOffset] = useState(0),
+  const [preview, setPreview] = useState<NotificationAudiencePreview | null>(
+      null,
+    ),
+    [previewFilters, setPreviewFilters] = useState<NotificationAudience | null>(
+      null,
+    ),
+    [templateOffset, setTemplateOffset] = useState(0),
+    [deliveryBatch, setDeliveryBatch] = useState<string | null>(null),
+    [deliveryOffset, setDeliveryOffset] = useState(0),
+    [offset, setOffset] = useState(0),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
@@ -34,10 +50,32 @@ export function useNotificationBatches() {
     retry: false,
     enabled: canManage,
   });
+  const templates = useQuery({
+    queryKey: ["private", "notification-batches", "templates", templateOffset],
+    queryFn: ({ signal }) => client.templates(templateOffset, signal),
+    retry: false,
+    enabled: canManage,
+  });
+  const deliveries = useQuery({
+    queryKey: [
+      "private",
+      "notification-batches",
+      "deliveries",
+      deliveryBatch,
+      deliveryOffset,
+    ],
+    queryFn: ({ signal }) =>
+      client.deliveries(deliveryBatch!, deliveryOffset, signal),
+    retry: false,
+    enabled: canManage && !!deliveryBatch,
+  });
   const expire = () => {
     ++epoch.current;
     request.current?.abort();
     setExpired(true);
+    setPreview(null);
+    setPreviewFilters(null);
+    setDeliveryBatch(null);
     setBusy(false);
     setError("登入或權限已失效，請重新登入。");
     void queries.cancelQueries({ queryKey: ["private"] });
@@ -45,14 +83,14 @@ export function useNotificationBatches() {
   };
   useEffect(() => {
     if (
-      [account.error, batches.error].some(
+      [account.error, batches.error, templates.error, deliveries.error].some(
         (e) =>
           e instanceof ApiError &&
           (e.code === "SESSION_EXPIRED" || e.code === "FORBIDDEN"),
       )
     )
       expire();
-  }, [account.error, batches.error]);
+  }, [account.error, batches.error, templates.error, deliveries.error]);
   useEffect(
     () => () => {
       ++epoch.current;
@@ -98,10 +136,46 @@ export function useNotificationBatches() {
   }
   return {
     canManage,
+    preview: canManage ? preview : null,
+    previewFilters: canManage ? previewFilters : null,
+    previewAudience: (filters: NotificationAudience) =>
+      run(async (signal) => {
+        setPreview(null);
+        setPreviewFilters(null);
+        const result = await client.preview(filters, signal);
+        if (signal.aborted) return;
+        setPreview(result);
+        setPreviewFilters(filters);
+      }, "受眾預覽已更新，請明確勾選並採用收件者。"),
+    templates: canManage ? (templates.data?.items ?? []) : [],
+    templateOffset,
+    templateNext: templates.data?.nextOffset ?? null,
+    templatePage: setTemplateOffset,
+    saveTemplate: (draft: NotificationTemplateDraft) =>
+      run((signal) => {
+        const payload = JSON.stringify(draft);
+        if (templateAttempt.current?.payload !== payload)
+          templateAttempt.current = { payload, key: crypto.randomUUID() };
+        return client.saveTemplate(
+          { ...draft, id: templateAttempt.current.key },
+          signal,
+        );
+      }, "已保存不可變的範本新版本。"),
+    deliveryBatch: canManage ? deliveryBatch : null,
+    deliveries: canManage ? (deliveries.data?.items ?? []) : [],
+    deliveryOffset,
+    deliveryNext: deliveries.data?.nextOffset ?? null,
+    deliveryPage: setDeliveryOffset,
+    selectDeliveries: (id: string) => {
+      setDeliveryBatch(id);
+      setDeliveryOffset(0);
+    },
     busy,
     error:
       error ||
-      ([account.error, batches.error].some(Boolean)
+      ([account.error, batches.error, templates.error, deliveries.error].some(
+        Boolean,
+      )
         ? "無法載入通知批次。"
         : ""),
     message,
@@ -118,18 +192,29 @@ export function useNotificationBatches() {
         (signal) => auth.mutate("reauthenticate", { password }, signal),
         "密碼已驗證。",
       ),
-    create: (recipientText: string, subject: string, text: string) =>
+    create: (
+      recipientText: string,
+      subject: string,
+      text: string,
+      options: NotificationBatchOptions,
+    ) =>
       run((signal) => {
         const recipientIds = recipientText
             .split(/[\s,;]+/)
             .map((v) => v.trim())
             .filter(Boolean)
             .sort(),
-          payload = JSON.stringify({ recipientIds, subject, text });
+          payload = JSON.stringify({ recipientIds, subject, text, ...options });
         if (attempt.current?.payload !== payload)
           attempt.current = { payload, key: crypto.randomUUID() };
         return client.create(
-          { recipientIds, subject, text, idempotencyKey: attempt.current.key },
+          {
+            recipientIds,
+            subject,
+            text,
+            ...options,
+            idempotencyKey: attempt.current.key,
+          },
           signal,
         );
       }, "通知批次已保存並排入佇列；不代表已送達。"),

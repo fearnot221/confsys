@@ -25,13 +25,22 @@ export function registerNotificationBatchRoutes(
             ]
           : [],
       schema: { response: { 200: z.toJSONSchema(spec.output) } },
-      handler: async (req) => {
+      handler: async (req, reply) => {
+        reply.header("x-robots-tag", "noindex, nofollow");
         const input = spec.input.safeParse(
           spec.method === "post" ? req.body : req.query,
         );
         if (!input.success) throw new AuthError("INVALID_REQUEST");
         const raw = req.cookies[cookiePolicy(config).name];
         switch (name) {
+          case "notificationAudiencePreview":
+            return service.preview(raw, input.data);
+          case "notificationTemplateList":
+            return service.templates(raw, input.data);
+          case "notificationTemplateSave":
+            return service.saveTemplate(raw, input.data, req.id);
+          case "notificationBatchDeliveries":
+            return service.deliveries(raw, input.data);
           case "notificationBatchList":
             return service.list(raw, input.data);
           case "notificationBatchCreate":

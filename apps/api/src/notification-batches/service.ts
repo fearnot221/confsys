@@ -52,6 +52,74 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
     });
   }
   return {
+    preview: (raw: string | undefined, input: unknown) =>
+      transaction(raw, false, (db) =>
+        repo.audience(
+          db,
+          notificationBatchEndpoints.notificationAudiencePreview.input.parse(
+            input,
+          ),
+        ),
+      ),
+    templates: (raw: string | undefined, input: unknown) =>
+      transaction(raw, false, (db) =>
+        repo.templates(
+          db,
+          notificationBatchEndpoints.notificationTemplateList.input.parse(input)
+            .offset,
+        ),
+      ),
+    saveTemplate: (
+      raw: string | undefined,
+      input: unknown,
+      requestId: string,
+    ) =>
+      transaction(raw, true, async (db, actorId) => {
+        const data =
+          notificationBatchEndpoints.notificationTemplateSave.input.parse(
+            input,
+          );
+        const latest = await repo.latestTemplateVersion(db, data.key);
+        const old = await repo.templateById(db, data.id);
+        if (old) {
+          if (
+            old.key !== data.key ||
+            old.version !== data.expectedVersion + 1 ||
+            old.name !== data.name ||
+            old.subject !== data.subject ||
+            old.text !== data.text
+          )
+            throw new AuthError("CONFLICT");
+          return old;
+        }
+        if (latest !== data.expectedVersion) throw new AuthError("CONFLICT");
+        const saved = await repo.saveTemplate(db, actorId, data);
+        if (!saved) throw new Error("Missing saved notification template");
+        await recordAccess(db, {
+          actorId,
+          targetId: actorId,
+          action: "notification_template.version_created",
+          requestId,
+          source: "session",
+          reason: "Explicit immutable notification template version",
+          before: "null",
+          after: JSON.stringify({
+            templateVersionId: saved.id,
+            key: saved.key,
+            version: saved.version,
+          }),
+        });
+        return saved;
+      }),
+    deliveries: (raw: string | undefined, input: unknown) =>
+      transaction(raw, false, async (db) => {
+        const data =
+          notificationBatchEndpoints.notificationBatchDeliveries.input.parse(
+            input,
+          );
+        if (!(await repo.detail(db, data.id))) throw new AuthError("NOT_FOUND");
+        return repo.deliveries(db, data.id, data.offset);
+      }),
     list: (raw: string | undefined, input: unknown) =>
       transaction(raw, false, (db) =>
         repo.list(
@@ -73,6 +141,13 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
               subject: data.subject,
               text: data.text,
               recipientIds: data.recipientIds,
+              ...(data.audience || data.templateVersionId || data.scheduledAt
+                ? {
+                    audience: data.audience,
+                    templateVersionId: data.templateVersionId,
+                    scheduledAt: data.scheduledAt,
+                  }
+                : {}),
             }),
           )
           .digest("hex");
@@ -82,6 +157,26 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
           if (old.request_hash !== hash) throw new AuthError("CONFLICT");
           return (await repo.detail(db, old.id))!;
         }
+        if (data.scheduledAt) {
+          const now = (await repo.databaseTime(db)).getTime();
+          const scheduled = Date.parse(data.scheduledAt);
+          if (scheduled < now || scheduled > now + 30 * 86400000)
+            throw new AuthError("INVALID_REQUEST");
+        }
+        if (data.templateVersionId) {
+          const template = await repo.templateById(db, data.templateVersionId);
+          if (
+            !template ||
+            template.subject !== data.subject ||
+            template.text !== data.text
+          )
+            throw new AuthError("CONFLICT");
+        }
+        if (
+          data.audience &&
+          !(await repo.matchesAudience(db, data.audience, data.recipientIds))
+        )
+          throw new AuthError("CONFLICT");
         if (!(await repo.eligibleRecipients(db, data.recipientIds)))
           throw new AuthError("CONFLICT");
         const id = await repo.create(db, actorId, data, hash),
@@ -97,6 +192,7 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
               text: data.text,
               requestId,
               batchId: id,
+              ...(data.scheduledAt ? { notBefore: data.scheduledAt } : {}),
             },
           );
         await audit(db, actorId, "notification_batch.create", id, requestId);
@@ -154,6 +250,8 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
             recipientIds: recipients,
             subject: source.row.subject,
             text: source.row.message_text,
+            audience: source.row.audience,
+            templateVersionId: source.row.template_version_id,
           },
           hash,
           data.id,

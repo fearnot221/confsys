@@ -8,6 +8,7 @@ import {
   createMailSender,
   processNotification,
 } from "../../packages/notifications/src/worker.js";
+import { withIdentityTransaction } from "@confsys/db";
 import { tokenHash } from "../../apps/api/src/auth/session.js";
 const f = authFixture(),
   auth = createAuthService(f.app, f.config),
@@ -72,6 +73,10 @@ afterAll(async () => {
   );
   await f.admin.query(
     "DELETE FROM confsys.notification_batches WHERE created_by=ANY($1::uuid[])",
+    [ids],
+  );
+  await f.admin.query(
+    "DELETE FROM confsys.notification_template_versions WHERE created_by=ANY($1::uuid[])",
     [ids],
   );
   await f.cleanup();
@@ -439,4 +444,408 @@ it("serializes different retry keys against the same source and refuses cancelle
       rid(),
     ),
   ).rejects.toMatchObject({ code: "CONFLICT" });
+});
+
+const audienceFilters = {
+  role: null,
+  registration: "any",
+  submission: "any",
+  publishedOutcome: "any",
+} as const;
+it("previews only eligible local audience with current registration precedence and excludes unpublished decisions", async () => {
+  await expect(
+    service.preview(recipient.raw, audienceFilters),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  expect(
+    (await f.app.query("SELECT * FROM confsys.notification_audience")).rows,
+  ).toHaveLength(0);
+  const person = await active();
+  await f.admin.query(
+    "INSERT INTO confsys.user_roles(user_id,role) VALUES($1,'reviewer')",
+    [person.id],
+  );
+  const version = Number(
+    (
+      await f.admin.query(
+        "SELECT coalesce(max(version),0)+1 AS version FROM confsys.registration_config_versions",
+      )
+    ).rows[0].version,
+  );
+  await f.admin.query(
+    "INSERT INTO confsys.registration_config_versions(version,document,created_by) VALUES($1,'{}',$2)",
+    [version, admin.id],
+  );
+  const paperId = rid(),
+    revisionId = rid(),
+    decisionId = rid();
+  try {
+    for (const state of ["cancelled", "cancelled", "confirmed"])
+      await f.admin.query(
+        "INSERT INTO confsys.registrations(id,user_id,config_version,ticket_id,ticket_name,state,badge_name,affiliation,answers,consent_snapshot,idempotency_key,request_hash) VALUES($1,$2,$3,$4,'Synthetic',$5,'Synthetic','Institute','{}','Synthetic consent',$6,'synthetic')",
+        [rid(), person.id, version, rid(), state, rid()],
+      );
+    const filters = {
+      ...audienceFilters,
+      role: "reviewer",
+      registration: "confirmed",
+    };
+    const preview = await service.preview(admin.raw, filters);
+    expect(preview.items).toContainEqual({
+      id: person.id,
+      email: person.email,
+    });
+    expect(
+      (
+        await service.preview(admin.raw, {
+          ...filters,
+          registration: "cancelled",
+        })
+      ).items.map((r) => r.id),
+    ).not.toContain(person.id);
+    await f.admin.query(
+      "INSERT INTO confsys.submissions(id,owner_id,version,document) VALUES($1,$2,1,'{}')",
+      [paperId, person.id],
+    );
+    await f.admin.query(
+      "INSERT INTO confsys.submission_revisions(id,submission_id,owner_id,version,document,config_snapshot) VALUES($1,$2,$3,1,'{}','{}')",
+      [revisionId, paperId, person.id],
+    );
+    await f.admin.query(
+      "UPDATE confsys.submissions SET state='submitted',submitted_version=1,current_revision_id=$2 WHERE id=$1",
+      [paperId, revisionId],
+    );
+    await f.admin.query(
+      "INSERT INTO confsys.review_decisions(id,submission_id,revision_id,version,outcome,author_message,internal_reason,decided_by) VALUES($1,$2,$3,1,'accept_oral','Published message','Private reason',$4)",
+      [decisionId, paperId, revisionId, admin.id],
+    );
+    expect(
+      (
+        await service.preview(admin.raw, {
+          ...filters,
+          publishedOutcome: "accepted",
+        })
+      ).items.map((r) => r.id),
+    ).not.toContain(person.id);
+    await f.admin.query(
+      "INSERT INTO confsys.review_publications(submission_id,decision_id,published_by) VALUES($1,$2,$3)",
+      [paperId, decisionId, admin.id],
+    );
+    expect(
+      (
+        await service.preview(admin.raw, {
+          ...filters,
+          publishedOutcome: "accepted",
+        })
+      ).items,
+    ).toContainEqual({ id: person.id, email: person.email });
+    await f.admin.query(
+      "DELETE FROM confsys.user_roles WHERE user_id=$1 AND role='reviewer'",
+      [person.id],
+    );
+    await expect(
+      service.create(
+        admin.raw,
+        { ...input(), recipientIds: [person.id], audience: filters },
+        rid(),
+      ),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(JSON.stringify(preview)).not.toMatch(
+      /Private reason|document|owner_id|roles/,
+    );
+  } finally {
+    await f.admin.query(
+      "DELETE FROM confsys.review_publications WHERE submission_id=$1",
+      [paperId],
+    );
+    await f.admin.query("DELETE FROM confsys.review_decisions WHERE id=$1", [
+      decisionId,
+    ]);
+    await f.admin.query(
+      "UPDATE confsys.submissions SET current_revision_id=null,submitted_version=null,state='draft' WHERE id=$1",
+      [paperId],
+    );
+    await f.admin.query(
+      "DELETE FROM confsys.submission_revisions WHERE id=$1",
+      [revisionId],
+    );
+    await f.admin.query("DELETE FROM confsys.submissions WHERE id=$1", [
+      paperId,
+    ]);
+    await f.admin.query("DELETE FROM confsys.registrations WHERE user_id=$1", [
+      person.id,
+    ]);
+    await f.admin.query(
+      "DELETE FROM confsys.registration_config_versions WHERE version=$1",
+      [version],
+    );
+  }
+});
+it("versions templates immutably and pins exact reviewed content to a batch", async () => {
+  const data = {
+    id: rid(),
+    key: `notice-${rid()}`,
+    expectedVersion: 0,
+    name: "Synthetic announcement",
+    subject: "Synthetic template subject",
+    text: "Generic authenticated navigation only.",
+  };
+  await expect(
+    service.saveTemplate(recipient.raw, data, rid()),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  const first = await service.saveTemplate(admin.raw, data, rid());
+  expect(await service.saveTemplate(admin.raw, data, rid())).toEqual(first);
+  const updates = await Promise.allSettled([
+    service.saveTemplate(
+      admin.raw,
+      { ...data, id: rid(), expectedVersion: 1, text: "Second version" },
+      rid(),
+    ),
+    service.saveTemplate(
+      admin.raw,
+      {
+        ...data,
+        id: rid(),
+        expectedVersion: 1,
+        text: "Concurrent other version",
+      },
+      rid(),
+    ),
+  ]);
+  expect(updates.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  expect(updates.find((r) => r.status === "rejected")).toMatchObject({
+    reason: { code: "CONFLICT" },
+  });
+  expect(
+    (await f.app.query("SELECT * FROM confsys.notification_template_versions"))
+      .rows,
+  ).toHaveLength(0);
+  await expect(
+    f.app.query(
+      "UPDATE confsys.notification_template_versions SET subject=subject WHERE false",
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+  const batch = await service.create(
+    admin.raw,
+    {
+      ...input(),
+      subject: first.subject,
+      text: first.text,
+      templateVersionId: first.id,
+    },
+    rid(),
+  );
+  expect(batch).toMatchObject({
+    templateVersionId: first.id,
+    subject: first.subject,
+    text: first.text,
+  });
+  await expect(
+    service.create(
+      admin.raw,
+      {
+        ...input(),
+        subject: first.subject,
+        text: "Tampered materialized content",
+        templateVersionId: first.id,
+      },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+});
+async function visibleTo(userId: string, notificationId: string) {
+  return withIdentityTransaction(f.app, async (db) => {
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [userId]);
+    return (
+      await db.query(
+        "SELECT id FROM confsys.user_notification_feed WHERE id=$1",
+        [notificationId],
+      )
+    ).rowCount;
+  });
+}
+it("keeps scheduled content hidden until due and preserves provider identifiers without claiming delivery", async () => {
+  const scheduledAt = new Date(Date.now() + 10 * 86400000).toISOString();
+  const data = { ...input(), scheduledAt };
+  const batch = await service.create(admin.raw, data, rid());
+  const notificationId = await mailId(batch.id);
+  expect(batch.scheduledAt).toBe(scheduledAt);
+  expect(await visibleTo(recipient.id, notificationId)).toBe(0);
+  let attempted = false;
+  await processNotification(
+    f.worker,
+    f.workerConfig,
+    notificationId,
+    async () => {
+      attempted = true;
+      throw new Error("Future notification must not reach transport");
+    },
+  );
+  expect(attempted).toBe(false);
+  const stored = (
+    await f.admin.query(
+      "SELECT available_at,expires_at,next_attempt_at FROM confsys.notifications WHERE id=$1",
+      [notificationId],
+    )
+  ).rows[0];
+  expect(stored.available_at.toISOString()).toBe(scheduledAt);
+  expect(stored.expires_at.getTime() - stored.available_at.getTime()).toBe(
+    7 * 86400000,
+  );
+  for (const scheduledAt of [
+    new Date(Date.now() - 1000).toISOString(),
+    new Date(Date.now() + 31 * 86400000).toISOString(),
+  ])
+    await expect(
+      service.create(admin.raw, { ...input(), scheduledAt }, rid()),
+    ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+  // Operator-only clock fixture advances initial availability and due work together.
+  await f.admin.query(
+    "UPDATE confsys.notifications SET available_at=now()-interval '1 second',next_attempt_at=now()-interval '1 second' WHERE id=$1",
+    [notificationId],
+  );
+  await f.admin.query(
+    "UPDATE confsys.notification_batches SET scheduled_at=now()-interval '1 second' WHERE id=$1",
+    [batch.id],
+  );
+  await send(batch.id);
+  expect(await visibleTo(recipient.id, notificationId)).toBe(1);
+  const detail = await service.deliveries(admin.raw, { id: batch.id });
+  expect(detail.items[0]).toMatchObject({
+    status: "accepted",
+    resultCode: "SMTP_ACCEPTED",
+    email: recipient.email,
+  });
+  expect(detail.items[0]?.providerId).toBeTruthy();
+  expect(detail.items[0]?.nextAttemptAt).not.toBe(detail.items[0]?.availableAt);
+  await expect(
+    service.deliveries(recipient.raw, { id: batch.id }),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  expect(
+    (await f.app.query("SELECT * FROM confsys.notification_batch_deliveries"))
+      .rows,
+  ).toHaveLength(0);
+  await expect(
+    f.worker.query(
+      "UPDATE confsys.notifications SET available_at=now() WHERE false",
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+  expect(JSON.stringify(detail)).not.toMatch(
+    /secret|ciphertext|token_hash|delivered/,
+  );
+});
+it("cancellation before scheduled availability permanently suppresses recipient content and scheduled retry windows start at due time", async () => {
+  const batch = await service.create(
+    admin.raw,
+    { ...input(), scheduledAt: new Date(Date.now() + 3600000).toISOString() },
+    rid(),
+  );
+  const id = await mailId(batch.id);
+  await service.cancel(admin.raw, { id: batch.id }, rid());
+  await f.admin.query(
+    "UPDATE confsys.notification_batches SET cancelled_at=now()-interval '2 seconds' WHERE id=$1",
+    [batch.id],
+  );
+  await f.admin.query(
+    "UPDATE confsys.notifications SET available_at=now()-interval '1 second',next_attempt_at=now()-interval '1 second' WHERE id=$1",
+    [id],
+  );
+  expect(await visibleTo(recipient.id, id)).toBe(0);
+  await send(batch.id);
+  expect(
+    (await service.deliveries(admin.raw, { id: batch.id })).items[0]?.status,
+  ).toBe("cancelled");
+  const retryable = await service.create(
+    admin.raw,
+    { ...input(), scheduledAt: new Date(Date.now() + 3600000).toISOString() },
+    rid(),
+  );
+  await f.admin.query(
+    "UPDATE confsys.notification_batches SET created_at=now()-interval '8 days',scheduled_at=now()-interval '1 day' WHERE id=$1",
+    [retryable.id],
+  );
+  await connectionFailure(retryable.id);
+  const child = await service.retry(
+    admin.raw,
+    {
+      id: retryable.id,
+      idempotencyKey: rid(),
+      reason: "Known connection failure within scheduled window",
+    },
+    rid(),
+  );
+  expect(child.retryOf).toBe(retryable.id);
+});
+it("audience and template HTTP endpoints enforce session, CSRF and no-store administrative projections", async () => {
+  const { buildApp } = await import("../../apps/api/src/app.js");
+  const { registerAuthRoutes } =
+    await import("../../apps/api/src/auth/routes.js");
+  const { registerNotificationBatchRoutes } =
+    await import("../../apps/api/src/notification-batches/routes.js");
+  const { createRateLimiter } =
+    await import("../../apps/api/src/auth/rate-limit.js");
+  const { Redis } = await import("ioredis");
+  const redis = new Redis(f.config.REDIS_URL),
+    up = async () => {},
+    server = buildApp({ postgres: up, redis: up, worker: up });
+  await registerAuthRoutes(server, {
+    config: f.config,
+    service: auth,
+    limit: createRateLimiter(
+      redis,
+      f.config.CSRF_SIGNING_KEY,
+      `notification-management-${rid()}`,
+    ),
+  });
+  registerNotificationBatchRoutes(server, f.config, service);
+  const host = new URL(f.config.PUBLIC_APP_ORIGIN).host;
+  try {
+    expect(
+      (
+        await server.inject({
+          url: "/api/notifications/templates",
+          headers: { host },
+        })
+      ).statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await server.inject({
+          method: "POST",
+          url: "/api/notifications/audience-preview",
+          headers: {
+            host,
+            cookie: `dev-session=${admin.raw}`,
+            origin: f.config.PUBLIC_APP_ORIGIN,
+          },
+          payload: audienceFilters,
+        })
+      ).statusCode,
+    ).toBe(403);
+    const csrf = await server.inject({
+      url: "/api/auth/csrf",
+      headers: { host },
+    });
+    const cookies = csrf.cookies
+      .map((cookie) => `${cookie.name}=${cookie.value}`)
+      .join("; ");
+    const response = await server.inject({
+      method: "POST",
+      url: "/api/notifications/audience-preview",
+      headers: {
+        host,
+        cookie: `dev-session=${admin.raw}; ${cookies}`,
+        origin: f.config.PUBLIC_APP_ORIGIN,
+        "x-csrf-token": csrf.json().csrfToken,
+      },
+      payload: audienceFilters,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.headers["x-robots-tag"]).toBe("noindex, nofollow");
+    for (const item of response.json().items)
+      expect(Object.keys(item).sort()).toEqual(["email", "id"]);
+  } finally {
+    await server.close();
+    await redis.quit();
+  }
 });

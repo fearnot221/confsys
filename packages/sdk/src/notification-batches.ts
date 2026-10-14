@@ -61,6 +61,26 @@ export function createNotificationBatchClient(
     );
   }
   return {
+    preview: (input: unknown, signal: AbortSignal) =>
+      call(
+        notificationBatchEndpoints.notificationAudiencePreview,
+        input,
+        signal,
+      ),
+    templates: (offset: number, signal: AbortSignal) =>
+      call(
+        notificationBatchEndpoints.notificationTemplateList,
+        { offset },
+        signal,
+      ),
+    saveTemplate: (input: unknown, signal: AbortSignal) =>
+      call(notificationBatchEndpoints.notificationTemplateSave, input, signal),
+    deliveries: (id: string, offset: number, signal: AbortSignal) =>
+      call(
+        notificationBatchEndpoints.notificationBatchDeliveries,
+        { id, offset },
+        signal,
+      ),
     list: (offset: number, signal: AbortSignal) =>
       call(
         notificationBatchEndpoints.notificationBatchList,
