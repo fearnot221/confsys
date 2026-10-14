@@ -1,3 +1,4 @@
+import { roleSchema } from "@confsys/contracts";
 import type {
   NotificationAudience,
   NotificationAudiencePreview,
@@ -135,6 +136,7 @@ export function useNotificationBatches() {
     }
   }
   return {
+    roleOptions: roleSchema.options,
     canManage,
     preview: canManage ? preview : null,
     previewFilters: canManage ? previewFilters : null,

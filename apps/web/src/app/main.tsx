@@ -3,6 +3,7 @@ import {createRoot} from "react-dom/client";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
 import "../design/styles.css";
 const App=lazy(()=>import("../features/health/entry.js").then(module=>({default:module.App})));
+const EmailChangeApp=lazy(()=>import("../features/email-change/entry.js"));
 const AuthApp=lazy(()=>import("../features/auth/entry.js").then(module=>({default:module.AuthApp})));
 const AccessApp=lazy(()=>import("../features/access/entry.js").then(module=>({default:module.AccessApp})));
 const SiteApp=lazy(()=>import("../features/site/entry.js").then(module=>({default:module.SiteApp})));
@@ -49,6 +50,7 @@ class ErrorBoundary extends Component<
   }
 }
 const pages:Record<string,ReactNode>={
+ "/auth/email-change":<EmailChangeApp/>,
  "/dashboard":<DashboardApp/>,
  "/admin/badge-template":<BadgeTemplateApp/>,
  "/admin/exports":<ExportJobsApp/>,

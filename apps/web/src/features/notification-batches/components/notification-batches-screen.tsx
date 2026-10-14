@@ -11,6 +11,7 @@ import type {
 import { NotificationAudiencePanel } from "./audience-panel.js";
 import { NotificationTemplatePanel } from "./template-panel.js";
 type Props = {
+  roleOptions: NonNullable<NotificationAudience["role"]>[];
   canManage: boolean;
   preview: NotificationAudiencePreview | null;
   previewFilters: NotificationAudience | null;
@@ -103,6 +104,7 @@ export function NotificationBatchesScreen(p: Props) {
             <button disabled={p.busy}>驗證密碼</button>
           </form>
           <NotificationAudiencePanel
+            roleOptions={p.roleOptions}
             busy={p.busy}
             preview={p.preview}
             previewFilters={p.previewFilters}

@@ -1001,8 +1001,8 @@ try {
       ).json();
       await sitePost(page, instance, "/api/submissions/config", {
         ...configuration,
-        opensAt: null,
-        closesAt: null,
+        opensAt: new Date(Date.now()-60*60*1000).toISOString(),
+        closesAt: new Date(Date.now()+24*60*60*1000).toISOString(),
         requireRegistration: false,
         requireAttachment: true,
         mode: "abstract",

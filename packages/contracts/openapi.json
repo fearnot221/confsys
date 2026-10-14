@@ -5,6 +5,826 @@
     "version": "0.0.0"
   },
   "paths": {
+    "/api/auth/email-change/request": {
+      "post": {
+        "operationId": "emailChangeRequest",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email",
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  }
+                },
+                "required": [
+                  "email"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "accepted"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/email-change/confirm": {
+      "post": {
+        "operationId": "emailChangeConfirm",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$"
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "complete"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/reauthenticate": {
       "post": {
         "operationId": "reauthenticate",
@@ -85736,6 +86556,2583 @@
         }
       }
     },
+    "/api/notifications/audience-preview": {
+      "post": {
+        "operationId": "notificationAudiencePreview",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "conference_staff",
+                          "conference_admin",
+                          "finance",
+                          "chair",
+                          "reviewer",
+                          "onsite",
+                          "competition_judge"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "registration": {
+                    "type": "string",
+                    "enum": [
+                      "any",
+                      "none",
+                      "confirmed",
+                      "cancelled"
+                    ]
+                  },
+                  "submission": {
+                    "type": "string",
+                    "enum": [
+                      "any",
+                      "none",
+                      "draft",
+                      "submitted",
+                      "withdrawn"
+                    ]
+                  },
+                  "publishedOutcome": {
+                    "type": "string",
+                    "enum": [
+                      "any",
+                      "accepted",
+                      "reject",
+                      "revision_requested"
+                    ]
+                  }
+                },
+                "required": [
+                  "role",
+                  "registration",
+                  "submission",
+                  "publishedOutcome"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "email": {
+                            "type": "string",
+                            "format": "email",
+                            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "email"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "truncated"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/templates": {
+      "get": {
+        "operationId": "notificationTemplateList",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000
+                }
+              },
+              "required": [
+                "offset"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "subject": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "key",
+                          "version",
+                          "name",
+                          "subject",
+                          "text",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextOffset": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextOffset"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "notificationTemplateSave",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]{1,80}$"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "subject": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  }
+                },
+                "required": [
+                  "id",
+                  "key",
+                  "expectedVersion",
+                  "name",
+                  "subject",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "key",
+                    "version",
+                    "name",
+                    "subject",
+                    "text",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/batches/deliveries": {
+      "get": {
+        "operationId": "notificationBatchDeliveries",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "offset",
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "email": {
+                            "type": "string",
+                            "format": "email",
+                            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "processing",
+                              "accepted",
+                              "failed",
+                              "unknown",
+                              "cancelled"
+                            ]
+                          },
+                          "resultCode": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "providerId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "attempts": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "nextAttemptAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "availableAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "userId",
+                          "email",
+                          "status",
+                          "resultCode",
+                          "providerId",
+                          "attempts",
+                          "nextAttemptAt",
+                          "availableAt",
+                          "expiresAt",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextOffset": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextOffset"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/notifications/batches/retry": {
       "post": {
         "operationId": "notificationBatchRetry",
@@ -85862,6 +89259,96 @@
                         }
                       ]
                     },
+                    "audience": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "conference_staff",
+                                    "conference_admin",
+                                    "finance",
+                                    "chair",
+                                    "reviewer",
+                                    "onsite",
+                                    "competition_judge"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "registration": {
+                              "type": "string",
+                              "enum": [
+                                "any",
+                                "none",
+                                "confirmed",
+                                "cancelled"
+                              ]
+                            },
+                            "submission": {
+                              "type": "string",
+                              "enum": [
+                                "any",
+                                "none",
+                                "draft",
+                                "submitted",
+                                "withdrawn"
+                              ]
+                            },
+                            "publishedOutcome": {
+                              "type": "string",
+                              "enum": [
+                                "any",
+                                "accepted",
+                                "reject",
+                                "revision_requested"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "role",
+                            "registration",
+                            "submission",
+                            "publishedOutcome"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "templateVersionId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "scheduledAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "statuses": {
                       "type": "array",
                       "items": {
@@ -85902,6 +89389,9 @@
                     "recipientCount",
                     "createdAt",
                     "cancelledAt",
+                    "audience",
+                    "templateVersionId",
+                    "scheduledAt",
                     "statuses"
                   ],
                   "additionalProperties": false
@@ -86528,6 +90018,96 @@
                               }
                             ]
                           },
+                          "audience": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "role": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "conference_staff",
+                                          "conference_admin",
+                                          "finance",
+                                          "chair",
+                                          "reviewer",
+                                          "onsite",
+                                          "competition_judge"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "registration": {
+                                    "type": "string",
+                                    "enum": [
+                                      "any",
+                                      "none",
+                                      "confirmed",
+                                      "cancelled"
+                                    ]
+                                  },
+                                  "submission": {
+                                    "type": "string",
+                                    "enum": [
+                                      "any",
+                                      "none",
+                                      "draft",
+                                      "submitted",
+                                      "withdrawn"
+                                    ]
+                                  },
+                                  "publishedOutcome": {
+                                    "type": "string",
+                                    "enum": [
+                                      "any",
+                                      "accepted",
+                                      "reject",
+                                      "revision_requested"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "role",
+                                  "registration",
+                                  "submission",
+                                  "publishedOutcome"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "templateVersionId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "scheduledAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "statuses": {
                             "type": "array",
                             "items": {
@@ -86568,6 +90148,9 @@
                           "recipientCount",
                           "createdAt",
                           "cancelledAt",
+                          "audience",
+                          "templateVersionId",
+                          "scheduledAt",
                           "statuses"
                         ],
                         "additionalProperties": false
@@ -87162,13 +90745,109 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 4000
+                  },
+                  "audience": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "conference_staff",
+                                  "conference_admin",
+                                  "finance",
+                                  "chair",
+                                  "reviewer",
+                                  "onsite",
+                                  "competition_judge"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "registration": {
+                            "type": "string",
+                            "enum": [
+                              "any",
+                              "none",
+                              "confirmed",
+                              "cancelled"
+                            ]
+                          },
+                          "submission": {
+                            "type": "string",
+                            "enum": [
+                              "any",
+                              "none",
+                              "draft",
+                              "submitted",
+                              "withdrawn"
+                            ]
+                          },
+                          "publishedOutcome": {
+                            "type": "string",
+                            "enum": [
+                              "any",
+                              "accepted",
+                              "reject",
+                              "revision_requested"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "role",
+                          "registration",
+                          "submission",
+                          "publishedOutcome"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "templateVersionId": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "scheduledAt": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
                   "idempotencyKey",
                   "recipientIds",
                   "subject",
-                  "text"
+                  "text",
+                  "audience",
+                  "templateVersionId",
+                  "scheduledAt"
                 ],
                 "additionalProperties": false
               }
@@ -87246,6 +90925,96 @@
                         }
                       ]
                     },
+                    "audience": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "conference_staff",
+                                    "conference_admin",
+                                    "finance",
+                                    "chair",
+                                    "reviewer",
+                                    "onsite",
+                                    "competition_judge"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "registration": {
+                              "type": "string",
+                              "enum": [
+                                "any",
+                                "none",
+                                "confirmed",
+                                "cancelled"
+                              ]
+                            },
+                            "submission": {
+                              "type": "string",
+                              "enum": [
+                                "any",
+                                "none",
+                                "draft",
+                                "submitted",
+                                "withdrawn"
+                              ]
+                            },
+                            "publishedOutcome": {
+                              "type": "string",
+                              "enum": [
+                                "any",
+                                "accepted",
+                                "reject",
+                                "revision_requested"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "role",
+                            "registration",
+                            "submission",
+                            "publishedOutcome"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "templateVersionId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "scheduledAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "statuses": {
                       "type": "array",
                       "items": {
@@ -87286,6 +91055,9 @@
                     "recipientCount",
                     "createdAt",
                     "cancelledAt",
+                    "audience",
+                    "templateVersionId",
+                    "scheduledAt",
                     "statuses"
                   ],
                   "additionalProperties": false
@@ -87923,6 +91695,96 @@
                         }
                       ]
                     },
+                    "audience": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "conference_staff",
+                                    "conference_admin",
+                                    "finance",
+                                    "chair",
+                                    "reviewer",
+                                    "onsite",
+                                    "competition_judge"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "registration": {
+                              "type": "string",
+                              "enum": [
+                                "any",
+                                "none",
+                                "confirmed",
+                                "cancelled"
+                              ]
+                            },
+                            "submission": {
+                              "type": "string",
+                              "enum": [
+                                "any",
+                                "none",
+                                "draft",
+                                "submitted",
+                                "withdrawn"
+                              ]
+                            },
+                            "publishedOutcome": {
+                              "type": "string",
+                              "enum": [
+                                "any",
+                                "accepted",
+                                "reject",
+                                "revision_requested"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "role",
+                            "registration",
+                            "submission",
+                            "publishedOutcome"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "templateVersionId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "scheduledAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "statuses": {
                       "type": "array",
                       "items": {
@@ -87963,6 +91825,9 @@
                     "recipientCount",
                     "createdAt",
                     "cancelledAt",
+                    "audience",
+                    "templateVersionId",
+                    "scheduledAt",
                     "statuses"
                   ],
                   "additionalProperties": false

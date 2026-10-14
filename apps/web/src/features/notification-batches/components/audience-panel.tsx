@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import {
-  roleSchema,
-  type NotificationAudience,
-  type NotificationAudiencePreview,
+import type {
+  NotificationAudience,
+  NotificationAudiencePreview,
 } from "@confsys/contracts";
 type Props = {
+  roleOptions: NonNullable<NotificationAudience["role"]>[];
   busy: boolean;
   preview: NotificationAudiencePreview | null;
   previewFilters: NotificationAudience | null;
@@ -40,14 +40,12 @@ export function NotificationAudiencePanel(p: Props) {
           onChange={(e) =>
             setFilters({
               ...filters,
-              role: roleSchema.safeParse(e.target.value).success
-                ? roleSchema.parse(e.target.value)
-                : null,
+              role: p.roleOptions.find(role => role === e.target.value) ?? null,
             })
           }
         >
           <option value="">全部角色</option>
-          {roleSchema.options.map((role) => (
+          {p.roleOptions.map((role) => (
             <option key={role} value={role}>
               {role}
             </option>

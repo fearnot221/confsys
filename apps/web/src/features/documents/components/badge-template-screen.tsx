@@ -67,9 +67,12 @@ export function BadgeTemplateScreen(props: Props) {
             >
               <fieldset disabled={props.busy} className="space-y-4">
                 <legend>版面設定</legend>
-                <label className="block">
-                  尺寸
+                <div>
+                  <label htmlFor="badge-template-size" className="block">
+                    尺寸
+                  </label>
                   <select
+                    id="badge-template-size"
                     value={draft.size}
                     onChange={(e) =>
                       setDraft({
@@ -84,10 +87,13 @@ export function BadgeTemplateScreen(props: Props) {
                     <option value="large">大型名牌 100 × 140 mm</option>
                     <option value="credit_card">卡片 86 × 54 mm</option>
                   </select>
-                </label>
-                <label className="block">
-                  文字排列
+                </div>
+                <div>
+                  <label htmlFor="badge-template-layout" className="block">
+                    文字排列
+                  </label>
                   <select
+                    id="badge-template-layout"
                     value={draft.layout}
                     onChange={(e) =>
                       setDraft({
@@ -99,7 +105,7 @@ export function BadgeTemplateScreen(props: Props) {
                     <option value="centered">置中</option>
                     <option value="left">靠左</option>
                   </select>
-                </label>
+                </div>
                 <label className="block">
                   <input
                     type="checkbox"

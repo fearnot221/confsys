@@ -1,4 +1,4 @@
-import {completeSite} from "../helpers/site.js";
+import { completeSite } from "../helpers/site.js";
 import { it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
@@ -65,10 +65,10 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
         const snapshot = async () =>
           (
             await pool.query(
-              `SELECT jsonb_build_object('users',(SELECT jsonb_agg(u) FROM confsys.users u),'tokens',(SELECT jsonb_agg(t) FROM confsys.auth_tokens t),'outbox',(SELECT jsonb_agg(to_jsonb(n)-'conference_name'-'invitation_id'-'event_key'-'message_subject'-'message_text'-'batch_id'-'available_at') FROM confsys.notifications n),'secrets',(SELECT jsonb_agg(s) FROM confsys.notification_secrets s),'audit',(SELECT jsonb_agg(jsonb_build_object('id',a.id,'event',a.event,'user_id',a.user_id,'request_id',a.request_id,'created_at',a.created_at)) FROM confsys.auth_audit a)) AS data`,
+              `SELECT jsonb_build_object('users',(SELECT jsonb_agg(u) FROM confsys.users u),'tokens',(SELECT jsonb_agg(to_jsonb(t)-'source_email'-'credential_version') FROM confsys.auth_tokens t),'outbox',(SELECT jsonb_agg(to_jsonb(n)-'conference_name'-'invitation_id'-'event_key'-'message_subject'-'message_text'-'batch_id'-'available_at'-'released_at') FROM confsys.notifications n),'secrets',(SELECT jsonb_agg(s) FROM confsys.notification_secrets s),'audit',(SELECT jsonb_agg(jsonb_build_object('id',a.id,'event',a.event,'user_id',a.user_id,'request_id',a.request_id,'created_at',a.created_at)) FROM confsys.auth_audit a)) AS data`,
             )
           ).rows[0].data;
-        if (kind === "phase11b" || (kind === "phase12" || kind === "phase13")) {
+        if (kind === "phase11b" || kind === "phase12" || kind === "phase13") {
           for (const file of ["0002_identity.sql", "0003_identity_grants.sql"])
             await copyFile(
               `packages/db/migrations/${file}`,
@@ -99,7 +99,7 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
             "INSERT INTO confsys.auth_audit(id,event,user_id,request_id) VALUES ($1,'login_succeeded',$2,$3)",
             [randomUUID(), userId, randomUUID()],
           );
-          if ((kind === "phase12" || kind === "phase13")) {
+          if (kind === "phase12" || kind === "phase13") {
             await copyFile(
               "packages/db/migrations/0004_access_control.sql",
               join(directory, "0004_access_control.sql"),
@@ -114,7 +114,7 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
               [userId],
             );
           }
-          if ((kind === "phase12" || kind === "phase13")) {
+          if (kind === "phase12" || kind === "phase13") {
             await pool.query(
               "UPDATE confsys.sessions SET password_verified_at=now()",
             );
@@ -129,12 +129,29 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
             ).rows[0].data;
           }
           if (kind === "phase13") {
-            await copyFile("packages/db/migrations/0005_conference_site.sql",join(directory,"0005_conference_site.sql"));
-            await runMigrations(pool,directory);
-            const publication=randomUUID(), document=completeSite("Preserved Phase 1.3");
-            await pool.query("INSERT INTO confsys.site_publications(id,source_draft_version,document,published_by,changed_fields) VALUES($1,1,$2,$3,'[]')",[publication,JSON.stringify(document),userId]);
-            await pool.query("UPDATE confsys.site_state SET draft_version=2,document=$1,active_publication_id=$2",[JSON.stringify(completeSite("Unpublished prior draft")),publication]);
-            siteSaved=(await pool.query("SELECT jsonb_build_object('state',(SELECT to_jsonb(s) FROM confsys.site_state s),'history',(SELECT jsonb_agg(p) FROM confsys.site_publications p)) AS data")).rows[0].data;
+            await copyFile(
+              "packages/db/migrations/0005_conference_site.sql",
+              join(directory, "0005_conference_site.sql"),
+            );
+            await runMigrations(pool, directory);
+            const publication = randomUUID(),
+              document = completeSite("Preserved Phase 1.3");
+            await pool.query(
+              "INSERT INTO confsys.site_publications(id,source_draft_version,document,published_by,changed_fields) VALUES($1,1,$2,$3,'[]')",
+              [publication, JSON.stringify(document), userId],
+            );
+            await pool.query(
+              "UPDATE confsys.site_state SET draft_version=2,document=$1,active_publication_id=$2",
+              [
+                JSON.stringify(completeSite("Unpublished prior draft")),
+                publication,
+              ],
+            );
+            siteSaved = (
+              await pool.query(
+                "SELECT jsonb_build_object('state',(SELECT to_jsonb(s) FROM confsys.site_state s),'history',(SELECT jsonb_agg(p) FROM confsys.site_publications p)) AS data",
+              )
+            ).rows[0].data;
           }
           saved = await snapshot();
         }
@@ -154,8 +171,24 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
         }
         await runMigrations(pool);
         await runMigrations(pool);
-        const expectedMigrations = await Promise.all((await readdir("packages/db/migrations")).filter(n => n.endsWith(".sql")).sort().map(async version => ({version,checksum:createHash("sha256").update(await readFile(`packages/db/migrations/${version}`)).digest("hex")})));
-        expect((await pool.query("SELECT version,checksum FROM confsys.schema_migrations ORDER BY version")).rows).toEqual(expectedMigrations);
+        const expectedMigrations = await Promise.all(
+          (await readdir("packages/db/migrations"))
+            .filter((n) => n.endsWith(".sql"))
+            .sort()
+            .map(async (version) => ({
+              version,
+              checksum: createHash("sha256")
+                .update(await readFile(`packages/db/migrations/${version}`))
+                .digest("hex"),
+            })),
+        );
+        expect(
+          (
+            await pool.query(
+              "SELECT version,checksum FROM confsys.schema_migrations ORDER BY version",
+            )
+          ).rows,
+        ).toEqual(expectedMigrations);
         if (checksum) {
           expect(
             (
@@ -179,13 +212,59 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
           expect(
             (await runtime.query("SELECT count(*) FROM confsys.users")).rows[0]
               .count,
-          ).toBe(kind === "phase11b" || (kind === "phase12" || kind === "phase13") ? "1" : "0");
-          if (kind === "phase11b" || (kind === "phase12" || kind === "phase13")) {
+          ).toBe(
+            kind === "phase11b" || kind === "phase12" || kind === "phase13"
+              ? "1"
+              : "0",
+          );
+          if (kind === "phase11b" || kind === "phase12" || kind === "phase13") {
             expect(await snapshot()).toEqual(saved);
-            expect((await pool.query("SELECT available_at=created_at AS preserved FROM confsys.notifications WHERE id=$1",[notificationId])).rows[0]).toEqual({preserved:true});
-            expect((await pool.query("SELECT invitation_id,event_key,message_subject,message_text,batch_id FROM confsys.notifications WHERE id=$1",[notificationId])).rows[0]).toEqual({invitation_id:null,event_key:null,message_subject:null,message_text:null,batch_id:null});
-            if(kind === "phase13") expect((await pool.query("SELECT jsonb_build_object('state',(SELECT to_jsonb(s) FROM confsys.site_state s),'history',(SELECT jsonb_agg(p) FROM confsys.site_publications p)) AS data")).rows[0].data).toEqual(siteSaved);
-            if ((kind === "phase12" || kind === "phase13"))
+            expect(
+              (
+                await pool.query(
+                  "SELECT source_email,credential_version FROM confsys.auth_tokens",
+                )
+              ).rows,
+            ).toEqual([{ source_email: null, credential_version: null }]);
+            expect(
+              (
+                await pool.query(
+                  "SELECT released_at FROM confsys.notifications WHERE id=$1",
+                  [notificationId],
+                )
+              ).rows[0],
+            ).toEqual({ released_at: null });
+            expect(
+              (
+                await pool.query(
+                  "SELECT available_at=created_at AS preserved FROM confsys.notifications WHERE id=$1",
+                  [notificationId],
+                )
+              ).rows[0],
+            ).toEqual({ preserved: true });
+            expect(
+              (
+                await pool.query(
+                  "SELECT invitation_id,event_key,message_subject,message_text,batch_id FROM confsys.notifications WHERE id=$1",
+                  [notificationId],
+                )
+              ).rows[0],
+            ).toEqual({
+              invitation_id: null,
+              event_key: null,
+              message_subject: null,
+              message_text: null,
+              batch_id: null,
+            });
+            if (kind === "phase13")
+              expect(
+                (
+                  await pool.query(
+                    "SELECT jsonb_build_object('state',(SELECT to_jsonb(s) FROM confsys.site_state s),'history',(SELECT jsonb_agg(p) FROM confsys.site_publications p)) AS data",
+                  )
+                ).rows[0].data,
+              ).toEqual(siteSaved);
+            if (kind === "phase12" || kind === "phase13")
               expect(
                 (
                   await pool.query(
@@ -194,7 +273,7 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
                 ).rows[0].data,
               ).toEqual(accessSaved);
 
-            if ((kind === "phase12" || kind === "phase13")) {
+            if (kind === "phase12" || kind === "phase13") {
               expect(
                 (
                   await pool.query(
@@ -217,7 +296,9 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
               loadApiConfig({ ...process.env, DATABASE_URL: runtimeUrl.href }),
             );
             expect((await service.me(sessionSecret)).user.roles).toEqual(
-              (kind === "phase12" || kind === "phase13") ? ["conference_admin"] : [],
+              kind === "phase12" || kind === "phase13"
+                ? ["conference_admin"]
+                : [],
             );
             expect(
               (
@@ -227,7 +308,9 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
               ).rows[0],
             ).toEqual({
               password_verified_at:
-                (kind === "phase12" || kind === "phase13") ? expect.any(Date) : null,
+                kind === "phase12" || kind === "phase13"
+                  ? expect.any(Date)
+                  : null,
               revoked_at: null,
             });
             expect(
@@ -236,8 +319,8 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
                   "SELECT initialized_user_id FROM confsys.access_control",
                 )
               ).rows[0].initialized_user_id,
-            ).toBe((kind === "phase12" || kind === "phase13") ? userId : null);
-            if ((kind === "phase12" || kind === "phase13")) {
+            ).toBe(kind === "phase12" || kind === "phase13" ? userId : null);
+            if (kind === "phase12" || kind === "phase13") {
               await service.consume(
                 "reset",
                 tokenSecret,

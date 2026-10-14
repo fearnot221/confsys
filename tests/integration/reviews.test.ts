@@ -979,26 +979,73 @@ it("initial-screen and audit roll back when the atomic reviewer notification can
   }
 });
 
-it('auxiliary review metadata is denied without actor context and manager reads retain explicit scope',async()=>{
- for(const table of ['review_forms','review_chair_scopes','review_conflicts','submission_revision_requests','competition_conflicts'])
-  expect((await f.app.query(`SELECT * FROM confsys.${table}`)).rows).toEqual([]);
- expect((await f.app.query('DELETE FROM confsys.review_chair_scopes')).rowCount).toBe(0);
- await expect(f.app.query("INSERT INTO confsys.review_chair_scopes(user_id,track_id) VALUES($1,'forged')",[outsider.id])).rejects.toMatchObject({code:'42501'});
- await withIdentityTransaction(f.app,async db=>{
-  await context(db,outsider.id,false);
-  expect((await db.query('SELECT * FROM confsys.review_forms')).rows).toEqual([]);
-  expect((await db.query('SELECT * FROM confsys.submission_revision_requests')).rows).toEqual([]);
- });
- await withIdentityTransaction(f.app,async db=>{
-  await context(db,admin.id,true);
-  expect((await db.query('SELECT id FROM confsys.review_forms WHERE id=$1',[form.id])).rowCount).toBe(1);
- });
-it('changing a verified coauthor email cannot evade reviewer assignment or manager candidate conflicts',async()=>{
- const alias=await account(['reviewer','conference_admin']);
- const paper=await submitted({authors:[...document().authors,{name:'Historical coauthor',email:alias.email,affiliation:'Synthetic'}]});
- const target=f.email();await auth.requestEmailChange(alias.raw,target,rid());
- await auth.confirmEmailChange(alias.raw,{token:(await f.link(alias.email,'email_change')).token},rid());
- const fresh=await auth.login(target,password,rid());
- await expect(assigned(paper,{id:alias.id,email:target,raw:fresh.raw})).rejects.toMatchObject({code:'FORBIDDEN'});
- expect((await reviews.board(fresh.raw,{})).papers.some(row=>row.submissionId===paper.id)).toBe(false);
+it("auxiliary review metadata is denied without actor context and manager reads retain explicit scope", async () => {
+  for (const table of [
+    "review_forms",
+    "review_chair_scopes",
+    "review_conflicts",
+    "submission_revision_requests",
+    "competition_conflicts",
+  ])
+    expect((await f.app.query(`SELECT * FROM confsys.${table}`)).rows).toEqual(
+      [],
+    );
+  expect(
+    (await f.app.query("DELETE FROM confsys.review_chair_scopes")).rowCount,
+  ).toBe(0);
+  await expect(
+    f.app.query(
+      "INSERT INTO confsys.review_chair_scopes(user_id,track_id) VALUES($1,'forged')",
+      [outsider.id],
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+  await withIdentityTransaction(f.app, async (db) => {
+    await context(db, outsider.id, false);
+    expect((await db.query("SELECT * FROM confsys.review_forms")).rows).toEqual(
+      [],
+    );
+    expect(
+      (await db.query("SELECT * FROM confsys.submission_revision_requests"))
+        .rows,
+    ).toEqual([]);
+  });
+  await withIdentityTransaction(f.app, async (db) => {
+    await context(db, admin.id, true);
+    expect(
+      (
+        await db.query("SELECT id FROM confsys.review_forms WHERE id=$1", [
+          form.id,
+        ])
+      ).rowCount,
+    ).toBe(1);
+  });
+});
+it("changing a verified coauthor email cannot evade reviewer assignment or manager candidate conflicts", async () => {
+  const alias = await account(["reviewer", "conference_admin"]);
+  const paper = await submitted({
+    authors: [
+      ...document().authors,
+      {
+        name: "Historical coauthor",
+        email: alias.email,
+        affiliation: "Synthetic",
+      },
+    ],
+  });
+  const target = f.email();
+  await auth.requestEmailChange(alias.raw, target, rid());
+  await auth.confirmEmailChange(
+    alias.raw,
+    { token: (await f.link(alias.email, "email_change")).token },
+    rid(),
+  );
+  const fresh = await auth.login(target, password, rid());
+  await expect(
+    assigned(paper, { id: alias.id, email: target, raw: fresh.raw }),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  expect(
+    (await reviews.board(fresh.raw, {})).papers.some(
+      (row) => row.submissionId === paper.id,
+    ),
+  ).toBe(false);
 });

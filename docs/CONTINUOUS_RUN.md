@@ -6,18 +6,18 @@ Baseline: 9642a62, verified descendant of d4c0788. Branch: codex/phase-1-4-to-6-
 ## Plan and ownership
 Main: private files/media then registration/finance and dependent workflow; owns migrations/contracts/permissions/lockfile. Separate invitation agent owns invitation-specific source/tests, proposing central changes for main review. Existing stack and access fences retained. No provider credentials required: local storage and Mailpit only.
 
-## Current scope status — 07:28 Taipei
+## Current scope status — 07:44 Taipei
 
 All rows describe implemented source plus actual verification; none imply production readiness or completion of every SPEC requirement.
 
 | Requirement | Current state | Evidence / remaining work |
 |---|---|---|
-| Phase1 files/media/local invitations | Implemented, integration verified | Real scanner clean/EICAR/limit rejection, private authorization, invitation acceptance; isolated deployment rehearsal next |
-| Phase2 registration/forms/prices/capacity/finance/activities/receipts | Core implemented and browser verified; repairs integrating | Conditional forms/history, group allocation/refunds, immutable receipt PDF; safety migration0036 scoped4/4, receipt reissue and allocation pagination in progress |
-| Phase3 submissions/authors/revisions/files/withdrawal | Implemented and verified | Author/admin browser flow, postacceptance deadline pinned; dedicated presenter-change approval beyond verified revision workflow remains to assess |
+| Phase1 files/media/local invitations | Implemented, integration verified | Real scanner clean/EICAR/limit rejection, private authorization, invitation acceptance; two-instance rehearsal30cec03e passed07:41 |
+| Phase2 registration/forms/prices/capacity/finance/activities/receipts | Core implemented and browser verified; repairs integrating | Conditional forms/history, group allocation/refunds, immutable receipt PDF; safety migration0036 scoped4/4, receipt reissue and allocation pagination browser passed; terminal void and pagination PG passed |
+| Phase3 submissions/authors/revisions/files/withdrawal | Implemented and verified | Author/admin browser flow, postacceptance deadline pinned; dedicated presenter-change consent/approval in progress (0044); not yet verified |
 | Phase4 reviews/conflicts/screening/decisions/publication | Implemented and verified | Blind review browser flow, track permissions, conflict gates, screening/reminders; bulk result operations remain to assess |
 | Phase5 program/competitions/awards | Implemented and verified | Program publication and competition browser flows, immutable snapshots/personal schedule; deadline gates scoped tests passed |
-| Phase6 onsite/PDF/notifications/stats/exports/site/preview | Core implemented; further capabilities in progress | Onsite real QR/PDF, real background CSV, notification retries, controlled preview, optional site pages; template scheduling/audience and reissue pending integration |
+| Phase6 onsite/PDF/notifications/stats/exports/site/preview | Core implemented; further capabilities in progress | Onsite real QR/PDF, real background CSV, notification retries, controlled preview, optional site pages; notification templates/audience/scheduling/release integrated,12 PG passed; reissue integrated and browser passed |
 
 ## Environment and verification
 
@@ -25,7 +25,7 @@ Pinned Node24.21.0/pnpm10.34.7 at /tmp/confsys-tools/node_modules/.bin. Own proj
 
 Latest full `pnpm check` at07:13–15 passed lint/typecheck/unit48/integration128/contract15/build/E2E19. Later `pnpm build && pnpm test:e2e` passed22 browser flows at07:24; current scoped unit55, contract16 and lint/typecheck passed. Newer feature changes require the next full regression; do not combine these into a claimed full current-suite pass.
 
-Latest central checkpoint:6ce0928 (07:27); branch history retains all independent feature commits. New migrations0033–0036 committed;0037 receipt reissue proposed, not yet feature-complete. Agent branches are independent; only reviewed commits are cherry-picked into this integration tree.
+Latest picked source checkpoint:99e10a5 (07:43); branch history retains all independent feature commits. Migrations0037–0039/0041–0043 integrated;0040 mailbox and0045 notification release central integration pending checkpoint,0044/0046 presenter/successor proposed. Agent branches are independent; only reviewed commits are cherry-picked into this integration tree.
 
 ## Focused baseline review
 Reviewed existing session/access locks, site service/repository, runtime role/transaction helper, contract registry, scripts/migrations and CI. Preserve post-lock actor checks and explicit permissions. No evidenced inherited blocker so far. Existing MFA/TLS/retention/backup/provider debt remains in ROADMAP. New file safety must fail closed and cannot claim a stub scanner is verified.
@@ -85,3 +85,11 @@ The entries below are chronological evidence; the current state is summarized ab
 - Two-instance run9d5dab76 passed eight isolation stages (accounts, sessions/tokens, administrator changes, Mailpit/worker isolation, restart/migration, multilingual site publication) then real file upload failed500. Inspection proved `/data/private` was root-owned0755 while API UID1000. Fixed image creation to node-owned0700 before volume initialization; startup now rejects unsafe/unwritable/symlink storage. No existing volumes were chmodded/deleted. Both failed-run projects stopped and retained; next run creates fresh resources. Storage unit5/5 passed.
 - Catalog review found private program draft contacts lacked RLS. Forward0042 fences rooms/sessions/slots/bookings behind trusted program.manage context; public reads see only active immutable publication. Program+upgrade migration regressions **8/8 passed**, preserving the genuine temporal-exclusion assertion under authorized context and adding no-context read/write denial.
 -0038 audience view scalar registration lookup needed to handle multiple cancelled historical registrations; corrected with forward0041 rather than rewriting applied0038.0040 reserved for verified account email changes.0037/0039 receipt reissue and terminal-void guard retained.
+
+## 07:44 checkpoint
+- `pnpm test:instances --native-scanner --scanner-port 53310 --image confsys:p6-8ecadf2e` passed using fresh run30cec03e: independent container/mail/identity/roles/branding, private real scanned uploads/submission attachment revisions, cross-instance denial, A restart leaves B unchanged. Image predates latest mailbox/scheduled inbox changes; not latest-source deployment claim.
+- Initial run9d5dab76 exposed private volume root ownership; Dockerfile now initializes node-owned0700 directory and API startup fails closed on invalid storage. Second run8ecadf2e exposed test submission window null=closed; fixture now explicitly opens synthetic window, production rule unchanged. Both failed own projects stopped, volumes retained.
+- `CONFSYS_ENV_FILE=.instances/30cec03e/a.env node --conditions=development --import tsx scripts/compose.mjs --profile app stop api worker` paused only own generated A writers. `node --conditions=development --import tsx scripts/backup-drill.ts --source-env .instances/30cec03e/a.env --validate-only` passed; same command without validate-only passed, evidence `.restore-drills/ed58cf47/evidence.json`. One file/reference restored with exact checksum, all table counts/sequences/migrations equal; actual app login RLS and pooled context reset pass. Generated PDF/CSV, stored envelope and QR counts all zero, so restoration of populated examples remains unverified. Probe envelope decrypt passed. Source untouched and writers remain paused; restore runs PostgreSQL only.
+- Latest browser run23 cases:22 passed, badge size label failed; fixed explicit label/id and pending rerun. No assertion weakened. Main full integration142/142 passed07:31 before mailbox/release changes. New scoped run43 pass, review suite parse failure from cherry-pick conflict repair fixed; focused review rerun underway.
+- Mailbox agent27 scoped PG tests passed (email6,HTTP1,competitions11,reviews9), recent proof/session revocation/alias conflicts/race covered. Main wiring+contract+40 migration integrated; main typecheck passed after fixing test merge syntax. Notification agent12 PG+2 unit passed with45; worker permission fence and released_at prevents scheduled inbox disclosure before authorized preflight.
+- Next: current-source lint/contract/build/browser; presenter approval44 and competition successor46 with immutable history; Phase6 reporting gaps; complete regression after integration.
