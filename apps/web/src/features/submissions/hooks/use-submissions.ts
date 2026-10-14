@@ -152,7 +152,7 @@ export function useSubmissions(admin = false) {
       setError(
         e instanceof ApiError && e.code === "CONFLICT"
           ? "版本衝突、投稿窗口已關閉，或未符合報名要求。未儲存內容已保留；請重新載入比對。"
-          : "操作失敗：請確認必填欄位、主題與附件，然後重試。",
+          : "操作失敗：請確認必填欄位、主題、報告者信箱與附件 PDF 要求，然後重試。",
       );
     } finally {
       if (ticket === epoch.current) setBusy(false);

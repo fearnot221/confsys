@@ -702,7 +702,7 @@ it("configurable presenter identity and full-paper/slide PDF rules are enforced 
       { id: foreign.id, expectedVersion: foreign.version, action: "submit" },
       rid(),
     ),
-  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
   const ownDoc = {
     ...doc(),
     authors: [

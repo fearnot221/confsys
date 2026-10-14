@@ -187,7 +187,7 @@ export function createSubmissionService(
               .trim()
               .toLowerCase() !== actorEmail
           )
-            throw new AuthError("FORBIDDEN");
+            throw new AuthError("INVALID_REQUEST");
           await dependencies.assertFiles(
             db,
             actor,

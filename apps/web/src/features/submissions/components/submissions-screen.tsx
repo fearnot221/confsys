@@ -66,7 +66,7 @@ export function SubmissionsScreen(p: Props) {
       </header>
       {p.loading && <p role="status">載入中…</p>}
       {p.error && (
-        <div role="alert">
+        <div role="alert" id="submission-error">
           <p>{p.error}</p>
           <button onClick={p.onRetry}>重試讀取</button>
         </div>
@@ -364,7 +364,19 @@ export function SubmissionsScreen(p: Props) {
             稿件編號：{current.number || "尚未儲存"} · 識別碼：{current.id} ·{" "}
             {p.dirty ? "有未儲存內容" : "已載入伺服器版本"}
           </p>
-          <fieldset disabled={readOnly}>
+          <p id="submission-requirements">
+            正式提交需填寫題目、摘要、主題軌、作者姓名／Email／單位，並選擇報告者與通訊作者。
+            {config?.mode === "full_paper"
+              ? "本會議要求至少一份完整論文 PDF。"
+              : ""}
+            {config?.presenterMustBeSubmitter
+              ? "報告者 Email 必須與目前帳號的已驗證信箱相同。"
+              : ""}
+          </p>
+          <fieldset
+            disabled={readOnly}
+            aria-describedby={`submission-requirements${p.error ? " submission-error" : ""}`}
+          >
             <legend>稿件內容</legend>
             <label>
               標題
@@ -664,11 +676,15 @@ export function SubmissionsScreen(p: Props) {
               <button onClick={() => setConfirm(null)}>取消</button>
             </div>
           )}
-          <button onClick={() => setPreview(!preview)} aria-expanded={preview}>
+          <button
+            onClick={() => setPreview(!preview)}
+            aria-expanded={preview}
+            aria-controls="submission-draft-preview"
+          >
             預覽目前草稿
           </button>
           {preview && (
-            <article aria-label="草稿預覽">
+            <article id="submission-draft-preview" aria-label="草稿預覽">
               <p>預覽尚未正式提交的目前內容；不代表已錄取。</p>
               <h3>{d.title || "未命名稿件"}</h3>
               <p style={{ whiteSpace: "pre-wrap" }}>{d.abstract}</p>
@@ -712,7 +728,13 @@ export function SubmissionsScreen(p: Props) {
           <ul>
             {p.revisions.map((r) => (
               <li key={r.id}>
-                <button onClick={() => setHistorical(r.id)}>
+                <button
+                  onClick={() =>
+                    setHistorical(historical === r.id ? null : r.id)
+                  }
+                  aria-expanded={historical === r.id}
+                  aria-controls={`submission-revision-${r.id}`}
+                >
                   版本 {r.version} · {r.submittedAt}
                 </button>
               </li>
@@ -721,7 +743,7 @@ export function SubmissionsScreen(p: Props) {
           {p.revisions
             .filter((r) => r.id === historical)
             .map((r) => (
-              <article key={r.id}>
+              <article key={r.id} id={`submission-revision-${r.id}`}>
                 <h4>{r.document.title}</h4>
                 <p style={{ whiteSpace: "pre-wrap" }}>{r.document.abstract}</p>
                 <ol>

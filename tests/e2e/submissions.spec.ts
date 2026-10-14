@@ -101,6 +101,19 @@ test("admin configures real window; author saves, submits, revises, inspects his
   await author.getByLabel("單位", { exact: true }).fill("Synthetic Institute");
   await author.getByRole("button", { name: "儲存草稿", exact: true }).click();
   await expect(author.getByRole("status")).toContainText("草稿已儲存");
+  const preview = author.getByRole("button", {
+    name: "預覽目前草稿",
+    exact: true,
+  });
+  await preview.click();
+  await expect(preview).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    author
+      .getByRole("article", { name: "草稿預覽" })
+      .getByRole("heading", { name: "Synthetic manuscript", exact: true }),
+  ).toBeVisible();
+  await preview.click();
+  await expect(preview).toHaveAttribute("aria-expanded", "false");
   await author
     .getByRole("button", { name: "正式提交此版本", exact: true })
     .click();
