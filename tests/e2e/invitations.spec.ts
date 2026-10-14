@@ -39,7 +39,7 @@ test("admin invitation email leads verified recipient to explicit acceptance and
   ).toBeVisible();
   await page.getByLabel("已驗證的本地 Email").fill(recipient);
   await page
-    .getByLabel("角色", { exact: true })
+    .getByRole("combobox", { name: "角色", exact: true })
     .selectOption("conference_staff");
   await page.getByLabel("建立／撤銷理由").fill("Synthetic browser invitation");
   await page.getByRole("button", { name: "建立並排入郵件佇列" }).click();

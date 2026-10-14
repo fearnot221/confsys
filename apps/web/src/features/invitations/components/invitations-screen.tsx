@@ -82,13 +82,18 @@ export function InvitationsScreen(props: Props) {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </label>
-            <label>
-              角色
-              <select value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="conference_staff">會議工作人員</option>
-                <option value="conference_admin">會議管理員</option>
-              </select>
-            </label>
+            <label htmlFor="invitation-role">角色</label>
+            <select
+              id="invitation-role"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            >
+              {props.roles.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
             <label>
               建立／撤銷理由
               <input
