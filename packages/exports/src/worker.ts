@@ -4,10 +4,10 @@ import type { Pool, PoolClient } from "pg";
 import { diagnostic, redisOptions, type WorkerConfig } from "@confsys/config";
 import { withIdentityTransaction } from "@confsys/db";
 import { permissionsFor } from "@confsys/policy";
-import { exportJobInput } from "@confsys/contracts";
+import { exportJobInput,type ExportJob } from "@confsys/contracts";
 import { csvCell, CsvBuffer } from "./csv.js";
 const queueName = "data-exports-v1";
-type Kind = "registrations" | "submissions" | "emails";
+type Kind = ExportJob["kind"];
 type Claim = { id: string; kind: Kind; claim_id: string };
 const sources = {
   registrations: {

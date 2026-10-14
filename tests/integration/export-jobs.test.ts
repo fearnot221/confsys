@@ -134,6 +134,23 @@ it("exports beyond1000 rows from one immutable snapshot, neutralizes formulas an
   expect(saved.sha256).toBe(
     createHash("sha256").update(output.bytes).digest("hex"),
   );
+  await expect(
+    f.worker.query("UPDATE confsys.export_jobs SET sha256=NULL WHERE id=$1", [
+      job.id,
+    ]),
+  ).rejects.toMatchObject({ code: "23514" });
+  await expect(
+    f.worker.query(
+      "UPDATE confsys.export_jobs SET row_count=NULL WHERE id=$1",
+      [job.id],
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
+  await expect(
+    f.admin.query(
+      "UPDATE confsys.export_jobs SET expires_at=created_at+interval '25 hours' WHERE id=$1",
+      [job.id],
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
   await f.admin.query(
     "UPDATE confsys.export_jobs SET sha256=repeat('0',64) WHERE id=$1",
     [job.id],
@@ -171,6 +188,22 @@ it("fresh final transaction observes permission/credential revocation after sour
   });
   admin.raw = (await auth.login(admin.email, password, rid())).raw;
   expect((await get(epoch.id)).status).toBe("cancelled");
+  const expiredDuringRead = await make("emails");
+  await processExportJob(f.worker, expiredDuringRead.id, async () => {
+    await f.admin.query(
+      "UPDATE confsys.export_jobs SET created_at=now()-interval '24 hours',expires_at=now()-interval '1 second' WHERE id=$1",
+      [expiredDuringRead.id],
+    );
+  });
+  await recoverExportJobs(f.worker);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT status,csv FROM confsys.export_jobs WHERE id=$1",
+        [expiredDuringRead.id],
+      )
+    ).rows[0],
+  ).toMatchObject({ status: "expired", csv: null });
   const ready = await make("emails");
   await processExportJob(f.worker, ready.id);
   await f.admin.query(
@@ -225,12 +258,24 @@ it("expires database output, bounds concurrent requests and recovers abandoned l
   );
   await recoverExportJobs(f.worker);
   expect((await get(lost.id)).status).toBe("failed");
-  for (let i = 0; i < 5; i++)
-    await service.create(
-      other.raw,
-      { kind: "emails", idempotencyKey: rid() },
-      rid(),
-    );
+  const raced = await Promise.allSettled(
+    Array.from({ length: 6 }, () =>
+      service.create(
+        other.raw,
+        { kind: "emails", idempotencyKey: rid() },
+        rid(),
+      ),
+    ),
+  );
+  expect(raced.filter((result) => result.status === "fulfilled")).toHaveLength(
+    5,
+  );
+  const rejected = raced.filter((result) => result.status === "rejected");
+  expect(rejected).toHaveLength(1);
+  expect(rejected[0]).toMatchObject({
+    status: "rejected",
+    reason: { code: "CONFLICT" },
+  });
   await expect(
     service.create(other.raw, { kind: "emails", idempotencyKey: rid() }, rid()),
   ).rejects.toMatchObject({ code: "CONFLICT" });
