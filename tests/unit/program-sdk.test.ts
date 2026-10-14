@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { createProgramClient } from "../../packages/sdk/src/program.js";
 it("personal schedule uses the authenticated no-store read and rejects private DTO drift", async () => {
   const signal = new AbortController().signal;
-  const calls: { url: string; init?: RequestInit }[] = [];
+  const calls: { url: string; init: RequestInit | undefined }[] = [];
   let leak = false;
   const client = createProgramClient("", async (input, init) => {
     calls.push({ url: String(input), init });
