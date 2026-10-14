@@ -64,6 +64,8 @@ const document = (): SubmissionDocument => ({
     },
   ],
   presenterIndex: 0,
+  correspondingAuthorIndex: 0,
+  keywords: [],
   presentationPreference: "either",
   competition: false,
   attachmentIds: [],
