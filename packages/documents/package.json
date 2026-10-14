@@ -8,11 +8,21 @@
       "development": "./src/index.ts",
       "types": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./worker": {
+      "development": "./src/worker.ts",
+      "types": "./src/worker.ts",
+      "default": "./dist/worker.js"
     }
   },
   "dependencies": {
     "@confsys/contracts": "workspace:*",
     "pdf-lib": "1.17.1",
-    "@pdf-lib/fontkit": "1.1.1"
+    "@pdf-lib/fontkit": "1.1.1",
+    "@confsys/config": "workspace:*",
+    "@confsys/db": "workspace:*",
+    "@confsys/policy": "workspace:*",
+    "qrcode": "1.5.4",
+    "bullmq": "6.3.15"
   }
 }

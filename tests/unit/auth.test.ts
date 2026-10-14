@@ -29,11 +29,13 @@ it("separates process configuration, validates origins and production cookie pol
   const api = loadApiConfig({
     ...settings,
     MIGRATION_DATABASE_URL: "postgres://supersecret@localhost/db",
+    QR_SIGNING_KEY: key,
     WORKER_DATABASE_URL: "postgres://worker@localhost/db",
   });
   expect(api).not.toHaveProperty("MIGRATION_DATABASE_URL");
   expect(api).not.toHaveProperty("WORKER_DATABASE_URL");
   const worker = loadWorkerConfig({
+    QR_SIGNING_KEY: key,
     WORKER_DATABASE_URL: "postgres://worker@localhost/db",
     REDIS_URL: "redis://localhost",
     MAIL_ENCRYPTION_KEY: key,

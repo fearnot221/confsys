@@ -114,6 +114,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       CONFERENCE_NAME: ${CONFERENCE_NAME:?Set conference display name}
+      QR_SIGNING_KEY: ${QR_SIGNING_KEY}
       WORKER_DATABASE_URL: postgresql://confsys_worker:${WORKER_PASSWORD}@postgres:5432/confsys
       REDIS_URL: redis://redis:6379/0
       WORKER_HOST: 0.0.0.0

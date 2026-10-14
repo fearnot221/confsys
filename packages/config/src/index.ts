@@ -97,6 +97,7 @@ export function loadWorkerConfig(env: NodeJS.ProcessEnv = process.env) {
       ...base,
       ...instance,
       ...mailKey,
+      QR_SIGNING_KEY: z.string().regex(/^[a-f0-9]{64}$/),
       WORKER_DATABASE_URL: database,
       REDIS_URL: redis,
       WORKER_HOST: z.string().default("127.0.0.1"),

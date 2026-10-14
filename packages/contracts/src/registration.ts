@@ -18,12 +18,19 @@ export const registrationConfigInput = z.strictObject({expectedVersion:z.number(
 export const answerValue = z.union([z.string().max(4000),z.number().finite(),z.boolean(),z.array(z.string().max(160)).max(30)]);
 export const registrationInput = z.strictObject({idempotencyKey:z.uuid(),configVersion:z.number().int().positive(),ticketId:z.uuid(),badgeName:label,affiliation:z.string().trim().max(300),consent:z.literal(true),answers:z.record(z.string().max(40),answerValue)});
 export type RegistrationInput = z.infer<typeof registrationInput>;
-export const registrationSchema = z.strictObject({id:z.uuid(),number:z.string(),state:z.enum(["confirmed","waitlisted","cancelled"]),ticketName:label,badgeName:label,affiliation:z.string(),configVersion:z.number().int(),answers:z.record(z.string(),answerValue),createdAt:z.iso.datetime(),order:z.strictObject({id:z.uuid(),state:z.enum(["open","cancelled"]),amount:minorAmount,currency:z.string(),paid:minorAmount,refunded:minorAmount}).nullable()});
+export const registrationSchema = z.strictObject({id:z.uuid(),number:z.string(),version:z.number().int().positive(),formFields:z.array(formFieldSchema),state:z.enum(["confirmed","waitlisted","cancelled"]),ticketName:label,badgeName:label,affiliation:z.string(),configVersion:z.number().int(),answers:z.record(z.string(),answerValue),createdAt:z.iso.datetime(),order:z.strictObject({id:z.uuid(),state:z.enum(["open","cancelled"]),amount:minorAmount,currency:z.string(),paid:minorAmount,refunded:minorAmount}).nullable()});
 export type Registration = z.infer<typeof registrationSchema>;
 export const registrationList = z.strictObject({items:z.array(registrationSchema),nextOffset:z.number().int().nullable()});
 export const registrationPage = z.strictObject({offset:z.coerce.number().int().min(0).max(100000).default(0)});
 export const registrationCancel = z.strictObject({id:z.uuid(),reason:z.string().trim().min(3).max(300)});
+export const registrationEdit=z.strictObject({id:z.uuid(),expectedVersion:z.number().int().positive(),badgeName:label,affiliation:z.string().trim().max(300),answers:z.record(z.string().max(40),answerValue),reason:z.string().trim().min(3).max(300)});
+export const registrationPromote=z.strictObject({id:z.uuid(),expectedVersion:z.number().int().positive(),reason:z.string().trim().min(3).max(300)});
+export const registrationHistory=z.strictObject({items:z.array(z.strictObject({version:z.number().int(),before:registrationSchema,after:registrationSchema,reason:z.string(),createdAt:z.iso.datetime()}))});
+export const registrationHistoryInput=z.strictObject({id:z.uuid()});
 export const registrationEndpoints = {
+ registrationEdit:{method:'post',path:'/api/registration/edit',input:registrationEdit,output:registrationSchema},
+ registrationPromote:{method:'post',path:'/api/registration/promote',input:registrationPromote,output:registrationSchema},
+ registrationHistory:{method:'get',path:'/api/registration/history',input:registrationHistoryInput,output:registrationHistory},
  registrationConfig:{method:"get",path:"/api/registration/config",output:registrationConfigResult},
  registrationConfigure:{method:"post",path:"/api/registration/config",input:registrationConfigInput,output:registrationConfigResult},
  registrationMine:{method:"get",path:"/api/registration/mine",input:registrationPage,output:registrationList},

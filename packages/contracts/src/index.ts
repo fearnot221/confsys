@@ -1,3 +1,7 @@
+import {notificationBatchEndpoints} from './notification-batches.js';
+export * from './notification-batches.js';
+import {documentJobEndpoints} from './document-jobs.js';
+export * from './document-jobs.js';
 import {reportingEndpoints} from './reporting.js';
 export * from './reporting.js';
 import {competitionEndpoints} from './competitions.js';
@@ -89,6 +93,8 @@ export function openApiDocument() {
       ...modulePaths(onsiteEndpoints),
       ...modulePaths(competitionEndpoints),
       ...modulePaths(reportingEndpoints),
+      ...modulePaths(notificationBatchEndpoints),
+      ...modulePaths(documentJobEndpoints),
       [routes.instance]: {
         get: {
           operationId: "getInstance",
