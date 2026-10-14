@@ -17,4 +17,4 @@ for record in font["name"].names:
         value = "ConfsysSansTC-Regular" if record.nameID == 6 else "Confsys Sans TC"
         record.string = value.encode(record.getEncoding())
 font.recalcTimestamp = False
-font.save("apps/api/assets/fonts/ConfsysSansTC-Regular.ttf")
+font.save("packages/documents/assets/fonts/ConfsysSansTC-Regular.ttf")

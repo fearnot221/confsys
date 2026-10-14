@@ -18,4 +18,4 @@ badge batch is approximately 4.2 MiB; the font is embedded once per batch. Do no
 subsetting back on without rendered CJK regression evidence. The initial variable/OTF
 experiments were rejected and are not shipped.
 
-Docker runtime must copy `apps/api/assets` beside src/dist.
+Docker runtime must copy `packages/documents/assets` beside src/dist.
