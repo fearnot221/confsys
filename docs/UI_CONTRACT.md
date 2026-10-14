@@ -59,3 +59,7 @@ Presentation imports only contract types, React/UI and other presentation compon
 ## Role invitation surfaces
 
 `features/invitations/hooks` owns account state, invitation mutations, abort/epoch guards, retry idempotency and private-cache clearing. `components/invitations-screen.tsx` and `invitation-acceptance-screen.tsx` only render props and call callbacks. The SDK owns all fetch/CSRF operations. `/admin/invitations` is for role managers; `/auth/invitation#token=…` requires the recipient to log in first and explicitly confirm their password. The fragment is removed immediately and is never persisted in browser storage. After accepting, all previous sessions are revoked and the UI directs the recipient to log in again. Missing/expired/wrong-account invitations show errors rather than granting fallback access.
+
+## Review workbench
+
+`/reviews` is shared by authors, reviewers and scoped chairs; the feature data hook receives authoritative permissions and only enables appropriate server queries. Pure `ReviewsScreen` subcomponents render form configuration, assignment selection, rubric draft/final review, conflict declaration, chair draft/publication and published author results. The SDK owns CSRF, JSON validation and private file fetches. Server errors preserve truthful state; expired sessions clear private queries and abort in-flight mutations. All board candidate/result collections use bounded pages with `nextOffset`; historical form versions remain pinned to assignments.

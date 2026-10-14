@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Invitation } from "@confsys/contracts";
 type Props = {
+  roles: readonly string[];
   expired: boolean;
   canManage: boolean;
   busy: boolean;

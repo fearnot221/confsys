@@ -102,6 +102,7 @@ export function useInvitations() {
   };
   return {
     expired,
+    roles: roleSchema.options,
     canManage,
     busy,
     message,
