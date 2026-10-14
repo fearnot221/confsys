@@ -63,3 +63,13 @@ Presentation imports only contract types, React/UI and other presentation compon
 ## Review workbench
 
 `/reviews` is shared by authors, reviewers and scoped chairs; the feature data hook receives authoritative permissions and only enables appropriate server queries. Pure `ReviewsScreen` subcomponents render form configuration, assignment selection, rubric draft/final review, conflict declaration, chair draft/publication and published author results. The SDK owns CSRF, JSON validation and private file fetches. Server errors preserve truthful state; expired sessions clear private queries and abort in-flight mutations. All board candidate/result collections use bounded pages with `nextOffset`; historical form versions remain pinned to assignments.
+
+### Notification and reporting workspace
+
+Mount `ReportingScreen` with `useReporting()` at `/notifications`. Presentation owns
+only local form controls; SDK owns network calls, hook owns permission-derived view
+flags, abort/lifecycle and server state. The notification list separates read state
+from SMTP acceptance and labels uncertain delivery truthfully. Admin exports offer
+individual bounded CSV pages. Controlled preview has an explicit read-only banner,
+a required reason, no impersonated principal and a close action. All form controls
+have native labels; asynchronous failures/status use alert/status announcements.

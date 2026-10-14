@@ -145,3 +145,24 @@ PostgreSQL `btree_gist` exclusion 約束保護會場 booking、主持人／報�
 排程寫入／發布短交易使用既有 access exclusive fence，與作者 withdrawal、review publication 串行化 eligibility 檢查；一般草稿讀取使用 shared fence。沒有外部 I/O 在鎖內。行政草稿以單一版本做 optimistic concurrency，限制會場100、不可排1000、Session500、slot5000；此界限是 v1 aggregate 保護，超過規模需分頁／分區演進。
 
 安排稿件時只讀 `published_acceptances` 與指定 immutable revision，發表類型必須相符，撤稿不得新安排／發布。發布重新檢查每篇稿件，保存不可改寫 JSON snapshot 與稽核、outbox；重送同版本回傳同一 publication。公開 projection 只有時段、題目、姓名／單位、會場、主持人及壁報編號，不包含 Email、摘要、附件、owner id 或審查資料。已發布版本不因新草稿／後續撤稿自行改寫；行政須移除已撤稿 slot 並重新發布，舊公開快照保留原發布歷史。
+審查角色新增 RLS 可見性後，投稿作者入口仍明確驗證 primary owner；不把「資料庫可以讀到」當作作者授權。此防線有 reviewer RLS 可見但 own detail/save/withdraw 全拒絕的真 PostgreSQL 回歸測試。
+
+## Reporting and notification center (continuous Phase 6)
+
+`reporting` services revalidate the session under the shared access fence. The user's
+business-notification feed uses a narrow security-barrier view and owner-scoped read
+receipts; identity/invitation/reset content and encrypted links never enter that feed.
+Marking read is idempotent and cannot refer to another user's notification.
+
+Explicit `reporting.read`, `reporting.export` and `authors.preview` grants currently
+belong to conference administrators. Exports and previews require recent password
+proof and an atomic audit record. Exports return at most 100 rows with `nextOffset`,
+quoted UTF-8 CSV and spreadsheet-formula neutralization. Separate pages are separate
+live reads, not a historical all-row snapshot. Statistics aggregate current states;
+order amounts are minor units grouped by currency, not net receipts or settlement.
+
+Author preview does not impersonate or swap sessions: the actual admin principal
+remains `app.actor_id`, while an explicit target UUID restricts every query. It
+returns only registration/submission summaries and immutable published author
+feedback, never private review comments, scores, draft decisions, author files or
+author action controls. Each collection is bounded to 100 and `truncated` is explicit.

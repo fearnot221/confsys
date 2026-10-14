@@ -152,3 +152,13 @@ Business mail checkpoint (2026-10-15 06:18 Asia/Taipei): `PATH=/tmp/confsys-tool
 Review checkpoint: `tests/unit/reviews.test.ts` verifies rubric completeness, per-criterion bounds and duplicate/unknown score denial; the focused review/access unit run passed 5/5. `tests/integration/reviews.test.ts` is prepared for real app-role PostgreSQL, real private storage and ClamAV: role/track/self/coauthor restrictions, assignment acceptance, draft/final review concurrency, immutable revision and publication behavior, blinded DTOs, conflict-fenced downloads, decision rollback/outbox, session revocation and chair conflicts. Integration execution is pending the shared synthetic-environment slot and real scanner readiness at this checkpoint; no browser or integration pass is implied by the static checks.
 
 Review verified checkpoint (2026-10-15 06:32 Asia/Taipei): `PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/reviews.test.ts` passed **8/8**, including real ClamAV-backed upload and anonymous authorized download. Earlier scoped run passed 7/7 while scanner startup was pending; the complete run supersedes that limitation. Snapshot preservation after a later conflict, chair conflict declaration and transaction rollback are exercised. No browser review flow has yet been executed at this checkpoint.
+
+### Phase 6 notification/reporting checks
+
+- `pnpm exec vitest run tests/unit/reporting.test.ts`: CSV escaping and formulas,
+  including leading whitespace/control characters.
+- `node --env-file=/path/to/synthetic.env node_modules/vitest/vitest.mjs run tests/integration/reporting.test.ts`:
+  real app-role notification RLS/ownership, read idempotency, session/permission/proof,
+  safe export/preview projections, audited principal preservation, pagination and HTTP CSRF.
+- Reporting exports are bounded live pages, not an asynchronous snapshot export job.
+  Large snapshot exports and richer aggregation remain distinct follow-up scope.

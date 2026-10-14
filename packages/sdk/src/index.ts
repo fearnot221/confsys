@@ -59,3 +59,4 @@ export {createActivitiesClient} from './activities.js';
 export {createOnsiteClient} from "./onsite.js";
 
 export {createDocumentJobsClient} from "./document-jobs.js";
+export { createReportingClient } from './reporting.js';
