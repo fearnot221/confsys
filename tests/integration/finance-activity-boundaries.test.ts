@@ -33,7 +33,7 @@ async function account(admin = false) {
   const login = await auth.login(email, password, rid());
   if (admin)
     await f.admin.query(
-      "INSERT INTO confsys.user_roles(user_id,role) VALUES($1,'conference_admin')",
+      "INSERT INTO confsys.user_roles(user_id,role) VALUES($1,'conference_admin'),($1,'finance')",
       [login.account.user.id],
     );
   return { id: login.account.user.id, email, raw: login.raw };
@@ -89,7 +89,7 @@ beforeAll(async () => {
             name: "Synthetic boundaries",
             capacity: 10,
             waitlist: false,
-            rates: [{ startsAt: start, endsAt: end, amount: "100" }],
+            rates: [{ startsAt: start, endsAt: end, amount: "200" }],
           },
         ],
       },
@@ -146,6 +146,18 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   const users = [owner?.id, other?.id, admin?.id].filter(Boolean);
+  await f.admin.query(
+    "DELETE FROM confsys.refunds WHERE created_by=ANY($1::uuid[])",
+    [users],
+  );
+  await f.admin.query(
+    "DELETE FROM confsys.payment_allocations WHERE created_by=ANY($1::uuid[])",
+    [users],
+  );
+  await f.admin.query(
+    "DELETE FROM confsys.payments WHERE payer_id=ANY($1::uuid[])",
+    [users],
+  );
   await f.admin.query(
     "DELETE FROM confsys.order_payers WHERE granted_by=ANY($1::uuid[])",
     [users],
@@ -292,6 +304,87 @@ it("database composite keys reject own booking rows pointing at another registra
       }),
     ).rejects.toMatchObject({ code: "23503" });
   }
+});
+it("paginates more than100 allocations independently from order pages, filters scope and refunds an older allocation through HTTP", async () => {
+  const payment = await finance.submit(
+    owner.raw,
+    {
+      idempotencyKey: rid(),
+      amount: "101",
+      currency: "TWD",
+      reference: `synthetic-pagination-${rid()}`,
+      evidenceFileId: null,
+    },
+    rid(),
+  );
+  await finance.verify(
+    admin.raw,
+    { id: payment.id, action: "verify", reason: "Synthetic verified transfer" },
+    rid(),
+  );
+  for (let i = 0; i < 101; i++)
+    await finance.allocate(
+      admin.raw,
+      {
+        idempotencyKey: rid(),
+        paymentId: payment.id,
+        orderId: ownerOrder,
+        amount: "1",
+        reason: "Synthetic partial allocation history",
+      },
+      rid(),
+    );
+  const first = await finance.dashboard(owner.raw, "own", 1000, 0, ownerOrder);
+  expect(first.orders).toHaveLength(0);
+  expect(first.payments).toHaveLength(0);
+  expect(first.allocations).toHaveLength(100);
+  expect(first.allocationsNextOffset).toBe(100);
+  const second = await finance.dashboard(
+    owner.raw,
+    "own",
+    1000,
+    100,
+    ownerOrder,
+  );
+  expect(second.allocations).toHaveLength(1);
+  expect(second.allocationsNextOffset).toBeNull();
+  expect(
+    new Set([...first.allocations, ...second.allocations].map((a) => a.id))
+      .size,
+  ).toBe(101);
+  expect(
+    (await finance.dashboard(other.raw, "own", 0, 0, ownerOrder)).allocations,
+  ).toEqual([]);
+  expect(
+    (await finance.dashboard(admin.raw, "own", 0, 0, ownerOrder)).allocations,
+  ).toEqual([]);
+  expect(
+    (await finance.dashboard(admin.raw, "admin", 0, 0, otherOrder)).allocations,
+  ).toEqual([]);
+  const response = await app.inject({
+    url: `/api/finance/dashboard?scope=own&allocationOffset=100&allocationOrderId=${ownerOrder}`,
+    headers: { cookie: `${cookiePolicy(f.config).name}=${owner.raw}` },
+  });
+  expect(response.statusCode, response.body).toBe(200);
+  expect(response.json().allocations).toHaveLength(1);
+  expect(response.json().allocationsNextOffset).toBeNull();
+  const invalid = await app.inject({
+    url: "/api/finance/dashboard?allocationOffset=-1",
+    headers: { cookie: `${cookiePolicy(f.config).name}=${owner.raw}` },
+  });
+  expect(invalid.statusCode).toBe(400);
+  const refund = await post(admin.raw, "/api/finance/refund", {
+    idempotencyKey: rid(),
+    allocationId: second.allocations[0]!.id,
+    amount: "1",
+    reference: `synthetic-old-refund-${rid()}`,
+    reason: "Refund old allocation reached through independent pager",
+  });
+  expect(refund.statusCode, refund.body).toBe(200);
+  expect(
+    (await finance.dashboard(owner.raw, "own", 0, 100, ownerOrder))
+      .allocations[0]?.refunded,
+  ).toBe("1");
 });
 it("activity and registration HTTP cancellation share deadline policy; admin cascade is audited and atomic", async () => {
   const booking = await activities.book(

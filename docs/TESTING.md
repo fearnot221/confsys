@@ -204,3 +204,8 @@ RLS without actor context and across owners, forged booking foreign keys, disabl
 payer revocation/reactivation, and HTTP cancellation deadline equivalence between
 activity and registration endpoints. It creates only synthetic records and
 restores the previous registration configuration pointer after cleanup.
+
+The finance/activity boundary suite also creates 101 real partial allocations,
+walks the independent allocation pager with an order filter, verifies own/admin
+scope separation, and refunds an older allocation through authenticated HTTP.
+Payment/order pagination cannot silently hide this allocation history.

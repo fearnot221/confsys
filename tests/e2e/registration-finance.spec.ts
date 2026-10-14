@@ -272,6 +272,30 @@ test("conditional registration and price snapshots -> group reconciliation -> re
     }
     expect((await mine(page)).order.paid).toBe("100");
     expect((await mine(second)).order.paid).toBe("200");
+    await admin
+      .getByLabel("分配紀錄訂單 ID（留白查全部授權紀錄）", { exact: true })
+      .fill(first.order.id);
+    const filtered = admin.waitForResponse(
+      (r) =>
+        r.url().includes("/api/finance/dashboard?") &&
+        r.url().includes(`allocationOrderId=${first.order.id}`),
+    );
+    await admin
+      .getByRole("button", { name: "套用分配篩選", exact: true })
+      .click();
+    expect((await filtered).ok()).toBe(true);
+    await expect(
+      admin.locator("li").filter({ hasText: first.order.id }),
+    ).toHaveCount(1);
+    await expect(
+      admin.locator("li").filter({ hasText: other.order.id }),
+    ).toHaveCount(0);
+    await expect(
+      admin.getByRole("button", { name: "上一頁分配紀錄", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      admin.getByRole("button", { name: "下一頁分配紀錄", exact: true }),
+    ).toBeDisabled();
     await admin.goto("/admin/receipts");
     await admin
       .getByLabel("已全額核帳的訂單 ID", { exact: true })

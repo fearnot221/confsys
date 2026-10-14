@@ -132,3 +132,11 @@ The current activity version and database clock determine the cutoff. An ordinar
 owner cannot bypass a closed activity deadline by cancelling its registration;
 an administrative cancellation requires the existing reason/audit flow. Redemption
 constraints still apply to administrators, and refunds remain separate operations.
+
+Finance dashboards use separate `allocationOffset` / `allocationsNextOffset`
+controls (100 rows per allocation page) and an optional `allocationOrderId` filter.
+The allocation query checks the requested own/admin scope independently of the
+20-row payment/order page, so historical allocations remain reachable for refund.
+Changing the order/payment page resets the allocation offset; SDK and data-hook
+cache keys include all filters. Presentation renders the pager and historical IDs
+without performing network calls or reconstructing business permissions.
