@@ -1,3 +1,7 @@
+export * from "./documents.js";
+export * from "./program.js";
+import {receiptEndpoints} from "./documents.js";
+import {programEndpoints} from "./program.js";
 import {reviewEndpoints} from "./reviews.js";
 export * from "./reviews.js";
 import {financeEndpoints} from "./finance.js";
@@ -71,6 +75,8 @@ export function openApiDocument() {
       ...modulePaths(registrationEndpoints),
       ...modulePaths(reviewEndpoints),
       ...modulePaths(financeEndpoints),
+      ...modulePaths(receiptEndpoints),
+      ...modulePaths(programEndpoints),
       [routes.instance]: {
         get: {
           operationId: "getInstance",

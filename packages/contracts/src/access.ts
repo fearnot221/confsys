@@ -21,6 +21,8 @@ export const permissionSchema = z.enum([
   "reviews.manage",
   "reviews.assigned",
   "reviews.decide",
+  "program.manage",
+  "program.publish",
 ]);
 export type Role = z.infer<typeof roleSchema>;
 export type Permission = z.infer<typeof permissionSchema>;

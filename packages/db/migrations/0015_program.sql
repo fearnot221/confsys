@@ -1,0 +1,15 @@
+-- btree_gist combines UUID/text equality with temporal exclusion in PostgreSQL.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+CREATE TABLE confsys.program_rooms(id uuid PRIMARY KEY,name text NOT NULL,venue text NOT NULL,buffer_minutes integer NOT NULL CHECK(buffer_minutes BETWEEN 0 AND 120));
+CREATE TABLE confsys.program_room_bookings(id uuid PRIMARY KEY,room_id uuid NOT NULL REFERENCES confsys.program_rooms(id),kind text NOT NULL CHECK(kind IN('session','blocked')),starts_at timestamptz NOT NULL,ends_at timestamptz NOT NULL,reason text NOT NULL DEFAULT '',CHECK(starts_at<ends_at),EXCLUDE USING gist(room_id WITH =,tstzrange(starts_at,ends_at,'[)') WITH &&));
+CREATE TABLE confsys.program_sessions(id uuid PRIMARY KEY REFERENCES confsys.program_room_bookings(id),room_id uuid NOT NULL REFERENCES confsys.program_rooms(id),title text NOT NULL,starts_at timestamptz NOT NULL,ends_at timestamptz NOT NULL,chair_name text NOT NULL,chair_email text NOT NULL,CHECK(starts_at<ends_at));
+CREATE TABLE confsys.program_slots(id uuid PRIMARY KEY,session_id uuid NOT NULL REFERENCES confsys.program_sessions(id),kind text NOT NULL CHECK(kind IN('oral','poster','invited')),revision_id uuid REFERENCES confsys.submission_revisions(id),submission_id uuid REFERENCES confsys.submissions(id),owner_id uuid REFERENCES confsys.users(id),title text NOT NULL,presenter_name text NOT NULL,presenter_affiliation text NOT NULL,presenter_key text NOT NULL,starts_at timestamptz NOT NULL,ends_at timestamptz NOT NULL,poster_number integer UNIQUE CHECK(poster_number>0),CHECK(starts_at<ends_at),CHECK((kind='invited')=(revision_id IS NULL)),CHECK((kind='poster')=(poster_number IS NOT NULL)),EXCLUDE USING gist(session_id WITH =,tstzrange(starts_at,ends_at,'[)') WITH &&) WHERE(kind<>'poster'));
+CREATE UNIQUE INDEX program_submission_once ON confsys.program_slots(submission_id) WHERE submission_id IS NOT NULL;
+CREATE TABLE confsys.program_person_bookings(source_id uuid NOT NULL,person_key text NOT NULL,starts_at timestamptz NOT NULL,ends_at timestamptz NOT NULL,PRIMARY KEY(source_id,person_key),CHECK(starts_at<ends_at),EXCLUDE USING gist(person_key WITH =,tstzrange(starts_at,ends_at,'[)') WITH &&));
+CREATE TABLE confsys.program_publications(id uuid PRIMARY KEY,source_version integer NOT NULL UNIQUE,document jsonb NOT NULL,published_by uuid NOT NULL REFERENCES confsys.users(id),published_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE confsys.program_state(singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),version integer NOT NULL DEFAULT 0,active_publication_id uuid REFERENCES confsys.program_publications(id));
+INSERT INTO confsys.program_state(singleton) VALUES(true);
+GRANT SELECT,INSERT,UPDATE,DELETE ON confsys.program_rooms,confsys.program_room_bookings,confsys.program_sessions,confsys.program_slots,confsys.program_person_bookings TO confsys_app;
+GRANT SELECT,INSERT ON confsys.program_publications TO confsys_app;
+GRANT SELECT,UPDATE(version,active_publication_id) ON confsys.program_state TO confsys_app;
+-- No worker access or runtime rewrite/delete of public history.

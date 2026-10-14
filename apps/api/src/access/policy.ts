@@ -21,6 +21,8 @@ export const rolePermissions: Readonly<Record<Role, readonly Permission[]>> = {
     "submissions.manage",
     "submissions.read_all",
     "reviews.manage",
+    "program.manage",
+    "program.publish",
   ],
 };
 export function permissionsFor(roles: readonly string[]): Permission[] {
