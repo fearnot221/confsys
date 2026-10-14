@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { PresenterChange, Submission } from "@confsys/contracts";
 type CreateInput = {
   submissionId: string;
@@ -134,6 +134,14 @@ export function PresenterChangesScreen(props: Props) {
     targetAuthorIndex: 1,
     reason: "",
   });
+  useEffect(() => {
+    const selected = props.candidates.find((s) => s.id === draft.submissionId);
+    if (
+      draft.submissionId &&
+      (!selected || selected.version !== draft.expectedSubmissionVersion)
+    )
+      setDraft((d) => ({ ...d, submissionId: "", sourceRevisionId: "" }));
+  }, [props.candidates, draft.submissionId, draft.expectedSubmissionVersion]);
   return (
     <main className="mx-auto max-w-4xl space-y-5 p-6">
       <h1 className="text-2xl font-semibold">報告者變更</h1>
@@ -200,6 +208,12 @@ export function PresenterChangesScreen(props: Props) {
                           sourceRevisionId: submission.currentRevisionId ?? "",
                           expectedSubmissionVersion: submission.version,
                           targetAuthorIndex: submission.document.presenterIndex,
+                        });
+                      else
+                        setDraft({
+                          ...draft,
+                          submissionId: "",
+                          sourceRevisionId: "",
                         });
                     }}
                     className="block w-full border p-2"

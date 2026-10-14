@@ -90,6 +90,9 @@ export function usePresenterChanges(administrative = false) {
         queryKey: ["private", "presenter-changes"],
       });
       await queries.invalidateQueries({ queryKey: ["private", "submissions"] });
+      await queries.invalidateQueries({
+        queryKey: ["private", "presenter-candidates"],
+      });
       setMessage(
         "申請已更新。核准後仍須新的錄取結果及議程／競賽作業；既有公開版本保留原內容。",
       );
@@ -131,8 +134,8 @@ export function usePresenterChanges(administrative = false) {
       error ||
       (!account.isPending && !canUse
         ? "登入失效或沒有管理權限。"
-        : list.error
-          ? "無法讀取申請。"
+        : list.error || candidates.error
+          ? "無法讀取申請或可選投稿，請重新載入。"
           : ""),
     message,
     changeScope: (value: "own" | "incoming") => {
@@ -140,7 +143,11 @@ export function usePresenterChanges(administrative = false) {
       setOffset(0);
     },
     page: (value: number) => setOffset(value),
-    reload: () => list.refetch(),
+    reload: () =>
+      Promise.all([
+        list.refetch(),
+        ...(!administrative ? [candidates.refetch()] : []),
+      ]),
     create: (data: {
       submissionId: string;
       sourceRevisionId: string;
