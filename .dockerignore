@@ -16,3 +16,6 @@ test-results
 .private-storage/
 
 .tools/
+
+output/
+coordination/

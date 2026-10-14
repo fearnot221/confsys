@@ -27,6 +27,7 @@ export const permissionSchema = z.enum([
   "onsite.checkin",
   "onsite.redeem",
   "onsite.undo",
+  "documents.template.manage",
   "competitions.manage",
   "reporting.read",
   "reporting.export",

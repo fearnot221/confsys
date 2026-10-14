@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../helpers/browser-test.js";
 import { randomUUID } from "node:crypto";
 import { bootstrapAdministrator } from "../../apps/api/src/access/bootstrap.js";
 import { authFixture } from "../helpers/auth.js";

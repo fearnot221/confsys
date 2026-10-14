@@ -566,6 +566,9 @@ it("optional pages publish atomically, disappear only after next publication, an
   const result=await server.inject({url:'/en/news',headers});
   expect(result.statusCode).toBe(200);
   expect(result.body).toContain('&lt;script&gt;');
+  expect(result.body).toContain('property="og:title" content="大會公告"');
+  expect(result.body).toContain(`property="og:url" content="${f.config.PUBLIC_APP_ORIGIN}/en/news"`);
+  expect(result.body).toContain('property="og:locale" content="en_US"');
   expect(result.body).not.toContain('<script>alert');
   expect((await server.inject({url:'/sitemap.xml',headers})).body).toContain('/en/news');
   delete doc.translations['zh-Hant'].pages.news;

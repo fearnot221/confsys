@@ -1,3 +1,6 @@
+import {downloadPaths} from "./download-paths.js";
+import {badgeTemplateEndpoints} from "./badge-template.js";
+export * from "./badge-template.js";
 import {exportJobEndpoints} from "./export-jobs.js";
 export * from "./export-jobs.js";
 import {notificationBatchEndpoints} from './notification-batches.js';
@@ -98,7 +101,8 @@ export function openApiDocument() {
       ...modulePaths(notificationBatchEndpoints),
       ...modulePaths(documentJobEndpoints),
       ...modulePaths(exportJobEndpoints),
-      "/api/reporting/export-jobs/{id}/download": {get:{operationId:"exportJobDownload",parameters:[{in:"path",name:"id",required:true,schema:{type:"string",format:"uuid"}}],responses:{"200":{description:"Private CSV snapshot; requires current reporting.export and recent password proof",content:{"text/csv":{schema:{type:"string"}}}},"401":{description:"Authentication required"},"403":{description:"Permission or recent proof required"},"404":{description:"Owned export not found"},"409":{description:"Export unavailable or expired"}}}},
+      ...modulePaths(badgeTemplateEndpoints),
+      ...downloadPaths(errorSchema),
       [routes.instance]: {
         get: {
           operationId: "getInstance",

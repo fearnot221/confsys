@@ -127,6 +127,9 @@ services:
       WORKER_DATABASE_URL: postgresql://confsys_worker:${WORKER_PASSWORD}@postgres:5432/confsys
       REDIS_URL: redis://redis:6379/0
       WORKER_HOST: 0.0.0.0
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-noreply@confsys.invalid}
+      MAIL_REPLY_TO_ADDRESS: ${MAIL_REPLY_TO_ADDRESS:-support@confsys.invalid}
+      MAIL_ENVELOPE_FROM: ${MAIL_ENVELOPE_FROM:-bounce@confsys.invalid}
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       MAIL_KEY_VERSION: ${MAIL_KEY_VERSION}

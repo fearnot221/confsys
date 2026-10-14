@@ -10,6 +10,7 @@ import {
   createReceiptsClient,
   createReviewClient,
   createReportingClient,
+  createProgramClient,
 } from "@confsys/sdk";
 import {
   registrationList,
@@ -19,6 +20,7 @@ import {
   financeDashboard,
   activityBookings,
   receiptList,
+  programPublicSchema,
   type Permission,
 } from "@confsys/contracts";
 import type {
@@ -32,7 +34,8 @@ const auth = createAuthClient(),
   activities = createActivitiesClient(),
   receipts = createReceiptsClient(),
   reviews = createReviewClient(),
-  reporting = createReportingClient();
+  reporting = createReportingClient(),
+  program = createProgramClient();
 const managementLinks: readonly {
   permission: Permission;
   title: string;
@@ -97,6 +100,7 @@ const managementLinks: readonly {
     title: "批次名牌文件",
     href: "/admin/documents",
   },
+  {permission: "documents.template.manage", title: "名牌模板", href: "/admin/badge-template"},
   {
     permission: "reporting.read",
     title: "統計與受控作者預覽",
@@ -138,6 +142,8 @@ export function useDashboard(): DashboardView {
         notices,
         regConfig,
         paperConfig,
+        personalProgram,
+        assignedReviews,
       ] = await Promise.all([
         registration
           .call("registrationMine", { offset: 0 }, signal)
@@ -162,6 +168,8 @@ export function useDashboard(): DashboardView {
         submissions("submissionConfig", null, signal).then((value) =>
           submissionConfigSchema.parse(value),
         ),
+        program("programMine",null,signal).then(value=>programPublicSchema.parse(value)),
+        account.data!.user.permissions.includes('reviews.assigned')?reviews.assigned(0,signal):Promise.resolve(null),
       ]);
       const sections: DashboardSection[] = [
         {
@@ -228,7 +236,10 @@ export function useDashboard(): DashboardView {
           more: notices.nextOffset !== null,
         },
       ];
+      sections.push({title:'我的已發布發表時段',href:'/program',more:false,rows:personalProgram.sessions.flatMap(session=>session.slots.map(slot=>({id:slot.id,text:`${slot.title} · ${slot.startsAt}–${slot.endsAt} · ${session.venue} ${session.roomName}${slot.posterNumber?` · 壁報 ${slot.posterNumber}`:''}`})))});
+      if(assignedReviews)sections.push({title:'我的審查任務',href:'/reviews',more:assignedReviews.nextOffset!==null,rows:assignedReviews.items.map(assignment=>({id:assignment.id,text:`${assignment.paper.title} · ${assignment.state} · 截止 ${assignment.form.document.closesAt}`}))});
       const deadlines = [
+        ...(assignedReviews?.items.filter(item=>["invited","accepted"].includes(item.state)).map(item=>({title:`審查：${item.paper.title}`,at:item.form.document.closesAt}))??[]),
         ...(regConfig.document
           ? [{ title: "報名截止", at: regConfig.document.closesAt }]
           : []),

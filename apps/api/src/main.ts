@@ -1,3 +1,5 @@
+import { createBadgeTemplateService } from "./badge-template/service.js";
+import { registerBadgeTemplateRoutes } from "./badge-template/routes.js";
 import { createExportJobsService } from "./export-jobs/service.js";
 import { registerExportJobRoutes } from "./export-jobs/routes.js";
 import { createNotificationBatchService } from "./notification-batches/service.js";
@@ -129,6 +131,7 @@ registerReviewRoutes(
 registerProgramRoutes(app, config, createProgramService(pool, config));
 registerOnsiteRoutes(app, config, createOnsiteService(pool, config));
 registerDocumentJobRoutes(app, config, createDocumentJobsService(pool, config));
+registerBadgeTemplateRoutes(app, config, createBadgeTemplateService(pool, config));
 registerReportingRoutes(app, config, createReportingService(pool, config));
 registerCompetitionRoutes(app, config, createCompetitionService(pool, config));
 registerNotificationBatchRoutes(

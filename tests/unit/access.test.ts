@@ -36,6 +36,7 @@ it("fixed explicit grants deny unknown roles, permissions and missing actors", (
     "onsite.checkin",
     "onsite.redeem",
     "onsite.undo",
+  "documents.template.manage",
     "competitions.manage",
     "reporting.read",
     "reporting.export",

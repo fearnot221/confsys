@@ -23,7 +23,7 @@ const server = http.createServer(async (req, res) => {
     /^\/auth\/(login|register|waiting|verify|forgot|reset|account|invitation)$/.test(
       pathname,
     ) ||
-    ["/dashboard", "/admin/exports", "/access/accounts", "/admin/site", "/admin/invitations", "/account/files", "/registration", "/admin/registration", "/submissions", "/admin/submissions", "/finance", "/admin/finance", "/admin/notifications", "/onsite/pass", "/admin/onsite", "/admin/documents", "/notifications", "/competitions", "/admin/competitions", "/judging", "/competition-awards", "/activities", "/admin/activities", "/reviews", "/program", "/admin/program", "/receipts", "/admin/receipts", "/system/status"].includes(pathname);
+    ["/admin/badge-template", "/dashboard", "/admin/exports", "/access/accounts", "/admin/site", "/admin/invitations", "/account/files", "/registration", "/admin/registration", "/submissions", "/admin/submissions", "/finance", "/admin/finance", "/admin/notifications", "/onsite/pass", "/admin/onsite", "/admin/documents", "/notifications", "/competitions", "/admin/competitions", "/judging", "/competition-awards", "/activities", "/admin/activities", "/reviews", "/program", "/admin/program", "/receipts", "/admin/receipts", "/system/status"].includes(pathname);
   if (!spa && !pathname.startsWith("/assets/")) {
     const upstream = http.request(
       {

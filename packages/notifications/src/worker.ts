@@ -215,7 +215,7 @@ export async function dispatchNotifications(pool: Pool, queue: Queue) {
     );
 }
 export function createMailSender(
-  config: Pick<WorkerConfig, "SMTP_HOST" | "SMTP_PORT">,
+  config: Pick<WorkerConfig, "SMTP_HOST" | "SMTP_PORT" | "MAIL_FROM_ADDRESS" | "MAIL_REPLY_TO_ADDRESS" | "MAIL_ENVELOPE_FROM">,
 ) {
   const transport = nodemailer.createTransport({
     host: config.SMTP_HOST,
@@ -231,7 +231,9 @@ export function createMailSender(
   const send: SendMail = async (mail) => {
     const result = await transport.sendMail({
       ...mail,
-      from: "Conference <noreply@confsys.invalid>",
+      from: {name: "Conference", address: config.MAIL_FROM_ADDRESS},
+      replyTo: config.MAIL_REPLY_TO_ADDRESS,
+      envelope: {from: config.MAIL_ENVELOPE_FROM, to: mail.to},
     });
     return { messageId: result.messageId };
   };

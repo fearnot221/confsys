@@ -1,0 +1,26 @@
+import {test,expect} from '../helpers/browser-test.js';
+import {authFixture} from '../helpers/auth.js';
+import {register,login} from '../helpers/browser-account.js';
+const fixture=authFixture();
+test.afterAll(async()=>fixture.cleanup());
+test('personal workspace uses real owner projections, reports unavailable data and clears revoked sessions',async({page})=>{
+ const email=fixture.email();
+ await register(page,email);await login(page,email);
+ await page.getByRole('link',{name:'開啟我的研討會工作台'}).click();
+ await expect(page.getByRole('heading',{name:'我的研討會工作台'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'已發布結果',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'報名',exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:'人工核帳、團體分配與退款'})).toHaveCount(0);
+ await page.route('**/api/registration/mine**',route=>route.abort());
+ await page.getByRole('button',{name:'重新整理工作台'}).click();
+ await expect(page.getByRole('alert')).toContainText('資料載入失敗');
+ await expect(page.getByRole('heading',{name:'報名',exact:true})).toHaveCount(0);
+ await page.unroute('**/api/registration/mine**');
+ await page.getByRole('button',{name:'重新整理工作台'}).click();
+ await expect(page.getByRole('heading',{name:'報名',exact:true})).toBeVisible();
+ await fixture.admin.query('UPDATE confsys.users SET credential_version=credential_version+1 WHERE email=$1',[email]);
+ await page.getByRole('button',{name:'重新整理工作台'}).click();
+ await expect(page.getByRole('link',{name:'重新登入',exact:true})).toBeVisible();
+ await expect(page.getByText(email,{exact:true})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'報名',exact:true})).toHaveCount(0);
+});

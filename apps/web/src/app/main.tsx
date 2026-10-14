@@ -25,6 +25,7 @@ const AwardsApp=lazy(()=>import("../features/competitions/entry.js").then(module
 const NotificationBatchesApp=lazy(()=>import("../features/notification-batches/entry.js").then(module=>({default:module.NotificationBatchesApp})));
 const ExportJobsApp=lazy(()=>import("../features/export-jobs/entry.js").then(module=>({default:module.ExportJobsApp})));
 const DashboardApp=lazy(()=>import("../features/dashboard/entry.js").then(module=>({default:module.DashboardApp})));
+const BadgeTemplateApp=lazy(()=>import("../features/documents/entry.js").then(module=>({default:module.BadgeTemplateApp})));
 class ErrorBoundary extends Component<
   { children: ReactNode },
   { failed: boolean }
@@ -49,6 +50,7 @@ class ErrorBoundary extends Component<
 }
 const pages:Record<string,ReactNode>={
  "/dashboard":<DashboardApp/>,
+ "/admin/badge-template":<BadgeTemplateApp/>,
  "/admin/exports":<ExportJobsApp/>,
  "/admin/notifications":<NotificationBatchesApp/>,
  "/onsite/pass":<OnsiteApp/>,

@@ -40,6 +40,9 @@ function authDefaults() {
     MAIL_ENCRYPTION_KEY: randomBytes(32).toString("hex"),
     QR_SIGNING_KEY: randomBytes(32).toString("hex"),
     CSRF_SIGNING_KEY: randomBytes(32).toString("hex"),
+    MAIL_FROM_ADDRESS: "noreply@confsys.invalid",
+    MAIL_REPLY_TO_ADDRESS: "support@confsys.invalid",
+    MAIL_ENVELOPE_FROM: "bounce@confsys.invalid",
     SMTP_HOST: "127.0.0.1",
     SMTP_PORT: String(smtpPort),
   };
