@@ -391,3 +391,134 @@ it("personal data export requires an operator purpose and records it without add
     ),
   ).rejects.toBeDefined();
 });
+
+it("reports grouped allocations without refund double counting and keeps draft vs public program aggregates distinct", async () => {
+  const version = Number(
+      (
+        await f.admin.query(
+          "SELECT coalesce(max(version),0)+1 AS next FROM confsys.registration_config_versions",
+        )
+      ).rows[0].next,
+    ),
+    regs = [rid(), rid()],
+    orders = [rid(), rid()],
+    payment = rid(),
+    allocations = [rid(), rid()],
+    publication = rid();
+  const previous = (
+    await f.admin.query(
+      "SELECT active_publication_id FROM confsys.program_state WHERE singleton",
+    )
+  ).rows[0].active_publication_id;
+  const sourceVersion = Number(
+    (
+      await f.admin.query(
+        "SELECT coalesce(max(source_version),0)+1 AS next FROM confsys.program_publications",
+      )
+    ).rows[0].next,
+  );
+  await f.admin.query(
+    "INSERT INTO confsys.registration_config_versions(version,document,created_by) VALUES($1,$2,$3)",
+    [version, {}, admin.id],
+  );
+  try {
+    for (let i = 0; i < 2; i++) {
+      const user = [owner.id, other.id][i];
+      await f.admin.query(
+        "INSERT INTO confsys.registrations(id,user_id,config_version,ticket_id,ticket_name,state,badge_name,affiliation,answers,consent_snapshot,idempotency_key,request_hash) VALUES($1,$2,$3,$4,'Synthetic','confirmed','Synthetic','Test','{}','Synthetic consent',$5,'synthetic-stats')",
+        [regs[i], user, version, rid(), rid()],
+      );
+      await f.admin.query(
+        "INSERT INTO confsys.orders(id,registration_id,user_id,state,amount,currency) VALUES($1,$2,$3,'open',100,'ZZZ')",
+        [orders[i], regs[i], user],
+      );
+    }
+    await f.admin.query(
+      "INSERT INTO confsys.payments(id,payer_id,state,amount,currency,reference,idempotency_key,request_hash) VALUES($1,$2,'verified',200,'ZZZ',$3,$4,'synthetic-stats')",
+      [payment, admin.id, rid(), rid()],
+    );
+    for (let i = 0; i < 2; i++)
+      await f.admin.query(
+        "INSERT INTO confsys.payment_allocations(id,payment_id,order_id,amount,created_by,idempotency_key,request_hash) VALUES($1,$2,$3,100,$4,$5,'synthetic-stats')",
+        [allocations[i], payment, orders[i], admin.id, rid()],
+      );
+    await f.admin.query(
+      "INSERT INTO confsys.refunds(id,allocation_id,amount,reference,reason,created_by,idempotency_key,request_hash) VALUES($1,$2,25,$3,'Synthetic refund',$4,$5,'synthetic-stats')",
+      [rid(), allocations[0], rid(), admin.id, rid()],
+    );
+    await f.admin.query(
+      "INSERT INTO confsys.program_publications(id,source_version,document,published_by) VALUES($1,$2,$3,$4)",
+      [
+        publication,
+        sourceVersion,
+        JSON.stringify([
+          { slots: [{ kind: "oral" }, { kind: "oral" }, { kind: "poster" }] },
+        ]),
+        admin.id,
+      ],
+    );
+    await f.admin.query(
+      "UPDATE confsys.program_state SET active_publication_id=$1 WHERE singleton",
+      [publication],
+    );
+    const result = await service.stats(admin.raw);
+    expect(result.groupPayments.find((r) => r.currency === "ZZZ")).toEqual({
+      state: "verified",
+      currency: "ZZZ",
+      payments: 1,
+      payers: 1,
+      participants: 2,
+      declaredAmount: "200",
+      allocatedAmount: "200",
+      refundedAmount: "25",
+    });
+    expect(result.program.published).toEqual([
+      { kind: "oral", count: 2 },
+      { kind: "poster", count: 1 },
+    ]);
+    expect(result.program.publishedAt).not.toBeNull();
+    await withIdentityTransaction(f.app, async (db) => {
+      expect(
+        (await db.query("SELECT * FROM confsys.reporting_program_totals"))
+          .rowCount,
+      ).toBe(0);
+      await db.query("SELECT set_config('app.actor_id',$1,true)", [owner.id]);
+      expect(
+        (await db.query("SELECT * FROM confsys.reporting_program_totals"))
+          .rowCount,
+      ).toBe(0);
+    });
+    expect(JSON.stringify(result.program)).not.toMatch(
+      /email|chair|presenter|title|owner/i,
+    );
+  } finally {
+    await f.admin.query(
+      "UPDATE confsys.program_state SET active_publication_id=$1 WHERE singleton",
+      [previous],
+    );
+    await f.admin.query(
+      "DELETE FROM confsys.program_publications WHERE id=$1",
+      [publication],
+    );
+    await f.admin.query(
+      "DELETE FROM confsys.refunds WHERE allocation_id=ANY($1::uuid[])",
+      [allocations],
+    );
+    await f.admin.query(
+      "DELETE FROM confsys.payment_allocations WHERE id=ANY($1::uuid[])",
+      [allocations],
+    );
+    await f.admin.query("DELETE FROM confsys.payments WHERE id=$1", [payment]);
+    await f.admin.query("DELETE FROM confsys.orders WHERE id=ANY($1::uuid[])", [
+      orders,
+    ]);
+    await f.admin.query(
+      "DELETE FROM confsys.registrations WHERE id=ANY($1::uuid[])",
+      [regs],
+    );
+    await f.admin.query(
+      "DELETE FROM confsys.registration_config_versions WHERE version=$1",
+      [version],
+    );
+  }
+});

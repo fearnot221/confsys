@@ -50,7 +50,20 @@ export async function stats(db: PoolClient) {
   // One statement has one MVCC snapshot across domains; no totals assembled from
   // unrelated timestamps. Currency totals remain exact text minor units.
   const row = (
-    await db.query(`SELECT statement_timestamp() AS as_of,
+    await db.query(`WITH group_payment_summary AS (
+ SELECT p.id,p.payer_id,p.state,p.currency,p.amount,
+ sum(a.amount) AS allocated,
+ sum(coalesce((SELECT sum(r.amount) FROM confsys.refunds r WHERE r.allocation_id=a.id),0)) AS refunded
+ FROM confsys.payments p JOIN confsys.payment_allocations a ON a.payment_id=p.id JOIN confsys.orders o ON o.id=a.order_id
+ GROUP BY p.id,p.payer_id,p.state,p.currency,p.amount HAVING count(DISTINCT o.user_id)>=2
+ ) SELECT statement_timestamp() AS as_of,
+ (SELECT jsonb_build_object('draft',draft,'published',published) FROM confsys.reporting_program_totals) AS program,
+ (SELECT published_at FROM confsys.reporting_program_totals) AS program_published_at,
+ (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (
+ SELECT s.state,s.currency,count(*)::integer AS payments,count(DISTINCT s.payer_id)::integer AS payers,
+ (SELECT count(DISTINCT o.user_id)::integer FROM confsys.payment_allocations a JOIN confsys.orders o ON o.id=a.order_id WHERE a.payment_id IN(SELECT id FROM group_payment_summary g WHERE g.state=s.state AND g.currency=s.currency)) AS participants,
+ sum(s.amount)::text AS "declaredAmount",sum(s.allocated)::text AS "allocatedAmount",sum(s.refunded)::text AS "refundedAmount"
+ FROM group_payment_summary s GROUP BY s.state,s.currency ORDER BY s.currency,s.state)x) AS "groupPayments",
   (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT state,count(*)::integer AS count FROM confsys.registrations GROUP BY state ORDER BY state)x) AS registrations,
   (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT state,count(*)::integer AS count FROM confsys.submissions GROUP BY state ORDER BY state)x) AS submissions,
   (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT state,count(*)::integer AS count FROM confsys.review_assignments GROUP BY state ORDER BY state)x) AS reviews,
@@ -67,9 +80,13 @@ export async function stats(db: PoolClient) {
   (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT status AS state,count FROM confsys.reporting_notification_totals ORDER BY status)x) AS notifications
  `)
   ).rows[0];
-  const { as_of, ...totals } = row;
+  const { as_of, program_published_at, program, ...totals } = row;
   return reportingStats.parse({
     ...totals,
+    program: {
+      ...program,
+      publishedAt: program_published_at?.toISOString() ?? null,
+    },
     asOf: as_of.toISOString(),
     timezone: "UTC",
   });

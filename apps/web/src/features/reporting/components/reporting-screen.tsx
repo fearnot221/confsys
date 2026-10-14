@@ -178,6 +178,68 @@ export function ReportingScreen(p: Props) {
                     付款、分配、退款分別呈現，不相加為營收；分配代表既有付款的用途。
                   </p>
 
+                  <h3>議程口頭／壁報數量</h3>
+                  <p>
+                    草稿為目前編輯狀態；公開數量來自目前啟用的不可變發布快照。發布時間：
+                    {p.stats.program.publishedAt
+                      ? new Date(p.stats.program.publishedAt).toLocaleString()
+                      : "尚未發布"}
+                    。兩者不可相加。
+                  </p>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>版本</th>
+                        <th>形式</th>
+                        <th>場次</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(["draft", "published"] as const).flatMap((version) =>
+                        p.stats!.program[version].map((row) => (
+                          <tr key={version + row.kind}>
+                            <td>
+                              {version === "draft" ? "目前草稿" : "公開快照"}
+                            </td>
+                            <td>{row.kind}</td>
+                            <td>{row.count}</td>
+                          </tr>
+                        )),
+                      )}
+                    </tbody>
+                  </table>
+                  <h3>團體付款</h3>
+                  <p>
+                    同一筆付款實際分配給至少兩個不同報名帳號才計入；各幣別及核帳狀態分開。參與者及付款人於同一列去重。金額以最小貨幣單位表示；申報、分配及退款不可相加。
+                  </p>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>狀態</th>
+                        <th>幣別</th>
+                        <th>付款筆數</th>
+                        <th>付款人</th>
+                        <th>參與者</th>
+                        <th>申報金額</th>
+                        <th>分配金額</th>
+                        <th>退款金額</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {p.stats.groupPayments.map((row) => (
+                        <tr key={row.state + row.currency}>
+                          <td>{row.state}</td>
+                          <td>{row.currency}</td>
+                          <td>{row.payments}</td>
+                          <td>{row.payers}</td>
+                          <td>{row.participants}</td>
+                          <td>{row.declaredAmount}</td>
+                          <td>{row.allocatedAmount}</td>
+                          <td>{row.refundedAmount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                   <h3>訂單</h3>
                   <table>
                     <thead>
