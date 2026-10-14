@@ -10,7 +10,7 @@ type Props = {
 export function InvitationAcceptanceScreen(props: Props) {
   const [password, setPassword] = useState("");
   return (
-    <main>
+    <main className="layout access-panel">
       <h1>接受本研討會角色邀請</h1>
       {props.error && <p role="alert">{props.error}</p>}
       {props.complete ? (

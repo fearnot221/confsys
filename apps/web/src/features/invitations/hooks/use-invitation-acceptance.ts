@@ -38,7 +38,7 @@ export function useInvitationAcceptance() {
     busy,
     complete,
     hasToken: token.length > 0,
-    email: complete ? "" : (account.data?.user.email ?? ""),
+    email: complete || account.error ? "" : (account.data?.user.email ?? ""),
     error:
       error ||
       (account.error

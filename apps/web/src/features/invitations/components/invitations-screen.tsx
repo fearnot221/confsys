@@ -22,11 +22,11 @@ export function InvitationsScreen(props: Props) {
     [reason, setReason] = useState(""),
     [password, setPassword] = useState("");
   return (
-    <main>
+    <main className="layout access-panel">
       <h1>本研討會角色邀請</h1>
       <p>
         <a href="/auth/account">返回帳號</a> ·{" "}
-        <a href="/admin/accounts">帳號管理</a>
+        <a href="/access/accounts">帳號管理</a>
       </p>
       <p>
         收件人須先註冊並驗證本研討會帳號。邀請於 72
