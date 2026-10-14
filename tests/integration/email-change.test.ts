@@ -74,3 +74,18 @@ it('historical verified addresses only deny manuscript conflicts; app role canno
   });
  }finally{await f.admin.query('DELETE FROM confsys.submission_revisions WHERE id=$1',[revisionId]);await f.admin.query('DELETE FROM confsys.submissions WHERE id=$1',[submissionId]);}
 });
+
+it('superseded or expired mailbox requests never send and confirmation independently requires recent proof',async()=>{
+ const a=await active();await auth.requestEmailChange(a.raw,f.email(),rid());const first=await f.link(a.email,'email_change');
+ await auth.requestEmailChange(a.raw,f.email(),rid());const second=await f.link(a.email,'email_change');
+ await processNotification(f.worker,f.workerConfig,first.id,async()=>{throw new Error('Revoked mailbox token must never reach transport');});
+ expect((await f.admin.query('SELECT status FROM confsys.notifications WHERE id=$1',[first.id])).rows[0].status).toBe('cancelled');
+ await f.admin.query("UPDATE confsys.sessions SET password_verified_at=now()-interval '20 minutes' WHERE token_hash=$1",[tokenHash(a.raw)]);
+ await expect(auth.confirmEmailChange(a.raw,{token:second.token},rid())).rejects.toMatchObject({code:'REAUTH_REQUIRED'});
+ await auth.reauthenticate(a.raw,password,rid());
+ await withIdentityTransaction(f.app,async db=>{
+  await db.query("SELECT set_config('app.actor_id',$1,true)",[a.account.user.id]);
+  await expect(db.query('INSERT INTO confsys.verified_email_history(user_id,email) VALUES($1,$2)',[a.account.user.id,f.email()])).rejects.toMatchObject({code:'42501'});
+ });
+ await auth.confirmEmailChange(a.raw,{token:second.token},rid());
+});
