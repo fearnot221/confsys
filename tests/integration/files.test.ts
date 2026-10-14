@@ -1,0 +1,75 @@
+import { beforeAll, afterAll, it, expect } from "vitest";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { authFixture, password } from "../helpers/auth.js";
+import { createAuthService } from "../../apps/api/src/auth/service.js";
+import { createAccessService } from "../../apps/api/src/access/service.js";
+import { bootstrapAdministrator } from "../../apps/api/src/access/bootstrap.js";
+import { createFilesService } from "../../apps/api/src/files/service.js";
+import { assertReadyOwnedFiles, referenceMedia } from "../../apps/api/src/files/repository.js";
+import { cleanupIncompleteUploads } from "../../apps/api/src/files/cleanup.js";
+import { scanContent, privatePath } from "../../apps/api/src/files/storage.js";
+import { withIdentityTransaction } from "@confsys/db";
+const f=authFixture(),auth=createAuthService(f.app,f.config),access=createAccessService(f.app,f.config),rid=()=>randomUUID();
+const png="iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADklEQVQImWP4DwYMEAoAU7oL9W/sIDEAAAAASUVORK5CYII=";
+let root:string,files:ReturnType<typeof createFilesService>,pending:ReturnType<typeof createFilesService>;
+async function account(){const email=f.email();await auth.requestMail("register",email,rid());await auth.consume("verify",(await f.link(email)).token,password,rid());const l=await auth.login(email,password,rid());return {id:l.account.user.id,email,raw:l.raw};}
+let owner:Awaited<ReturnType<typeof account>>,other:Awaited<ReturnType<typeof account>>,admin:Awaited<ReturnType<typeof account>>;
+const scanner={scannerHost:"127.0.0.1",scannerPort:Number(process.env.CLAMAV_PORT ?? 53310)};
+beforeAll(async()=>{
+  f.migrate();root=await mkdtemp(join(tmpdir(),"confsys-private-integration-"));
+  files=createFilesService(f.app,f.config,{root,...scanner});pending=createFilesService(f.app,f.config,{root,...scanner,scannerPort:1});
+  owner=await account();other=await account();admin=await account();
+  await bootstrapAdministrator(f.admin,{conferenceName:f.config.CONFERENCE_NAME,origin:f.config.PUBLIC_APP_ORIGIN},{targetId:admin.id,apply:true,reason:"Synthetic files test",confirmOrigin:f.config.PUBLIC_APP_ORIGIN},rid());
+  admin.raw=(await auth.login(admin.email,password,rid())).raw;
+});
+afterAll(async()=>{
+  await f.admin.query("DELETE FROM confsys.file_references WHERE file_id IN(SELECT id FROM confsys.file_assets WHERE owner_id IN(SELECT id FROM confsys.users WHERE email LIKE $1))",[`${f.prefix}%`]);
+  await f.admin.query("DELETE FROM confsys.file_assets WHERE owner_id IN(SELECT id FROM confsys.users WHERE email LIKE $1)",[`${f.prefix}%`]);
+  await f.cleanup();if(root)await rm(root,{recursive:true,force:true});
+});
+it("real local ClamAV detects EICAR; unavailable scanner quarantines files, retry checks content before release",async()=>{
+  const eicar=Buffer.from("X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*");
+  expect(await scanContent(eicar,{root,...scanner})).toBe("infected");
+  const upload=await pending.upload(owner.raw,{purpose:"manuscript",name:"paper.png",content:png},rid());
+  expect(upload.status).toBe("quarantined");
+  await expect(pending.download(owner.raw,upload.id,rid())).rejects.toMatchObject({code:"CONFLICT"});
+  await expect(withIdentityTransaction(f.app,db=>assertReadyOwnedFiles(db,owner.id,[upload.id]))).rejects.toMatchObject({code:"CONFLICT"});
+  expect((await files.retry(owner.raw,upload.id,rid())).status).toBe("ready");
+  expect((await files.download(owner.raw,upload.id,rid())).bytes.length).toBeGreaterThan(0);
+  await withIdentityTransaction(f.app,db=>assertReadyOwnedFiles(db,owner.id,[upload.id]));
+  for(const raw of [other.raw,admin.raw]) await expect(files.download(raw,upload.id,rid())).rejects.toMatchObject({code:"NOT_FOUND"});
+  expect((await files.list(other.raw,{})).items).toHaveLength(0);
+  await expect(files.publicMedia(upload.id)).rejects.toMatchObject({code:"NOT_FOUND"});
+  await expect(withIdentityTransaction(f.app,db=>assertReadyOwnedFiles(db,other.id,[upload.id]))).rejects.toMatchObject({code:"NOT_FOUND"});
+});
+it("ordinary accounts cannot upload public media; admin media remains private until active publication reference",async()=>{
+  await expect(files.upload(owner.raw,{purpose:"site_media",name:"hero.png",content:png},rid())).rejects.toMatchObject({code:"FORBIDDEN"});
+  const media=await files.upload(admin.raw,{purpose:"site_media",name:"hero.png",content:png},rid());expect(media.status).toBe("ready");
+  await expect(files.publicMedia(media.id)).rejects.toMatchObject({code:"NOT_FOUND"});
+  // A reference to an inactive publication is not public; current pointer is required.
+  await withIdentityTransaction(f.app,db=>referenceMedia(db,[media.id],rid()));
+  await expect(files.publicMedia(media.id)).rejects.toMatchObject({code:"NOT_FOUND"});
+  await expect(f.app.query("DELETE FROM confsys.file_assets WHERE id=$1",[media.id])).rejects.toMatchObject({code:"42501"});
+  await expect(f.app.query("UPDATE confsys.file_assets SET storage_key=$2 WHERE id=$1",[media.id,rid()])).rejects.toMatchObject({code:"42501"});
+});
+it("malformed file and traversal names rejected; revoked session cannot retry or download; integrity corruption fails closed",async()=>{
+  await expect(files.upload(owner.raw,{purpose:"manuscript",name:"../x.png",content:png},rid())).rejects.toThrow();
+  await expect(files.upload(owner.raw,{purpose:"manuscript",name:"fake.pdf",content:Buffer.from("%PDF-1.7\n%%EOF").toString("base64")},rid())).rejects.toMatchObject({code:"UNSUPPORTED_MEDIA_TYPE"});
+  const file=await files.upload(other.raw,{purpose:"manuscript",name:"synthetic.png",content:png},rid());
+  const row=(await f.admin.query("SELECT storage_key FROM confsys.file_assets WHERE id=$1",[file.id])).rows[0];
+  await writeFile(privatePath(root,row.storage_key),Buffer.from("corrupt"));
+  await expect(files.download(other.raw,file.id,rid())).rejects.toThrow("integrity");
+  await access.mutate(admin.raw,other.id,{action:"revoke_sessions",reason:"Synthetic revocation"},rid());
+  await expect(files.download(other.raw,file.id,rid())).rejects.toMatchObject({code:"SESSION_EXPIRED"});
+});
+it("abandoned uploads become rejected, private bytes removed and quotas remain durable",async()=>{
+  const id=rid(),key=rid();
+  await f.admin.query("INSERT INTO confsys.file_assets(id,owner_id,purpose,original_name,media_type,size_bytes,sha256,storage_key,status,created_at) VALUES($1,$2,'manuscript','abandoned.pdf','application/pdf',1,$3,$4,'uploading',now()-interval '2 hours')",[id,owner.id,"0".repeat(64),key]);
+  await writeFile(privatePath(root,key),Buffer.from("x"));
+  expect(await cleanupIncompleteUploads(f.app,root)).toBeGreaterThanOrEqual(1);
+  expect((await f.admin.query("SELECT status FROM confsys.file_assets WHERE id=$1",[id])).rows[0].status).toBe("rejected");
+  await expect(files.download(owner.raw,id,rid())).rejects.toMatchObject({code:"CONFLICT"});
+});
