@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { randomUUID } from "node:crypto";
 import {
   submissionSchema,
+  submissionDocumentSchema,
   submissionRevisionSchema,
   submissionConfigSchema,
   type SubmissionDocument,
@@ -142,4 +143,30 @@ export async function audit(
       requestId,
     ],
   );
+}
+
+// Caller holds the shared/exclusive access fence and establishes trusted resource context.
+// Both agenda and competition use this projection; draft decisions never qualify.
+export async function publishedAcceptedRevision(db: PoolClient, id: string) {
+  const row = (
+    await db.query<{
+      submission_id: string;
+      owner_id: string;
+      document: unknown;
+      outcome: string;
+    }>(
+      "SELECT r.submission_id,r.owner_id,r.document,a.outcome FROM confsys.submission_revisions r JOIN confsys.published_acceptances a ON a.revision_id=r.id JOIN confsys.submissions s ON s.id=r.submission_id WHERE r.id=$1 AND s.state<>'withdrawn'",
+      [id],
+    )
+  ).rows[0];
+  if (!row || !["accept_oral", "accept_poster"].includes(row.outcome))
+    throw new AuthError("CONFLICT");
+  return {
+    id,
+    submissionId: row.submission_id,
+    ownerId: row.owner_id,
+    document: submissionDocumentSchema.parse(row.document),
+    presentation:
+      row.outcome === "accept_oral" ? ("oral" as const) : ("poster" as const),
+  };
 }

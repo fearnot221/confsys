@@ -5,7 +5,6 @@ import {
   type ProgramDraft,
 } from "@confsys/contracts";
 import { randomUUID } from "node:crypto";
-import { AuthError } from "../auth/errors.js";
 type Room = ProgramDraft["rooms"][number];
 type Session = ProgramDraft["sessions"][number];
 type Block = ProgramDraft["blocked"][number];
@@ -274,19 +273,4 @@ export async function publishedFor(db: PoolClient, version: number) {
       [version],
     )
   ).rows[0]?.id;
-}
-export async function acceptedRevision(db: PoolClient, id: string) {
-  const row = (
-    await db.query<{
-      submission_id: string;
-      owner_id: string;
-      document: unknown;
-      outcome: string;
-    }>(
-      "SELECT r.submission_id,r.owner_id,r.document,a.outcome FROM confsys.submission_revisions r JOIN confsys.published_acceptances a ON a.revision_id=r.id JOIN confsys.submissions s ON s.id=r.submission_id WHERE r.id=$1 AND s.state<>'withdrawn'",
-      [id],
-    )
-  ).rows[0];
-  if (!row) throw new AuthError("CONFLICT");
-  return row;
 }

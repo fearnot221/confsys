@@ -3,7 +3,6 @@ import type { ApiConfig } from "@confsys/config";
 import { withIdentityTransaction } from "@confsys/db";
 import {
   programEndpoints,
-  submissionDocumentSchema,
   type ProgramDraft,
   type PublicProgram,
 } from "@confsys/contracts";
@@ -18,6 +17,7 @@ import { sessionActor } from "../auth/session.js";
 import { AuthError } from "../auth/errors.js";
 import { effectivePublicSite } from "../site/branding.js";
 import * as repo from "./repository.js";
+import { publishedAcceptedRevision } from "../submissions/repository.js";
 import {
   assertInterval,
   assertVersion,
@@ -74,20 +74,19 @@ export function createProgramService(pool: Pool, config: ApiConfig) {
       return repo.draft(db);
     });
   const accepted = async (db: PoolClient, id: string) => {
-    const r = await repo.acceptedRevision(db, id),
-      d = submissionDocumentSchema.parse(r.document),
+    const r = await publishedAcceptedRevision(db, id),
+      d = r.document,
       presenter = d.authors[d.presenterIndex];
     if (!presenter) throw new AuthError("CONFLICT");
     return {
       revisionId: id,
-      submissionId: r.submission_id,
-      ownerId: r.owner_id,
+      submissionId: r.submissionId,
+      ownerId: r.ownerId,
       title: d.title,
       presenterName: presenter.name,
       presenterAffiliation: presenter.affiliation,
       presenterKey: presenter.email.toLowerCase(),
-      kind:
-        r.outcome === "accept_oral" ? ("oral" as const) : ("poster" as const),
+      kind: r.presentation,
     };
   };
   return {
