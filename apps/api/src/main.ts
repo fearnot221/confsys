@@ -1,3 +1,5 @@
+import { registerAccessRoutes } from "./access/routes.js";
+import { createAccessService } from "./access/service.js";
 import { registerInstanceRoute } from "./instance.js";
 import { registerAuthRoutes } from "./auth/routes.js";
 import { createAuthService } from "./auth/service.js";
@@ -38,6 +40,7 @@ await registerAuthRoutes(app, {
   service: createAuthService(pool, config),
   limit: createRateLimiter(redis, config.CSRF_SIGNING_KEY),
 });
+registerAccessRoutes(app, config, createAccessService(pool, config));
 app.addHook("onClose", async () => {
   redis.disconnect();
   await pool.end();

@@ -1,0 +1,42 @@
+{
+  "run": "9dc62bba",
+  "image": "confsys:p12-9dc62bba",
+  "checks": [
+    "Same immutable image for both Web/API/worker; independent credentials, networks and data volumes; process config separation",
+    "Same browser context resolves both localhost hostnames; runtime display/title and public DTO/bundle secrecy",
+    "A-only identity absent in B; identical email independent passwords; verification token rejection in B does not consume A; host-only cookies coexist; foreign session rejected",
+    "Reset/revoke/logout A leave B password/session/audit unchanged; foreign reset token invalid; forged Host rejected and forwarded Host cannot poison canonical mail URL",
+    "A-only CLI bootstrap, reauthentication, grants/revokes/disable/restore/session revocation preserve B roles, bootstrap marker, accounts, sessions and audit; foreign admin cookie and wrong CLI origin rejected",
+    "Stopped A worker retains durable mail; live B worker processes only B; restarting A delivers only to A Mailpit",
+    "A-only stop/restart/migration/smoke leaves B available and B schema/data unchanged"
+  ],
+  "imageId": "sha256:04f030aedd50264fbe11feaf577674c7b97328cd718ae341ffe3dfedc48a20ab",
+  "resources": [
+    {
+      "project": "confsys-p12-9dc62bba-a",
+      "origin": "http://a.localhost:45173",
+      "envFile": ".instances/9dc62bba/a.env",
+      "networks": [
+        "confsys-p12-9dc62bba-a_default"
+      ],
+      "volumes": [
+        "confsys-p12-9dc62bba-a_mailpit-data",
+        "confsys-p12-9dc62bba-a_postgres-data",
+        "confsys-p12-9dc62bba-a_redis-data"
+      ]
+    },
+    {
+      "project": "confsys-p12-9dc62bba-b",
+      "origin": "http://b.localhost:45174",
+      "envFile": ".instances/9dc62bba/b.env",
+      "networks": [
+        "confsys-p12-9dc62bba-b_default"
+      ],
+      "volumes": [
+        "confsys-p12-9dc62bba-b_mailpit-data",
+        "confsys-p12-9dc62bba-b_redis-data",
+        "confsys-p12-9dc62bba-b_postgres-data"
+      ]
+    }
+  ]
+}

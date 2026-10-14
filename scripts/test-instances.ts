@@ -1,4 +1,5 @@
-import { execFileSync } from "node:child_process";
+import { promisify } from "node:util";
+import { execFile, execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import { randomUUID } from "node:crypto";
@@ -8,7 +9,7 @@ import { localFetch } from "./local-http.js";
 
 // Own fresh resources only. No global cleanup and no reuse of user volumes.
 const run = randomUUID().slice(0, 8);
-const image = `confsys:p11b-${run}`;
+const image = `confsys:p12-${run}`;
 const directory = `.instances/${run}`;
 mkdirSync(directory, { recursive: true });
 const evidence: Record<string, unknown> = { run, image, checks: [] };
@@ -22,21 +23,21 @@ function command(args: string[], env: NodeJS.ProcessEnv = process.env) {
 }
 const instances = ["a", "b"].map((letter, i) => {
   const file = `${directory}/${letter}.env`;
-  const origin = `http://${letter}.localhost:${35173 + i}`;
+  const origin = `http://${letter}.localhost:${45173 + i}`;
   command(
     ["--conditions=development", "--import", "tsx", "scripts/setup.mjs"],
     {
       ...process.env,
       CONFSYS_ENV_FILE: file,
-      COMPOSE_PROJECT_NAME: `confsys-p11b-${run}-${letter}`,
+      COMPOSE_PROJECT_NAME: `confsys-p12-${run}-${letter}`,
       APP_IMAGE: image,
       PUBLIC_APP_ORIGIN: origin,
       CONFERENCE_NAME: `Synthetic Conference ${letter.toUpperCase()}`,
-      WEB_PORT: String(35173 + i),
-      POSTGRES_PORT: String(35432 + i),
-      REDIS_PORT: String(36379 + i),
-      MAILPIT_PORT: String(38025 + i),
-      SMTP_PORT: String(31025 + i),
+      WEB_PORT: String(45173 + i),
+      POSTGRES_PORT: String(45432 + i),
+      REDIS_PORT: String(46379 + i),
+      MAILPIT_PORT: String(48025 + i),
+      SMTP_PORT: String(41025 + i),
     },
   );
   const env = parseEnv(readFileSync(file, "utf8"));
@@ -177,7 +178,7 @@ async function snapshotB() {
   // Read-only snapshots exclude mutable last_seen_at (session read intentionally updates it).
   return (
     await b.db.query(
-      `SELECT jsonb_build_object('users',(SELECT jsonb_agg(u) FROM confsys.users u),'sessions',(SELECT jsonb_agg(jsonb_build_object('id',s.id,'token_hash',s.token_hash,'revoked_at',s.revoked_at)) FROM confsys.sessions s),'audit',(SELECT count(*) FROM confsys.auth_audit),'migrations',(SELECT jsonb_agg(m) FROM confsys.schema_migrations m)) AS state`,
+      `SELECT jsonb_build_object('users',(SELECT jsonb_agg(u) FROM confsys.users u),'sessions',(SELECT jsonb_agg(jsonb_build_object('id',s.id,'token_hash',s.token_hash,'revoked_at',s.revoked_at)) FROM confsys.sessions s),'roles',(SELECT jsonb_agg(r) FROM confsys.user_roles r),'bootstrap',(SELECT jsonb_agg(c) FROM confsys.access_control c),'audit',(SELECT count(*) FROM confsys.auth_audit),'migrations',(SELECT jsonb_agg(m) FROM confsys.schema_migrations m)) AS state`,
     )
   ).rows[0].state;
 }
@@ -464,6 +465,112 @@ try {
   ).toBe(403);
   record(
     "Reset/revoke/logout A leave B password/session/audit unchanged; foreign reset token invalid; forged Host rejected and forwarded Host cannot poison canonical mail URL",
+  );
+  const beforeAccess = await snapshotB();
+  await login(pa, a, email, newA);
+  const userA = (
+    await a.db.query("SELECT id FROM confsys.users WHERE email=$1", [email])
+  ).rows[0].id;
+  const bootstrap = (apply: boolean, origin = a.origin) =>
+    promisify(execFile)(
+      process.execPath,
+      [
+        "--conditions=development",
+        `--env-file=${a.file}`,
+        "--import",
+        "tsx",
+        "scripts/bootstrap-admin.ts",
+        "--user-id",
+        userA,
+        ...(apply
+          ? [
+              "--apply",
+              "--reason",
+              "synthetic dual-instance bootstrap",
+              "--confirm-origin",
+              origin,
+            ]
+          : []),
+      ],
+      { env: process.env },
+    );
+  expect(JSON.parse((await bootstrap(false)).stdout).changed).toBe(false);
+  await expect(bootstrap(true, b.origin)).rejects.toBeDefined();
+  expect(JSON.parse((await bootstrap(true)).stdout).changed).toBe(true);
+  await login(pa, a, email, newA);
+  const cookieA = (await context.cookies()).find(
+    (c) => c.name === "dev-session" && c.domain === "a.localhost",
+  )!;
+  expect(
+    (
+      await localFetch(`${b.origin}/api/access/accounts`, {
+        headers: { cookie: `dev-session=${cookieA.value}` },
+      })
+    ).status,
+  ).toBe(401);
+  expect(
+    (await b.db.query("SELECT count(*) FROM confsys.user_roles")).rows[0].count,
+  ).toBe("0");
+  expect(
+    (await b.db.query("SELECT initialized_user_id FROM confsys.access_control"))
+      .rows[0].initialized_user_id,
+  ).toBeNull();
+  const managedEmail = `managed-${run}@example.invalid`;
+  expect((await post(a, "register", { email: managedEmail })).status).toBe(202);
+  const managedLink = await mail(a, managedEmail, "verify");
+  expect(
+    (await post(a, "verify", { token: managedLink.token, password: passA }))
+      .status,
+  ).toBe(200);
+  const managedId = (
+    await a.db.query("SELECT id FROM confsys.users WHERE email=$1", [
+      managedEmail,
+    ])
+  ).rows[0].id;
+  const browserPost = async (path: string, body: object) => {
+    const csrf = await (
+      await pa.request.get(`${a.origin}/api/auth/csrf`)
+    ).json();
+    return pa.request.post(`${a.origin}${path}`, {
+      data: body,
+      headers: { origin: a.origin, "x-csrf-token": csrf.csrfToken },
+    });
+  };
+  expect(
+    (
+      await browserPost("/api/auth/reauthenticate", { password: newA })
+    ).status(),
+  ).toBe(200);
+  for (const action of [
+    "grant",
+    "revoke",
+    "disable",
+    "restore",
+    "revoke_sessions",
+  ]) {
+    if (action === "revoke_sessions")
+      expect(
+        (await post(a, "login", { email: managedEmail, password: passA }))
+          .status,
+      ).toBe(200);
+    const response = await browserPost(
+      `/api/access/accounts/${managedId}/actions`,
+      {
+        action,
+        reason: "synthetic A-only access test",
+        ...(action === "grant" || action === "revoke"
+          ? { role: "conference_staff" }
+          : {}),
+      },
+    );
+    expect(response.status()).toBe(200);
+    expect((await response.json()).changed).toBe(true);
+  }
+  expect(await snapshotB()).toEqual(beforeAccess);
+  await pb.reload();
+  await expect(pb.getByTestId("account-email")).toHaveText(email);
+  record(
+    "A-only CLI bootstrap, reauthentication, grants/revokes/disable/restore/session revocation preserve B roles, bootstrap marker, accounts, sessions and audit; foreign admin cookie and wrong CLI origin rejected",
   );
   a.compose("--profile", "app", "stop", "worker");
   try {

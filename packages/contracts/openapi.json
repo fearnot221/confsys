@@ -5,6 +5,376 @@
     "version": "0.0.0"
   },
   "paths": {
+    "/api/auth/reauthenticate": {
+      "post": {
+        "operationId": "reauthenticate",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": ["password"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "complete"
+                    }
+                  },
+                  "required": ["status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/register": {
       "post": {
         "operationId": "register",
@@ -41,9 +411,7 @@
                     "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
-                "required": [
-                  "email"
-                ],
+                "required": ["email"],
                 "additionalProperties": false
               }
             }
@@ -63,9 +431,7 @@
                       "const": "accepted"
                     }
                   },
-                  "required": [
-                    "status"
-                  ],
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -90,6 +456,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -108,17 +478,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -143,6 +507,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -161,17 +529,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -196,6 +558,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -214,17 +580,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -249,6 +609,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -267,17 +631,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -302,6 +660,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -320,17 +682,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -355,6 +711,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -373,17 +733,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -428,9 +782,7 @@
                     "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
-                "required": [
-                  "email"
-                ],
+                "required": ["email"],
                 "additionalProperties": false
               }
             }
@@ -450,9 +802,7 @@
                       "const": "accepted"
                     }
                   },
-                  "required": [
-                    "status"
-                  ],
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -477,6 +827,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -495,17 +849,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -530,6 +878,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -548,17 +900,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -583,6 +929,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -601,17 +951,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -636,6 +980,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -654,17 +1002,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -689,6 +1031,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -707,17 +1053,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -742,6 +1082,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -760,17 +1104,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -815,9 +1153,7 @@
                     "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
-                "required": [
-                  "email"
-                ],
+                "required": ["email"],
                 "additionalProperties": false
               }
             }
@@ -837,9 +1173,7 @@
                       "const": "accepted"
                     }
                   },
-                  "required": [
-                    "status"
-                  ],
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -864,6 +1198,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -882,17 +1220,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -917,6 +1249,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -935,17 +1271,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -970,6 +1300,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -988,17 +1322,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1023,6 +1351,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1041,17 +1373,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1076,6 +1402,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1094,17 +1424,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1129,6 +1453,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1147,17 +1475,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1204,10 +1526,7 @@
                     "maxLength": 512
                   }
                 },
-                "required": [
-                  "token",
-                  "password"
-                ],
+                "required": ["token", "password"],
                 "additionalProperties": false
               }
             }
@@ -1227,9 +1546,7 @@
                       "const": "complete"
                     }
                   },
-                  "required": [
-                    "status"
-                  ],
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -1254,6 +1571,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1272,17 +1593,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1307,6 +1622,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1325,17 +1644,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1360,6 +1673,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1378,17 +1695,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1413,6 +1724,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1431,17 +1746,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1466,6 +1775,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1484,17 +1797,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1519,6 +1826,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1537,17 +1848,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1594,10 +1899,7 @@
                     "maxLength": 512
                   }
                 },
-                "required": [
-                  "token",
-                  "password"
-                ],
+                "required": ["token", "password"],
                 "additionalProperties": false
               }
             }
@@ -1617,9 +1919,7 @@
                       "const": "complete"
                     }
                   },
-                  "required": [
-                    "status"
-                  ],
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -1644,6 +1944,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1662,17 +1966,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1697,6 +1995,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1715,17 +2017,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1750,6 +2046,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1768,17 +2068,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1803,6 +2097,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1821,17 +2119,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1856,6 +2148,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1874,17 +2170,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1909,6 +2199,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -1927,17 +2221,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -1987,10 +2275,7 @@
                     "maxLength": 512
                   }
                 },
-                "required": [
-                  "email",
-                  "password"
-                ],
+                "required": ["email", "password"],
                 "additionalProperties": false
               }
             }
@@ -2021,19 +2306,39 @@
                         "verified": {
                           "type": "boolean",
                           "const": true
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": ["conference_staff", "conference_admin"]
+                          }
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "accounts.directory.read",
+                              "access.roles.manage",
+                              "accounts.status.manage",
+                              "accounts.sessions.revoke",
+                              "security_audit.read"
+                            ]
+                          }
                         }
                       },
                       "required": [
                         "id",
                         "email",
-                        "verified"
+                        "verified",
+                        "roles",
+                        "permissions"
                       ],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "user"
-                  ],
+                  "required": ["user"],
                   "additionalProperties": false
                 }
               }
@@ -2058,6 +2363,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2076,17 +2385,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2111,6 +2414,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2129,17 +2436,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2164,6 +2465,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2182,17 +2487,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2217,6 +2516,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2235,17 +2538,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2270,6 +2567,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2288,17 +2589,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2323,6 +2618,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2341,17 +2640,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2408,9 +2701,7 @@
                       "const": "complete"
                     }
                   },
-                  "required": [
-                    "status"
-                  ],
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -2435,6 +2726,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2453,17 +2748,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2488,6 +2777,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2506,17 +2799,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2541,6 +2828,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2559,17 +2850,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2594,6 +2879,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2612,17 +2901,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2647,6 +2930,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2665,17 +2952,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2700,6 +2981,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2718,17 +3003,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2753,9 +3032,7 @@
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "csrfToken"
-                  ],
+                  "required": ["csrfToken"],
                   "additionalProperties": false
                 }
               }
@@ -2792,19 +3069,39 @@
                         "verified": {
                           "type": "boolean",
                           "const": true
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": ["conference_staff", "conference_admin"]
+                          }
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "accounts.directory.read",
+                              "access.roles.manage",
+                              "accounts.status.manage",
+                              "accounts.sessions.revoke",
+                              "security_audit.read"
+                            ]
+                          }
                         }
                       },
                       "required": [
                         "id",
                         "email",
-                        "verified"
+                        "verified",
+                        "roles",
+                        "permissions"
                       ],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "user"
-                  ],
+                  "required": ["user"],
                   "additionalProperties": false
                 }
               }
@@ -2829,6 +3126,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2847,17 +3148,11 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2882,6 +3177,10 @@
                             "INTERNAL_ERROR",
                             "FORBIDDEN",
                             "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
                             "REQUEST_TOO_LARGE",
                             "UNSUPPORTED_MEDIA_TYPE",
                             "INVALID_CREDENTIALS",
@@ -2900,17 +3199,2308 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "code",
-                        "message",
-                        "requestId"
-                      ],
+                      "required": ["code", "message", "requestId"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "error"
-                  ],
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/access/accounts": {
+      "get": {
+        "operationId": "directory",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": {
+                "search": {
+                  "default": "",
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "state": {
+                  "type": "string",
+                  "enum": ["pending", "active", "disabled"]
+                },
+                "offset": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                },
+                "limit": {
+                  "default": 20,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50
+                }
+              },
+              "required": ["search", "offset", "limit"],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized explicit projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "email": {
+                            "type": "string",
+                            "format": "email",
+                            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": ["pending", "active", "disabled"]
+                          },
+                          "verified": {
+                            "type": "boolean"
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": ["conference_staff", "conference_admin"]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "email",
+                          "state",
+                          "verified",
+                          "roles"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextOffset": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["items", "nextOffset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/access/accounts/{id}": {
+      "get": {
+        "operationId": "detail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized explicit projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "email": {
+                      "type": "string",
+                      "format": "email",
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": ["pending", "active", "disabled"]
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["conference_staff", "conference_admin"]
+                      }
+                    }
+                  },
+                  "required": ["id", "email", "state", "verified", "roles"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/access/roles": {
+      "get": {
+        "operationId": "roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized explicit projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "type": "string",
+                            "enum": ["conference_staff", "conference_admin"]
+                          },
+                          "permissions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "accounts.directory.read",
+                                "access.roles.manage",
+                                "accounts.status.manage",
+                                "accounts.sessions.revoke",
+                                "security_audit.read"
+                              ]
+                            }
+                          }
+                        },
+                        "required": ["role", "permissions"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/access/audit": {
+      "get": {
+        "operationId": "audit",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                },
+                "limit": {
+                  "default": 20,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50
+                }
+              },
+              "required": ["offset", "limit"],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized explicit projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "event": {
+                            "type": "string"
+                          },
+                          "targetId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "actorId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "session",
+                              "operator_cli",
+                              "authentication"
+                            ]
+                          },
+                          "reason": {
+                            "type": ["string", "null"]
+                          },
+                          "before": {
+                            "type": ["string", "null"]
+                          },
+                          "after": {
+                            "type": ["string", "null"]
+                          },
+                          "requestId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "event",
+                          "targetId",
+                          "actorId",
+                          "source",
+                          "reason",
+                          "before",
+                          "after",
+                          "requestId",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextOffset": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["items", "nextOffset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/access/accounts/{id}/actions": {
+      "post": {
+        "operationId": "mutate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "grant"
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": ["conference_staff", "conference_admin"]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 300
+                      }
+                    },
+                    "required": ["action", "role", "reason"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "revoke"
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": ["conference_staff", "conference_admin"]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 300
+                      }
+                    },
+                    "required": ["action", "role", "reason"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "disable"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 300
+                      }
+                    },
+                    "required": ["action", "reason"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "restore"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 300
+                      }
+                    },
+                    "required": ["action", "reason"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "revoke_sessions"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 300
+                      }
+                    },
+                    "required": ["action", "reason"],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authorized explicit projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "changed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["changed"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Safe error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_FOUND",
+                            "INVALID_REQUEST",
+                            "INTERNAL_ERROR",
+                            "FORBIDDEN",
+                            "CONFLICT",
+                            "LAST_ADMIN",
+                            "SELF_CHANGE",
+                            "BOOTSTRAP_COMPLETED",
+                            "REAUTH_REQUIRED",
+                            "REQUEST_TOO_LARGE",
+                            "UNSUPPORTED_MEDIA_TYPE",
+                            "INVALID_CREDENTIALS",
+                            "SESSION_EXPIRED",
+                            "CSRF_REJECTED",
+                            "INVALID_TOKEN",
+                            "WEAK_PASSWORD",
+                            "RATE_LIMITED",
+                            "SERVICE_UNAVAILABLE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message", "requestId"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["error"],
                   "additionalProperties": false
                 }
               }
@@ -2937,9 +5527,7 @@
                       "maxLength": 160
                     }
                   },
-                  "required": [
-                    "conferenceName"
-                  ],
+                  "required": ["conferenceName"],
                   "additionalProperties": false
                 }
               }
@@ -2965,9 +5553,7 @@
                       "const": "alive"
                     }
                   },
-                  "required": [
-                    "status"
-                  ],
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -2990,48 +5576,29 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "ready",
-                        "not_ready"
-                      ]
+                      "enum": ["ready", "not_ready"]
                     },
                     "dependencies": {
                       "type": "object",
                       "properties": {
                         "postgres": {
                           "type": "string",
-                          "enum": [
-                            "up",
-                            "down"
-                          ]
+                          "enum": ["up", "down"]
                         },
                         "redis": {
                           "type": "string",
-                          "enum": [
-                            "up",
-                            "down"
-                          ]
+                          "enum": ["up", "down"]
                         },
                         "worker": {
                           "type": "string",
-                          "enum": [
-                            "up",
-                            "down"
-                          ]
+                          "enum": ["up", "down"]
                         }
                       },
-                      "required": [
-                        "postgres",
-                        "redis",
-                        "worker"
-                      ],
+                      "required": ["postgres", "redis", "worker"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "status",
-                    "dependencies"
-                  ],
+                  "required": ["status", "dependencies"],
                   "additionalProperties": false
                 }
               }
@@ -3047,48 +5614,29 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "ready",
-                        "not_ready"
-                      ]
+                      "enum": ["ready", "not_ready"]
                     },
                     "dependencies": {
                       "type": "object",
                       "properties": {
                         "postgres": {
                           "type": "string",
-                          "enum": [
-                            "up",
-                            "down"
-                          ]
+                          "enum": ["up", "down"]
                         },
                         "redis": {
                           "type": "string",
-                          "enum": [
-                            "up",
-                            "down"
-                          ]
+                          "enum": ["up", "down"]
                         },
                         "worker": {
                           "type": "string",
-                          "enum": [
-                            "up",
-                            "down"
-                          ]
+                          "enum": ["up", "down"]
                         }
                       },
-                      "required": [
-                        "postgres",
-                        "redis",
-                        "worker"
-                      ],
+                      "required": ["postgres", "redis", "worker"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "status",
-                    "dependencies"
-                  ],
+                  "required": ["status", "dependencies"],
                   "additionalProperties": false
                 }
               }
@@ -3115,6 +5663,10 @@
                   "INTERNAL_ERROR",
                   "FORBIDDEN",
                   "CONFLICT",
+                  "LAST_ADMIN",
+                  "SELF_CHANGE",
+                  "BOOTSTRAP_COMPLETED",
+                  "REAUTH_REQUIRED",
                   "REQUEST_TOO_LARGE",
                   "UNSUPPORTED_MEDIA_TYPE",
                   "INVALID_CREDENTIALS",
@@ -3133,17 +5685,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "code",
-              "message",
-              "requestId"
-            ],
+            "required": ["code", "message", "requestId"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       }
     }

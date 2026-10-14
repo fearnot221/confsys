@@ -1,3 +1,5 @@
+import { accessEndpoints } from "./access.js";
+export * from "./access.js";
 import {
   authOperations,
   accountSchema,
@@ -47,6 +49,7 @@ export function openApiDocument() {
     info: { title: "Conference Platform Infrastructure API", version: "0.0.0" },
     paths: {
       ...authPaths(),
+      ...accessPaths(),
       [routes.instance]: {
         get: {
           operationId: "getInstance",
@@ -168,4 +171,85 @@ function authPaths() {
       },
     },
   };
+}
+
+function accessPaths() {
+  return Object.fromEntries(
+    Object.entries(accessEndpoints).map(([operationId, spec]) => [
+      spec.path.replace(":id", "{id}"),
+      {
+        [spec.method]: {
+          operationId,
+          parameters: [
+            ...(spec.path.includes(":id")
+              ? [
+                  {
+                    in: "path",
+                    name: "id",
+                    required: true,
+                    schema: { type: "string", format: "uuid" },
+                  },
+                ]
+              : []),
+            ...(spec.method === "post"
+              ? [
+                  {
+                    in: "header",
+                    name: "Origin",
+                    required: true,
+                    schema: { type: "string" },
+                  },
+                  {
+                    in: "header",
+                    name: "x-csrf-token",
+                    required: true,
+                    schema: { type: "string" },
+                  },
+                ]
+              : []),
+            ...(spec.method === "get" && "input" in spec
+              ? [
+                  {
+                    in: "query",
+                    name: "query",
+                    style: "form",
+                    explode: true,
+                    schema: z.toJSONSchema(spec.input),
+                  },
+                ]
+              : []),
+          ],
+          ...(spec.method === "post" && "input" in spec
+            ? {
+                requestBody: {
+                  required: true,
+                  content: {
+                    "application/json": { schema: z.toJSONSchema(spec.input) },
+                  },
+                },
+              }
+            : {}),
+          responses: {
+            200: {
+              description: "Authorized explicit projection",
+              content: {
+                "application/json": { schema: z.toJSONSchema(spec.output) },
+              },
+            },
+            ...Object.fromEntries(
+              [400, 401, 403, 404, 409, 500, 503].map((code) => [
+                code,
+                {
+                  description: "Safe error",
+                  content: {
+                    "application/json": { schema: jsonSchemas.error },
+                  },
+                },
+              ]),
+            ),
+          },
+        },
+      },
+    ]),
+  );
 }

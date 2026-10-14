@@ -158,3 +158,11 @@ export function loadLocalConfig(env: NodeJS.ProcessEnv = process.env) {
     env,
   );
 }
+
+export function loadBootstrapConfig(env: NodeJS.ProcessEnv = process.env) {
+  return {
+    ...loadMigrationConfig(env),
+    ...loadIngressConfig(env),
+    ...parse(z.object(instance), env),
+  };
+}

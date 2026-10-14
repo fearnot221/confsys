@@ -128,6 +128,11 @@ export function useAuth(mode: string) {
     error: error || (account.error && !hidden ? errorText(account.error) : ""),
     loading: mode === "account" && account.isPending && !hidden,
     email: !hidden && !account.error ? account.data?.user.email : undefined,
+    userId: !hidden && !account.error ? account.data?.user.id : undefined,
+    canDirectory:
+      !hidden &&
+      !account.error &&
+      !!account.data?.user.permissions.includes("accounts.directory.read"),
     onSubmit: submit,
     onRetry: () => {
       setError("");

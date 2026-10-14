@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button, Input, Layout } from "@confsys/ui";
 export type AuthView = {
   conferenceName: string;
+  canDirectory?: boolean;
+  userId?: string | undefined;
   mode: string;
   busy: boolean;
   loading: boolean;
@@ -59,8 +61,10 @@ export function AuthScreen(view: AuthView) {
           <>
             {view.email && (
               <>
+                {view.canDirectory && <a href="/access/accounts">帳號管理</a>}
                 <p>已驗證的信箱</p>
                 <p data-testid="account-email">{view.email}</p>
+                <p>本地帳號 ID：{view.userId}</p>
               </>
             )}
             {!view.loading && (

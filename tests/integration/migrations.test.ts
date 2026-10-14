@@ -1,13 +1,19 @@
 import { it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, copyFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPool, assertRuntimeRole } from "@confsys/db";
 import { runMigrations } from "../../packages/db/src/migrations.js";
+import { hashPassword } from "../../apps/api/src/auth/password.js";
+import {
+  createAuthService,
+  tokenHash,
+} from "../../apps/api/src/auth/service.js";
+import { loadApiConfig } from "@confsys/config";
 import { testUrl } from "../helpers/auth.js";
-it("migrates a blank isolated database and upgrades an isolated Phase 0 database without rewriting history", async () => {
+it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e databases preserving credentials, sessions, outbox and audit", async () => {
   const original = testUrl("TEST_MIGRATION_DATABASE_URL", "/confsys_test");
   const directory = await mkdtemp(join(tmpdir(), "confsys-phase0-"));
   await copyFile(
@@ -39,7 +45,7 @@ it("migrates a blank isolated database and upgrades an isolated Phase 0 database
       { stdio: "pipe" },
     );
   try {
-    for (const kind of ["blank", "upgrade"]) {
+    for (const kind of ["blank", "upgrade", "phase11b"]) {
       const name = `confsys_test_${kind}_${randomBytes(6).toString("hex")}`;
       cluster(`CREATE DATABASE ${name} OWNER confsys_migrator`);
       const url = new URL(original);
@@ -47,6 +53,50 @@ it("migrates a blank isolated database and upgrades an isolated Phase 0 database
       const pool = createPool(url.href, 1);
       try {
         let checksum: string | undefined;
+        let saved: unknown;
+        const userId = randomUUID(),
+          tokenId = randomUUID(),
+          sessionSecret = randomBytes(32).toString("base64url"),
+          notificationId = randomUUID();
+        const snapshot = async () =>
+          (
+            await pool.query(
+              `SELECT jsonb_build_object('users',(SELECT jsonb_agg(u) FROM confsys.users u),'tokens',(SELECT jsonb_agg(t) FROM confsys.auth_tokens t),'outbox',(SELECT jsonb_agg(n) FROM confsys.notifications n),'secrets',(SELECT jsonb_agg(s) FROM confsys.notification_secrets s),'audit',(SELECT jsonb_agg(jsonb_build_object('id',a.id,'event',a.event,'user_id',a.user_id,'request_id',a.request_id,'created_at',a.created_at)) FROM confsys.auth_audit a)) AS data`,
+            )
+          ).rows[0].data;
+        if (kind === "phase11b") {
+          for (const file of ["0002_identity.sql", "0003_identity_grants.sql"])
+            await copyFile(
+              `packages/db/migrations/${file}`,
+              join(directory, file),
+            );
+          await runMigrations(pool, directory);
+          await pool.query(
+            "INSERT INTO confsys.users(id,email,state,password_hash,verified_at,credential_version) VALUES ($1,'upgrade@example.invalid','active',$2,now(),1)",
+            [userId, await hashPassword("Synthetic migration password 981!")],
+          );
+          await pool.query(
+            "INSERT INTO confsys.auth_tokens(id,user_id,email,purpose,token_hash,expires_at) VALUES ($1,$2,'upgrade@example.invalid','reset',$3,now()+interval '1 hour')",
+            [tokenId, userId, tokenHash(randomUUID())],
+          );
+          await pool.query(
+            "INSERT INTO confsys.sessions(id,user_id,token_hash,credential_version,created_at,last_seen_at,expires_at) VALUES ($1,$2,$3,1,now(),now(),now()+interval '1 hour')",
+            [randomUUID(), userId, tokenHash(sessionSecret)],
+          );
+          await pool.query(
+            "INSERT INTO confsys.notifications(id,scope,user_id,token_id,kind,request_id,expires_at) VALUES ($1,'identity',$2,$3,'reset',$4,now()+interval '1 hour')",
+            [notificationId, userId, tokenId, randomUUID()],
+          );
+          await pool.query(
+            "INSERT INTO confsys.notification_secrets(notification_id,key_version,ciphertext,expires_at) VALUES ($1,'synthetic','synthetic-preserved-envelope',now()+interval '1 hour')",
+            [notificationId],
+          );
+          await pool.query(
+            "INSERT INTO confsys.auth_audit(id,event,user_id,request_id) VALUES ($1,'login_succeeded',$2,$3)",
+            [randomUUID(), userId, randomUUID()],
+          );
+          saved = await snapshot();
+        }
         if (kind === "upgrade") {
           await runMigrations(pool, directory);
           checksum = (
@@ -66,7 +116,7 @@ it("migrates a blank isolated database and upgrades an isolated Phase 0 database
         expect(
           (await pool.query("SELECT count(*) FROM confsys.schema_migrations"))
             .rows[0].count,
-        ).toBe("3");
+        ).toBe("4");
         if (checksum) {
           expect(
             (
@@ -90,7 +140,29 @@ it("migrates a blank isolated database and upgrades an isolated Phase 0 database
           expect(
             (await runtime.query("SELECT count(*) FROM confsys.users")).rows[0]
               .count,
-          ).toBe("0");
+          ).toBe(kind === "phase11b" ? "1" : "0");
+          if (kind === "phase11b") {
+            expect(await snapshot()).toEqual(saved);
+            const service = createAuthService(
+              runtime,
+              loadApiConfig({ ...process.env, DATABASE_URL: runtimeUrl.href }),
+            );
+            expect((await service.me(sessionSecret)).user.roles).toEqual([]);
+            expect(
+              (
+                await runtime.query(
+                  "SELECT password_verified_at,revoked_at FROM confsys.sessions",
+                )
+              ).rows[0],
+            ).toEqual({ password_verified_at: null, revoked_at: null });
+            expect(
+              (
+                await runtime.query(
+                  "SELECT initialized_user_id FROM confsys.access_control",
+                )
+              ).rows[0].initialized_user_id,
+            ).toBeNull();
+          }
         } finally {
           await runtime.end();
         }

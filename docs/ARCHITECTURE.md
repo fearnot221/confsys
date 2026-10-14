@@ -54,9 +54,9 @@ Each deployment fixes its own database/Redis connections at startup. Host/header
 
 The unused Phase 0 `withTenant` helper and tenant fixture were retired in 1.1b. `withIdentityTransaction` still owns one pooled connection and commit/rollback; failed rollback destroys it. Actual-role grant, rollback, pool-reuse and constraint tests remain. Resource authorization and suitable resource-level RLS belong to future local business modules; no production RLS policy was disabled.
 
-## Beyond Phase 1.1; not implemented
+## Later business modules; not implemented
 
-Phase 1.1 implements identity/session and its minimal audit/outbox. Later units introduce local conference roles/resource permissions, controlled administrator initialization, settings versions and private file metadata. Domain services/policies will be shared with worker; controllers only validate/map requests. No empty domain package was created because there are no business state machines yet.
+Phase 1.1 implements identity/session and its minimal audit/outbox. Phase 1.2 adds local account access control below. Later units introduce resource permissions, settings versions and private file metadata. Domain services/policies will be shared with worker; controllers only validate/map requests. No empty domain package was created because there are no business state machines yet.
 
 Outbox: business state + event commit atomically in PostgreSQL. Dispatcher retries delivery using stable event IDs; handlers re-load trusted scope, re-check current policy, record attempts and deduplicate business outcomes. At-least-once processing does not guarantee exactly-once SMTP/payment effects. See ADR for interface conventions. This was the Phase 0 convention; Phase 1.1 implements identity-only notification records as described below.
 
@@ -80,3 +80,13 @@ Migration `0003_identity_grants.sql` narrows runtime UPDATE privileges to requir
 `packages/config` validates server-only connection/secrets and canonical `PUBLIC_APP_ORIGIN`, plus `CONFERENCE_NAME`. API `instance.ts` exposes only `{conferenceName}`; contracts → SDK `getInstance` → `useInstance` → props-only UI. API and capture worker receive the same display setting; no DB settings authority or CMS exists yet. There is no build-time VITE identity/config value. Web ingress validates Host and forwards canonical Host to API, never trusts forwarded host/IP. Health endpoints permit internal probes; all other API routes require canonical Host.
 
 One image contains Web/API/worker builds and can run multiple independent Compose projects. Compose's project name is sufficient operational identification; no redundant INSTANCE_ID field is added to account rows. Project-specific networks have no shared external network; only loopback development ports are published. No file adapter/metadata/storage volume exists yet: private upload/download is explicitly unimplemented.
+
+## Phase 1.2 entry points and responsibility boundaries
+
+`access/routes.ts` validates transport and Origin/CSRF; `access/service.ts` owns session authorization, target eligibility, recent proof, transactions and last-admin invariant; `access/policy.ts` owns the fixed mapping and pure policies; `access/repository.ts` owns bindings/control/audit projections and SQL. `auth/session.ts` is the shared trusted session resolver. Identity and access services intentionally share the existing user lock/credential/session/token persistence primitives in `auth/repository.ts`; neither duplicates password logic or creates a second epoch. Auth account projection uses the same roles reader/mapping. These are parts of the local identity domain, not separate services with circular service calls.
+
+`access/bootstrap.ts` is an operator-only application entry point, imported by `scripts/bootstrap-admin.ts`, never registered by HTTP or worker. Its validated config contains only migration connection/display/origin; no new environment variable or bootstrap password exists. It checks the operator DB role, uses the same lock/grant/audit primitives, and stores the one-time marker atomically. The worker has no access to new role/marker/audit reads; disabled notification eligibility remains its existing narrow view.
+
+Readiness now requires migration 0004. Existing tables/migrations are not rewritten. New session proof is nullable for preserved old sessions; current login records true password verification time. See ADR 0004 for lock order, version fencing, failure/roll-forward semantics and pagination tradeoff. No extra RBAC framework, empty package, Redis permission cache or shared-instance identity.
+
+Browser flow: contracts/access → SDK (`createAuthClient` retains the single credential/CSRF transport) → `features/access/hooks/use-access` → props-only `access-screen`. Account links expose the directory only through server capabilities. Queries use private keys, AbortSignal and cancellation/removal on session expiry; in-flight detail/mutation callbacks are aborted and gated. Login/logout fully navigate, discarding the old query client. No token/browser persistence in components.

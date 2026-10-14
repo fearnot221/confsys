@@ -1,13 +1,14 @@
 # Roadmap
 
-Scope follows SPEC. This delivery is limited to authorized Phase 1.1b; Phase 1.2 and later units still require approval.
+Scope follows SPEC. This delivery is limited to authorized Phase 1.2; later units still require approval.
 
 | Phase | Status / scope |
 |---|---|
 | 0 | Implemented engineering foundation, real service UI, contracts, isolation tests, CI configuration and docs; evidence in PHASE0_DELIVERY |
 | 1.1 | Implemented identity lifecycle/session plus required identity audit/outbox/worker/Mailpit; see PHASE1_1_DELIVERY |
 | 1.1b | Single-conference deployment correction; runtime display, isolated resource template and dual-instance regression |
-| 1.2+ | Not started: local conference roles/resource permissions/controlled administrator initialization, invitations, settings/public pages and private files |
+| 1.2 | Implemented fixed local roles/permissions, one-time operator CLI bootstrap, account management UI/API, reauthentication and audit; see PHASE1_2_DELIVERY |
+| Later Phase 1 | Not started: invitations, versioned settings/public pages, private files and resource-specific permissions |
 | 2 | Not started: registration, pricing, capacity, manual reconciliation, group payments, meals, receipts |
 | 3 | Not started: submission, revisions, private content validation/quarantine |
 | 4 | Not started: assignments, conflicts, review and decision publication |
@@ -15,15 +16,15 @@ Scope follows SPEC. This delivery is limited to authorized Phase 1.1b; Phase 1.2
 | 6 | Not started: check-in/redemption, documents, notifications, exports, selected provider sandboxes |
 | 7 | Not started: Claude read-only UI audit then isolated presentation PRs; end-to-end launch verification |
 
-## Phase 1 increments (only 1.1b currently authorized)
+## Phase 1 increments (only 1.2 currently authorized)
 
 1. **1.1 retained:** local registration/verification/reset/session, CSRF/Origin, audit/outbox/worker/Mailpit, race and crash recovery.
-2. **1.1b current:** correct single-conference model in contracts/config/Compose/UI/mail/docs/tests, same-build dual-instance isolation. No role/CMS/business modules.
-3. **1.2 proposed, requires approval:** local permission model and policies first; then operator-authorized one-time audited administrator bootstrap; then bounded role-grant/revoke UI. Include resource-ID substitution, revoked permissions and author/reviewer self-review exclusion when resources exist. Administrator MFA remains a launch gate. Original membership/scope-resolver and conference-switch plans are cancelled.
+2. **1.1b retained:** correct single-conference model in contracts/config/Compose/UI/mail/docs/tests, same-build dual-instance isolation. No role/CMS/business modules.
+3. **1.2 implemented:** fixed roles, explicit policies, one-time operator CLI bootstrap, bounded account UI/API, audited grant/revoke/status/session management and recent password proof. Resource/assignment/self-review exclusions await their real business modules. Administrator MFA remains a launch gate. Membership/scope-resolver and conference-switch plans remain cancelled.
 4. **Later settings/site:** versioned local conference configuration, dates/timezone/currency/locales, public draft/revision/projection and locale/SEO. Future reuse exports/imports whitelisted settings into a fresh instance; never clone account/business DBs.
 5. **Later reliability:** local invitations and resource-specific notification policy; private file framework with validation/quarantine/download authorization. Preserve all original registration/finance/submission/review/competition/program/on-site/mail/statistics phases above.
 
-Each unit needs real UI/API/errors/permissions/tests/docs. Stop after 1.1b; no implicit Phase 1.2 approval.
+Each unit needs real UI/API/errors/permissions/tests/docs. Stop after Phase 1.2 local commit; no implicit approval for invitations, CMS or later business work.
 
 Open questions that do not block Phase 0: hosting, volumes/traffic, external mail/payment provider, SSO, receipt requirements, data retention and anonymization policy. No provider/production-readiness claim is made.
 
@@ -72,3 +73,16 @@ Verified `f1126ad` includes `c10b025`/`c6f1d5f`. M1–M5 fixes remain; no auth r
 Additional bounded debt: shared-host Docker projects do not constrain host/Docker administrators or guarantee CPU/memory availability. Before public deployment review network/firewall/resource limits and separate queue/cache services; validate TLS, secret management, backup/restore and exact image digests for each instance. Local loopback infra ports are a development convenience, not a production exposure policy.
 
 No file adapter/metadata exists, so private file isolation is unimplemented and must be tested in its authorized unit. Runtime display env is intentionally minimal; editable/versioned settings and white-list import are future units. Update each instance independently using an explicit version/digest, documented config requirements, migration/backup/recovery; no central upgrade controller is planned here.
+
+## Phase 1.2 focused Phase 0 baseline recheck — 2026-10-15
+
+Verified 520607e contains ab7120f, f1126ad, c10b025 and c6f1d5f before creating the isolated branch/worktree. Rechecked M1–M5 against config/process grants, auth/service/repository/session/outbox, contracts/SDK/hooks/UI boundaries, migration ledger, build and tests. Existing fixes remain effective. No evidenced inherited blocker required unrelated restructuring. Existing credential_version and user locks support this unit; new management operations must share those fences rather than create a second revocation counter. New additive 0004, serialized access writes, operator-only bootstrap and real failure/race tests close this unit's correctness requirements. Historical approvals are not perpetual approval.
+
+| New evidence | Practical risk | Acceptance / treatment |
+|---|---|---|
+| Bounded offset directory/audit with literal substring scan | Large accounts/audit tables can increase scan cost; pages shift while concurrent rows are inserted | Before measured large-event rollout: benchmark representative synthetic volumes, add keyset pagination/search indexes if needed, preserve strict projection/permissions and add cursor/filter tests. Current max 50 page / 100000 offset is not an export facility. |
+| Single-control-row locking for rare administration | Long transactions can delay management requests | Before scaling administration: monitor safe timeout metrics, load-test lock contention; retain post-lock actor revalidation and invariant tests. No unmeasured permission cache/engine now. |
+| Bootstrap intentionally stays closed after completion | All admin credentials lost requires controlled recovery | Before privileged production operation: review a separate audited, operator-authenticated recovery procedure with MFA and backup rehearsal; no force-admin flag or marker-reset product. |
+| Account UI has email/UUID and no profile/name editing | Directory can only search actual existing identity fields | Future profile/settings unit: define owned fields and privacy rules before adding names; do not mislabel registration as conference participation. |
+
+All previous debt remains: MFA launch gate, rotation, trusted proxy/IP limits, stronger password screening/Argon2 capacity, retention, TLS, backup restore, external-provider readiness, full accessibility/browser matrix and shared-host limits. Next minimal unit proposed for approval: versioned local conference settings/public website; invitations and other business phases remain separate authorization decisions.

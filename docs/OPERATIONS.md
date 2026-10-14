@@ -2,7 +2,7 @@
 
 Compose services are project-namespaced, persistent volumes are local, mapped ports bind to 127.0.0.1 only. PostgreSQL official entrypoint bootstraps roles before accepting application use; app images run as node (non-root). Redis is persistent AOF/noeviction; cache and queues share only the development instance. Mailpit has no relay configuration. No real email sender or payment adapter exists.
 
-Migration is a separate command/container under confsys_migrator, serialized by a PostgreSQL advisory transaction lock. The ledger tracks SHA-256 checksums, rejecting edited applied migrations. Migrations are forward-only; write an explicit repair/forward migration after review, not automatic down migrations. API and worker readiness require the identity grants migration (0003) and safe database roles. Applications never get migrator/admin credentials through Compose service env.
+Migration is a separate command/container under confsys_migrator, serialized by a PostgreSQL advisory transaction lock. The ledger tracks SHA-256 checksums, rejecting edited applied migrations. Migrations are forward-only; write an explicit repair/forward migration after review, not automatic down migrations. API and worker readiness require the access control migration (0004) and safe database roles. Applications never get migrator/admin credentials through Compose service env.
 
 Development app images contain build dependencies; do not treat them as hardened production images. Before production: separate queue/cache instances, TLS/reverse-proxy controls, managed secrets, restricted network access, backup policy, object storage, logs/metrics/alerts, vulnerability review, public rendering, capacity testing, provider sandbox verification and local business authorization. `NODE_ENV=production` is a runtime optimization, not a production-readiness certification.
 
@@ -78,3 +78,26 @@ The template uses independent project bridges with no shared external network, n
 Upgrade one instance at a time: choose version/digest, review required env changes, make and verify an instance-specific backup, stop only its app processes as needed, run its migration, start its matching image, then smoke that instance. Phase 1.1b preserves 0001–0003 byte-for-byte and requires no schema/data backfill; old hashes/sessions/outbox remain valid. Rollback to an earlier image requires compatible settings and image-specific review; do not rewrite migration history. Actual disaster restore/TLS/provider/load drills remain unverified.
 
 A new conference is always a fresh instance with new credentials. Future whitelisted settings export/import is separate from disaster recovery and must exclude accounts, sessions, tokens, manuscripts, payments and secrets. No central auto-upgrade/control plane exists.
+
+## Phase 1.2 controlled administrator bootstrap and handoff
+
+1. Select the exact instance env file and matching software. The person registers and verifies through its real auth flow, then copies **their local account ID** from `/auth/account`.
+2. From an operator shell authorized to access this instance's migration connection, preview the target and compare conference name, public origin, UUID/email/status. Do not publish this output; it contains a local account email.
+3. Apply once with an explicit reason and exact public origin. No password/token appears in args. The following are executable script forms; replace only the example path/UUID/origin with the selected deployment's values:
+
+```sh
+CONFSYS_ENV_FILE=/absolute/path/instance.env pnpm admin:bootstrap --user-id <local-user-uuid>
+CONFSYS_ENV_FILE=/absolute/path/instance.env pnpm admin:bootstrap --user-id <local-user-uuid> --apply --reason 'Initial conference administrator' --confirm-origin https://conference.example
+```
+
+The selected file supplies `MIGRATION_DATABASE_URL`, `CONFERENCE_NAME`, `PUBLIC_APP_ORIGIN`, `NODE_ENV`; all are centrally validated. No API or worker receives the migration credential. There is no HTTP bootstrap endpoint, automatic startup/migration/seed admin, force flag or default password. `operator_cli` records shell authority and a correlation UUID; it does not certify who physically used the shell. Reasons must omit secrets and unnecessary personal information.
+
+Preview changes no account/role/session/audit data and sends no mail. Apply serializes on the persistent control row, requires an active verified password-bearing target, and commits binding/marker/audit/session revocation/credential epoch together. Exactly one competing initialization can succeed. Same completed target returns unchanged (even if its admin binding was later removed); another target rejects. A disabled/missing/unverified target fails. A crash before commit rolls back; after uncertain completion, rerun preview then same-target apply to inspect the durable result, never delete the marker.
+
+After bootstrap the target logs in again, opens 帳號管理, finds another already-verified local account and grants conference_admin with reason/confirmation. That account must log in again before handoff. Use a second admin to revoke the previous admin or disable it; self role/status changes are prohibited and at least one eligible admin must remain. Staff only read the minimal directory. Effective role changes and disable/restore revoke old sessions; disable also invalidates recovery links. Restore preserves any displayed remaining roles, never revives removed ones. Forced logout always fences in-progress login, even if the account has no visible active sessions.
+
+Password proof is valid for less than five minutes; use 目前密碼 / 重新驗證密碼 then separately reconfirm the action. Password failure uses the existing safe error and Redis source limit plus five reauth attempts per session per 15 minutes. Redis failure denies reauthentication; existing recent proof and DB-only management remain available. Admin is not exempt from Origin/CSRF. Review security audit with request ID when diagnosing; logs never contain passwords/reasons/body/SQL.
+
+For 520607e → Phase 1.2: stop only the selected instance's app processes, preserve/verify its backup, run `pnpm db:migrate` separately, start matching new API/worker/Web images, run smoke and `pnpm test:access` only against an isolated test DB. Migration 0004 preserves existing identities and sessions; old sessions require reauth before management. New DTOs are strict and require matching Web/SDK. Do not mix old/new API versions for privileged operations. Roll-forward is supported by versioned migrations; automatic down migration, emergency admin recovery, production backup restoration and mixed-version compatibility are not validated. If all administrators lose access, bootstrap stays closed: commission a separately reviewed operator recovery procedure rather than editing production data ad hoc.
+
+MFA remains mandatory before high-privilege production launch. Key rotation, stronger password screening, trusted proxy, TLS, retention/backup rehearsal, real provider and full WCAG work remain ROADMAP items. This round uses synthetic data/Mailpit only.

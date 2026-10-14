@@ -8,6 +8,7 @@ import {
   tokenPasswordInput,
   accountSchema,
   csrfSchema,
+  reauthenticateInput,
 } from "@confsys/contracts";
 import type { ApiConfig } from "@confsys/config";
 import type { AuthService } from "./service.js";
@@ -73,7 +74,7 @@ export async function registerAuthRoutes(
               ? parsed.data.email
               : "token" in parsed.data
                 ? parsed.data.token
-                : undefined;
+                : req.cookies[policy.name];
           await limit(
             operation === "register" || operation === "resend"
               ? "verification"
@@ -108,6 +109,13 @@ export async function registerAuthRoutes(
             });
             return result.account;
           }
+          case "reauthenticate":
+            await service.reauthenticate(
+              req.cookies[policy.name],
+              reauthenticateInput.parse(parsed.data).password,
+              req.id,
+            );
+            return { status: "complete" };
           case "logout":
             await service.logout(req.cookies[policy.name], req.id);
             reply.clearCookie(policy.name, policy.options);

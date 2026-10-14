@@ -229,3 +229,63 @@ header a {
 .auth-panel [data-testid="account-email"] {
   overflow-wrap: anywhere;
 }
+
+.access-panel {
+  padding-bottom: 48px;
+  overflow-wrap: anywhere;
+}
+.access-panel header {
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.access-panel header h1 {
+  width: 100%;
+  font-size: clamp(28px, 4vw, 38px);
+}
+.access-panel form {
+  display: grid;
+  gap: 16px;
+  max-width: 640px;
+  margin: 24px 0;
+}
+.access-panel label {
+  display: grid;
+  gap: 8px;
+}
+.access-panel input:not([type="checkbox"]),
+.access-panel select {
+  font: inherit;
+  min-height: 46px;
+  width: 100%;
+  padding: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.access-panel section {
+  margin-top: 32px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+.access-panel li {
+  margin: 16px 0;
+}
+.access-panel li button {
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  text-align: left;
+}
+.access-panel nav {
+  display: flex;
+  gap: 16px;
+}
+.access-panel [role="alert"] {
+  padding: 14px;
+  background: #f7eddb;
+  color: #6d3814;
+}
+.access-panel [role="status"] {
+  padding: 14px;
+  background: #e9f2ea;
+}

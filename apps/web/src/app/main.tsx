@@ -1,3 +1,5 @@
+import { useAccess } from "../features/access/hooks/use-access.js";
+import { AccessScreen } from "../features/access/components/access-screen.js";
 import { useInstance } from "../features/instance/hooks/use-instance.js";
 import { useAuth } from "../features/auth/hooks/use-auth.js";
 import { AuthScreen } from "../features/auth/components/auth-screen.js";
@@ -75,12 +77,38 @@ function AuthApp() {
     <AuthScreen {...state} conferenceName={instance.data.conferenceName} />
   );
 }
+function AccessApp() {
+  const state = useAccess();
+  const instance = useInstance();
+  useEffect(() => {
+    document.documentElement.lang = "zh-Hant";
+    document.title = `${instance.data?.conferenceName ?? "研討會"} · 帳號管理`;
+  }, [instance.data]);
+  if (!instance.data)
+    return (
+      <main>
+        <p role={instance.error ? "alert" : "status"}>
+          {instance.error ? "無法取得研討會設定。" : "載入研討會…"}
+        </p>
+        <button onClick={() => void instance.refetch()}>重試</button>
+      </main>
+    );
+  return (
+    <AccessScreen {...state} conferenceName={instance.data.conferenceName} />
+  );
+}
 const queryClient = new QueryClient();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        {window.location.pathname.startsWith("/auth/") ? <AuthApp /> : <App />}
+        {window.location.pathname.startsWith("/access/") ? (
+          <AccessApp />
+        ) : window.location.pathname.startsWith("/auth/") ? (
+          <AuthApp />
+        ) : (
+          <App />
+        )}
       </QueryClientProvider>
     </ErrorBoundary>
   </React.StrictMode>,

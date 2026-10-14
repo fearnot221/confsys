@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import type { ApiConfig } from "@confsys/config";
 import { withIdentityTransaction } from "@confsys/db";
@@ -25,12 +25,25 @@ import {
   lockUser,
   revokeSessions,
   revokeTokens,
+  recordPasswordProof,
 } from "./repository.js";
-export const tokenHash = (value: string) =>
-  createHash("sha256").update(value).digest("hex");
+import { tokenHash, sessionActor } from "./session.js";
+export { tokenHash } from "./session.js";
+import { rolesFor } from "../access/repository.js";
+import { permissionsFor } from "../access/policy.js";
+import type { Role } from "@confsys/contracts";
 const secret = () => randomBytes(32).toString("base64url");
-const projection = (user: { id: string; email: string }): Account => ({
-  user: { id: user.id, email: user.email, verified: true },
+const projection = (
+  user: { id: string; email: string },
+  roles: Role[],
+): Account => ({
+  user: {
+    id: user.id,
+    email: user.email,
+    verified: true,
+    roles,
+    permissions: permissionsFor(roles),
+  },
 });
 export function createAuthService(
   pool: Pool,
@@ -179,7 +192,7 @@ export function createAuthService(
           ),
         });
         await audit(db, "login_succeeded", user.id, requestId);
-        return { raw, account: projection(user) };
+        return { raw, account: projection(user, await rolesFor(db, user.id)) };
       });
       if (!result) throw new AuthError("INVALID_CREDENTIALS");
       return result;
@@ -195,7 +208,37 @@ export function createAuthService(
         new Date(now.getTime() - config.SESSION_IDLE_SECONDS * 1000),
       );
       if (!user) throw new AuthError("SESSION_EXPIRED");
-      return projection(user);
+      return projection(user, await rolesFor(pool, user.id));
+    },
+    async reauthenticate(
+      raw: string | undefined,
+      password: string,
+      requestId: string,
+    ) {
+      const initial = await withIdentityTransaction(pool, (db) =>
+        sessionActor(db, raw, config, clock()),
+      );
+      const user = await findUser(pool, initial.email);
+      const valid = await verify(
+        user?.password_hash ?? (await dummyHash),
+        password,
+      );
+      const accepted = await withIdentityTransaction(pool, async (db) => {
+        const actor = await sessionActor(db, raw, config, clock(), true);
+        const current = await lockUser(db, actor.id);
+        if (
+          !valid ||
+          !current ||
+          current.credential_version !== user?.credential_version
+        ) {
+          await audit(db, "reauthentication_failed", actor.id, requestId);
+          return false;
+        }
+        await recordPasswordProof(db, actor.hash, clock());
+        await audit(db, "reauthentication_succeeded", actor.id, requestId);
+        return true;
+      });
+      if (!accepted) throw new AuthError("INVALID_CREDENTIALS");
     },
     async logout(raw: string | undefined, requestId: string) {
       await withIdentityTransaction(pool, async (db) => {

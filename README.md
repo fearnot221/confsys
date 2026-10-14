@@ -2,7 +2,7 @@
 
 **一份程式碼，每場研討會獨立部署，每個實例只服務一場。** 帳號、Session、token、資料、佇列與郵件各自獨立；不是全域帳號跨研討會平台。主辦單位是介紹／聯絡資料，不是 tenant。產品決策見 [SPEC](docs/SPEC.md)／[ADR 0003](docs/adr/0003-single-conference.md)。
 
-目前有 Phase 0 工程底座、Phase 1.1 真實帳號生命週期，以及 Phase 1.1b 單研討會校正。角色、CMS、報名、付款、投稿尚未實作；[ROADMAP](docs/ROADMAP.md) 的 Phase 1.2 需要另行授權。
+目前有 Phase 0 工程底座、Phase 1.1 帳號生命週期、Phase 1.1b 單研討會校正，以及 Phase 1.2 固定角色、權限與受控管理員初始化。CMS、邀請、報名、付款、投稿尚未實作；後續單元需要另行授權。
 
 ## 本地啟動
 
@@ -22,7 +22,7 @@ pnpm dev
 
 預設 Web 25173、API 23000、worker 23001、PostgreSQL 25432、Redis 26379、Mailpit UI 28025／SMTP 21025，全部本地。可用 `WEB_PORT`、`API_PORT`、`WORKER_PORT`、`POSTGRES_PORT`、`REDIS_PORT`、`MAILPIT_PORT`、`SMTP_PORT` 避免衝突；canonical `PUBLIC_APP_ORIGIN` 必須對應 Web URL。不同實例必須使用不同 hostname，僅換 port 不隔離 Cookie。範例雙實例由 `pnpm test:instances` 建立。
 
-開啟 `/auth/register` → 使用合成 `@example.invalid` 信箱 → 在該實例 Mailpit 找驗證信 → 明確送出新密碼 → `/auth/login` → `/auth/account`。支援重寄、重設與登出。頁面標題、登入頁、帳號頁與郵件由 runtime `CONFERENCE_NAME` 呈現；`/` 保留服務診斷頁。沒有假角色或業務資料。
+開啟 `/auth/register` → 使用合成 `@example.invalid` 信箱 → 在該實例 Mailpit 找驗證信 → 明確送出新密碼 → `/auth/login` → `/auth/account`。支援重寄、重設與登出。頁面標題、登入頁、帳號頁與郵件由 runtime `CONFERENCE_NAME` 呈現；`/` 保留服務診斷頁。一般新帳號沒有管理角色，也不代表已完成研討會報名。管理員由部署者明確執行一次性 CLI 初始化，見下方及 [OPERATIONS](docs/OPERATIONS.md#phase-12-controlled-administrator-bootstrap-and-handoff)。
 
 ## 全容器啟動與選擇實例
 
@@ -51,8 +51,21 @@ pnpm check
 pnpm test:instances
 ```
 
-`check` 依序執行 lint、typecheck、unit、真實 PostgreSQL／Redis／Mailpit integration、contract、clean build、Playwright E2E。E2E 不重用已佔用服務，host E2E 與選定容器 Web 不能同時使用相同 port。雙實例入口使用 35173–35174、35432–35433、36379–36380、38025–38026、31025–31026，需先確認空閒。精確步驟、測試替換對照與安全清理見 [TESTING](docs/TESTING.md)；本輪證據見 [PHASE1_1B_DELIVERY](docs/PHASE1_1B_DELIVERY.md)。
+`check` 依序執行 lint、typecheck、unit、真實 PostgreSQL／Redis／Mailpit integration、contract、clean build、Playwright E2E。E2E 不重用已佔用服務，host E2E 與選定容器 Web 不能同時使用相同 port。雙實例入口使用 45173–45174、45432–45433、46379–46380、48025–48026、41025–41026，需先確認空閒。精確步驟、測試替換對照與安全清理見 [TESTING](docs/TESTING.md)；本輪證據見 [PHASE1_2_DELIVERY](docs/PHASE1_2_DELIVERY.md)。
 
 API/DB/policy/contracts/SDK/hooks/CI 由 Codex 負責；後期 Claude 改善純呈現元件、layout、tokens 與 accessibility。`presentation → hooks → SDK → contracts/API`，元件不讀 token、不 fetch、不定義業務授權。[ARCHITECTURE](docs/ARCHITECTURE.md)、[PERMISSIONS](docs/PERMISSIONS.md)、[UI_CONTRACT](docs/UI_CONTRACT.md)、[DATA_CONTRACT](docs/DATA_CONTRACT.md) 提供入口與責任邊界。
 
-只使用合成資料與 Mailpit；沒有 production seeds／真信／金流。完成本輪本地提交後停止，不 push、merge 或開始 Phase 1.2。
+只使用合成資料與 Mailpit；沒有 production seeds／真信／金流。完成本輪本地提交後停止，不 push、merge 或開始下一階段。
+
+## 本研討會管理員初始化與管理
+
+先在此實例自行完成註冊及驗證，在自己的帳號頁取得本地 UUID。部署者選定此實例 env，預覽目標再明確 apply：
+
+```sh
+CONFSYS_ENV_FILE=/absolute/path/instance.env pnpm admin:bootstrap --user-id <local-user-uuid>
+CONFSYS_ENV_FILE=/absolute/path/instance.env pnpm admin:bootstrap --user-id <local-user-uuid> --apply --reason 'Initial conference administrator' --confirm-origin https://conference.example
+```
+
+使用實際 env 路徑、UUID 與該實例 origin。成功後重新登入 → 帳號管理 → 搜尋已驗證的本地帳號 → 確認角色／狀態、理由與 Session 失效效果 → 執行。只有 conference_admin 可寫與讀稽核；conference_staff 只能查目錄。高風險操作要求五分鐘內密碼驗證；不可改自己的角色／停用自己，不能失去最後管理員。bootstrap 永不自動重開。完整矩陣見 PERMISSIONS，鎖與升級限制見 ADR 0004，維運步驟見 OPERATIONS。
+
+`pnpm test:access` 是可重跑的真 PostgreSQL／Redis／CLI 存取控制驗證入口，限定此輪合成 `confsys_test`。`pnpm check` 包含它所用的整合案例與完整 UI E2E。沒有新增依賴／環境變數；需要向前 migration 0004。MFA 尚未實作，本地測試不代表高權限 production ready。

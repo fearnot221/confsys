@@ -133,7 +133,7 @@ export async function insertSession(
   },
 ) {
   await db.query(
-    "INSERT INTO confsys.sessions(id,user_id,token_hash,credential_version,created_at,last_seen_at,expires_at) VALUES ($1,$2,$3,$4,$5,$5,$6)",
+    "INSERT INTO confsys.sessions(id,user_id,token_hash,credential_version,created_at,last_seen_at,expires_at,password_verified_at) VALUES ($1,$2,$3,$4,$5,$5,$6,$5)",
     [
       randomUUID(),
       session.userId,
@@ -167,5 +167,29 @@ export async function revokeSession(db: PoolClient, hash: string, now: Date) {
         [hash, now],
       )
     ).rows[0]?.user_id ?? null
+  );
+}
+export async function advanceCredentialVersion(db: PoolClient, userId: string) {
+  await db.query(
+    "UPDATE confsys.users SET credential_version=credential_version+1 WHERE id=$1",
+    [userId],
+  );
+}
+export async function sessionByHash(db: Connection, hash: string) {
+  return (
+    await db.query<{ user_id: string; password_verified_at: Date | null }>(
+      "SELECT user_id,password_verified_at FROM confsys.sessions WHERE token_hash=$1",
+      [hash],
+    )
+  ).rows[0];
+}
+export async function recordPasswordProof(
+  db: PoolClient,
+  hash: string,
+  now: Date,
+) {
+  await db.query(
+    "UPDATE confsys.sessions SET password_verified_at=$2 WHERE token_hash=$1",
+    [hash, now],
   );
 }

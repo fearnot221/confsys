@@ -1,5 +1,13 @@
 import {
   accountSchema,
+  directorySchema,
+  directoryAccountSchema,
+  directoryQuery,
+  roleCatalogSchema,
+  auditPageSchema,
+  accessMutationInput,
+  accessResultSchema,
+  type AccessMutation,
   authOperations,
   csrfSchema,
   errorSchema,
@@ -29,6 +37,59 @@ export function createAuthClient(
     return body;
   }
   return {
+    async directory(
+      input: {
+        search?: string;
+        state?: "pending" | "active" | "disabled";
+        offset?: number;
+      },
+      signal: AbortSignal,
+    ) {
+      const query = directoryQuery.parse(input);
+      const params = new URLSearchParams(
+        Object.entries(query).map(([key, value]) => [key, String(value)]),
+      );
+      return directorySchema.parse(
+        await request(`/api/access/accounts?${params}`, { signal }),
+      );
+    },
+    async detail(id: string, signal: AbortSignal) {
+      return directoryAccountSchema.parse(
+        await request(`/api/access/accounts/${encodeURIComponent(id)}`, {
+          signal,
+        }),
+      );
+    },
+    async roles(signal: AbortSignal) {
+      return roleCatalogSchema.parse(
+        await request("/api/access/roles", { signal }),
+      );
+    },
+    async audit(offset: number, signal: AbortSignal) {
+      return auditPageSchema.parse(
+        await request(`/api/access/audit?offset=${offset}`, { signal }),
+      );
+    },
+    async manage(id: string, input: AccessMutation, signal: AbortSignal) {
+      const data = accessMutationInput.parse(input);
+      const { csrfToken } = csrfSchema.parse(
+        await request("/api/auth/csrf", { signal }),
+      );
+      return accessResultSchema.parse(
+        await request(
+          `/api/access/accounts/${encodeURIComponent(id)}/actions`,
+          {
+            method: "POST",
+            signal,
+            headers: {
+              "content-type": "application/json",
+              "x-csrf-token": csrfToken,
+            },
+            body: JSON.stringify(data),
+          },
+        ),
+      );
+    },
     async me(signal?: AbortSignal) {
       return accountSchema.parse(
         await request("/api/auth/me", {

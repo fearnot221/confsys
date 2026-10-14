@@ -1,8 +1,8 @@
 # 可重複使用的研討會管理平台｜產品與工程規格
 
-版本：0.2（單研討會獨立部署決策）
+版本：0.3（單研討會部署與 Phase 1.2 本地權限）
 日期：2026-10-15  
-狀態：產品目標與工程契約；已實作範圍以 Phase 0、1.1 與 1.1b 交付證據為準，其餘仍待分階段授權與驗證。
+狀態：產品目標與工程契約；已實作範圍以 Phase 0、1.1、1.1b 與 1.2 交付證據為準，其餘仍待分階段授權與驗證。
 
 ## 0. 需求來源與決策界線
 
@@ -126,7 +126,7 @@ User 是本實例帳號，可有本場報名、投稿與審查指派；未來外
 | Conference | 現場工作人員 | 報到、名牌、餐券／活動核銷所需最小資料 |
 | Own resources | 參與者／作者／報告者 | 自己有權管理的報名、稿件及文件 |
 
-實作採 scoped roles + granular permissions + resource relationships。同一個本地帳號可在本會議兼作者與審查者，但不能自審或自行決議自己的論文。角色與受控管理員初始化留待 Phase 1.2；第一個公開註冊者不能自動成為管理員。先提供固定角色模板與明確 permission matrix，不在首輪開發任意權限規則 DSL。
+實作採 scoped roles + granular permissions + resource relationships。同一個本地帳號可在本會議兼作者與審查者，但不能自審或自行決議自己的論文。Phase 1.2 實作 conference_staff／conference_admin 固定角色與受控管理員初始化，正式矩陣見 PERMISSIONS；第一個公開註冊者不能自動成為管理員。先提供固定角色模板與明確 permission matrix，不在首輪開發任意權限規則 DSL。
 
 ### 5.3 登入與安全
 
@@ -303,7 +303,7 @@ Redis queue 不可用時，可在 PostgreSQL 已可靠保存 outbox 的前提下
 | 模組 | 核心 entities |
 |---|---|
 | Identity | User、AuthIdentity、Session、Invitation、VerificationToken |
-| Local access | 本會議 RoleBinding、Permission、Resource relationship（Phase 1.2 待授權） |
+| Local access | 本地 RoleBinding、固定 Permission（Phase 1.2）；Resource relationship 待其業務單元 |
 | Configuration / CMS | ConferenceSettingsVersion、DeadlineWindow、FormDefinitionVersion、Page、PageRevision、News、Sponsor |
 | Registration | Registration、RegistrationAnswerSnapshot、TicketType、PriceRule、CapacityReservation |
 | Finance | Order、OrderItem、Payment、PaymentAllocation、Refund、Receipt、ReceiptRevision |
@@ -404,8 +404,8 @@ Phase 0 曾有測試專用 tenant-context／RLS 範例；Phase 1.1b 退役未採
 ### Phase 1：本地帳號、權限、會議設定與基礎官網
 
 1.1 已實作註冊／驗證／登入／登出／重設、Session、CSRF、audit／outbox／worker／Mailpit。
-1.1b 本輪限定校正單研討會獨立部署、runtime 名稱及雙實例隔離，保留既有安全回歸。
-原 membership／scope resolver 計畫取消。1.2 待授權實作本研討會角色、資源權限及可稽核、維運授權的一次性管理員初始化；不得以第一個公開註冊者取得權限。管理員 MFA 仍為上線門檻。
+1.1b 已校正單研討會獨立部署、runtime 名稱及雙實例隔離，保留既有安全回歸。
+原 membership／scope resolver 計畫取消。1.2 本輪實作本研討會固定角色與帳號管理權限、可稽核的一次性 CLI 管理員初始化、角色授予／撤銷、停用／恢復、Session 撤銷及近期密碼驗證；未來稿件等資源權限留待相應業務單元；不得以第一個公開註冊者取得權限。管理員 MFA 仍為上線門檻。
 後續再實作版本化會議設定、基礎公開內容、邀請與私有檔案框架。只用合成資料；公開投影不含私人資料，角色撤銷與資源 ID 替換應被拒絕。不同實例帳號／Cookie／Session／token／worker／mail／資料隔離需實測。
 
 ### Phase 2：報名、費率、人工核帳、團體繳費與餐飲

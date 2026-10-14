@@ -88,6 +88,18 @@ export function authFixture() {
         )
       ).rows.map((r) => r.id);
       await admin.query(
+        "UPDATE confsys.access_control SET initialized_user_id=null,initialized_at=null WHERE initialized_user_id=ANY($1::uuid[])",
+        [ids],
+      );
+      await admin.query(
+        "DELETE FROM confsys.user_roles WHERE user_id=ANY($1::uuid[])",
+        [ids],
+      );
+      await admin.query(
+        "DELETE FROM confsys.auth_audit WHERE actor_id=ANY($1::uuid[])",
+        [ids],
+      );
+      await admin.query(
         "DELETE FROM confsys.notification_secrets WHERE notification_id IN (SELECT id FROM confsys.notifications WHERE user_id=ANY($1::uuid[]))",
         [ids],
       );

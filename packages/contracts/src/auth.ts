@@ -1,3 +1,4 @@
+import { roleSchema, permissionSchema, reauthenticateInput } from "./access.js";
 import { z } from "zod";
 export const emailSchema = z
   .string()
@@ -30,10 +31,18 @@ export const accountSchema = z.strictObject({
     id: z.uuid(),
     email: z.email(),
     verified: z.literal(true),
+    roles: z.array(roleSchema),
+    permissions: z.array(permissionSchema),
   }),
 });
 export type Account = z.infer<typeof accountSchema>;
 export const authOperations = {
+  reauthenticate: {
+    path: "/api/auth/reauthenticate",
+    input: reauthenticateInput,
+    output: doneSchema,
+    status: 200,
+  },
   register: {
     path: "/api/auth/register",
     input: emailInput,
@@ -84,6 +93,10 @@ export const errorStatuses = {
   INTERNAL_ERROR: 500,
   FORBIDDEN: 403,
   CONFLICT: 409,
+  LAST_ADMIN: 409,
+  SELF_CHANGE: 409,
+  BOOTSTRAP_COMPLETED: 409,
+  REAUTH_REQUIRED: 403,
   REQUEST_TOO_LARGE: 413,
   UNSUPPORTED_MEDIA_TYPE: 415,
   INVALID_CREDENTIALS: 401,
