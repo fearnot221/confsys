@@ -1,0 +1,26 @@
+-- Resource-scoped review metadata and conflict reasons require explicit trusted context.
+ALTER TABLE confsys.review_forms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE confsys.review_forms FORCE ROW LEVEL SECURITY;
+CREATE POLICY review_forms_operator ON confsys.review_forms TO confsys_migrator USING(true) WITH CHECK(true);
+ALTER TABLE confsys.review_chair_scopes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE confsys.review_chair_scopes FORCE ROW LEVEL SECURITY;
+CREATE POLICY review_chair_scopes_operator ON confsys.review_chair_scopes TO confsys_migrator USING(true) WITH CHECK(true);
+ALTER TABLE confsys.review_conflicts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE confsys.review_conflicts FORCE ROW LEVEL SECURITY;
+CREATE POLICY review_conflicts_operator ON confsys.review_conflicts TO confsys_migrator USING(true) WITH CHECK(true);
+ALTER TABLE confsys.submission_revision_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE confsys.submission_revision_requests FORCE ROW LEVEL SECURITY;
+CREATE POLICY submission_revision_requests_operator ON confsys.submission_revision_requests TO confsys_migrator USING(true) WITH CHECK(true);
+ALTER TABLE confsys.competition_conflicts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE confsys.competition_conflicts FORCE ROW LEVEL SECURITY;
+CREATE POLICY competition_conflicts_operator ON confsys.competition_conflicts TO confsys_migrator USING(true) WITH CHECK(true);
+CREATE POLICY review_forms_read ON confsys.review_forms FOR SELECT TO confsys_app USING(current_setting('app.reviews_manage',true)='true' OR EXISTS(SELECT 1 FROM confsys.review_assignments a WHERE a.form_id=review_forms.id AND a.reviewer_id=nullif(current_setting('app.actor_id',true),'')::uuid));
+CREATE POLICY review_forms_write ON confsys.review_forms FOR INSERT TO confsys_app WITH CHECK(current_setting('app.reviews_manage',true)='true');
+CREATE POLICY review_chair_scopes_read ON confsys.review_chair_scopes FOR SELECT TO confsys_app USING(current_setting('app.reviews_manage',true)='true' OR user_id=nullif(current_setting('app.actor_id',true),'')::uuid);
+CREATE POLICY review_chair_scopes_insert ON confsys.review_chair_scopes FOR INSERT TO confsys_app WITH CHECK(current_setting('app.reviews_manage',true)='true');
+CREATE POLICY review_chair_scopes_delete ON confsys.review_chair_scopes FOR DELETE TO confsys_app USING(current_setting('app.reviews_manage',true)='true');
+CREATE POLICY review_conflicts_actor ON confsys.review_conflicts TO confsys_app USING(current_setting('app.reviews_manage',true)='true' OR user_id=nullif(current_setting('app.actor_id',true),'')::uuid) WITH CHECK(current_setting('app.reviews_manage',true)='true' OR user_id=nullif(current_setting('app.actor_id',true),'')::uuid);
+CREATE POLICY revision_requests_read ON confsys.submission_revision_requests FOR SELECT TO confsys_app USING(current_setting('app.submissions_admin',true)='true' OR EXISTS(SELECT 1 FROM confsys.submissions s WHERE s.id=submission_id AND s.owner_id=nullif(current_setting('app.actor_id',true),'')::uuid));
+CREATE POLICY revision_requests_insert ON confsys.submission_revision_requests FOR INSERT TO confsys_app WITH CHECK(current_setting('app.reviews_manage',true)='true');
+CREATE POLICY revision_requests_fulfill ON confsys.submission_revision_requests FOR UPDATE TO confsys_app USING(EXISTS(SELECT 1 FROM confsys.submissions s WHERE s.id=submission_id AND s.owner_id=nullif(current_setting('app.actor_id',true),'')::uuid)) WITH CHECK(EXISTS(SELECT 1 FROM confsys.submissions s WHERE s.id=submission_id AND s.owner_id=nullif(current_setting('app.actor_id',true),'')::uuid));
+CREATE POLICY competition_conflicts_actor ON confsys.competition_conflicts TO confsys_app USING(current_setting('app.competitions_manage',true)='true' OR judge_id=nullif(current_setting('app.actor_id',true),'')::uuid) WITH CHECK(current_setting('app.competitions_manage',true)='true' OR judge_id=nullif(current_setting('app.actor_id',true),'')::uuid);

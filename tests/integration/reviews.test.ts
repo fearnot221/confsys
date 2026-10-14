@@ -978,3 +978,19 @@ it("initial-screen and audit roll back when the atomic reviewer notification can
     await f.admin.query("DROP FUNCTION confsys.test_screen_notice_failure()");
   }
 });
+
+it('auxiliary review metadata is denied without actor context and manager reads retain explicit scope',async()=>{
+ for(const table of ['review_forms','review_chair_scopes','review_conflicts','submission_revision_requests','competition_conflicts'])
+  expect((await f.app.query(`SELECT * FROM confsys.${table}`)).rows).toEqual([]);
+ expect((await f.app.query('DELETE FROM confsys.review_chair_scopes')).rowCount).toBe(0);
+ await expect(f.app.query("INSERT INTO confsys.review_chair_scopes(user_id,track_id) VALUES($1,'forged')",[outsider.id])).rejects.toMatchObject({code:'42501'});
+ await withIdentityTransaction(f.app,async db=>{
+  await context(db,outsider.id,false);
+  expect((await db.query('SELECT * FROM confsys.review_forms')).rows).toEqual([]);
+  expect((await db.query('SELECT * FROM confsys.submission_revision_requests')).rows).toEqual([]);
+ });
+ await withIdentityTransaction(f.app,async db=>{
+  await context(db,admin.id,true);
+  expect((await db.query('SELECT id FROM confsys.review_forms WHERE id=$1',[form.id])).rowCount).toBe(1);
+ });
+});
