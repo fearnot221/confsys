@@ -10,6 +10,7 @@ import { bootstrapAdministrator } from "../../apps/api/src/access/bootstrap.js";
 import { createProgramService } from "../../apps/api/src/program/service.js";
 import { createSubmissionService } from "../../apps/api/src/submissions/service.js";
 import { submissionDependencies } from "../../apps/api/src/submissions/dependencies.js";
+import { withIdentityTransaction } from "@confsys/db";
 import type { ProgramDraft, SubmissionDocument } from "@confsys/contracts";
 const f = authFixture(),
   auth = createAuthService(f.app, f.config),
@@ -337,6 +338,132 @@ it("public snapshots omit private emails and remain unchanged after draft edits;
     program.publish(leader.raw, { expectedVersion: await version() }, id()),
   ).rejects.toMatchObject({ code: "REAUTH_REQUIRED" });
   await auth.reauthenticate(leader.raw, password, id());
+});
+it("treats verified address history as a conservative scheduling conflict without changing ownership or old publications", async () => {
+  const person = await account(),
+    alias = f.email();
+  await f.admin.query(
+    "INSERT INTO confsys.verified_email_history(user_id,email) VALUES($1,$2)",
+    [person.id, alias],
+  );
+  const firstRoom = await room(),
+    secondRoom = await room();
+  const chair = await session(
+    firstRoom.id,
+    "2040-01-01T01:00:00Z",
+    "2040-01-01T02:00:00Z",
+    person.email,
+  );
+  await expect(
+    session(secondRoom.id, chair.startsAt, chair.endsAt, alias),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const other = await session(secondRoom.id, chair.startsAt, chair.endsAt);
+  await expect(
+    program.slot(
+      leader.raw,
+      {
+        expectedVersion: await version(),
+        item: invited(other, { invitedEmail: alias }),
+      },
+      id(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+
+  const laterPerson = await account(),
+    laterAlias = f.email();
+  const one = await session(
+    firstRoom.id,
+    "2041-01-01T01:00:00Z",
+    "2041-01-01T03:00:00Z",
+  );
+  const two = await session(secondRoom.id, one.startsAt, one.endsAt);
+  const firstSlot = invited(one, {
+    invitedEmail: laterPerson.email,
+    endsAt: "2041-01-01T02:00:00Z",
+  });
+  const secondSlot = invited(two, {
+    invitedEmail: laterAlias,
+    endsAt: "2041-01-01T02:00:00Z",
+  });
+  await program.slot(
+    leader.raw,
+    { expectedVersion: await version(), item: firstSlot },
+    id(),
+  );
+  await program.slot(
+    leader.raw,
+    { expectedVersion: await version(), item: secondSlot },
+    id(),
+  );
+  const published = await program.publish(
+    leader.raw,
+    { expectedVersion: await version() },
+    id(),
+  );
+  // A subsequently verified alias is conflict evidence, not a grant of paper
+  // ownership; no existing draft/public snapshot identity is rewritten.
+  await f.admin.query(
+    "INSERT INTO confsys.verified_email_history(user_id,email) VALUES($1,$2)",
+    [laterPerson.id, laterAlias],
+  );
+  await expect(
+    program.publish(leader.raw, { expectedVersion: await version() }, id()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(await program.public()).toEqual(published);
+  await expect(
+    program.slot(
+      leader.raw,
+      { expectedVersion: await version(), item: secondSlot },
+      id(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await withIdentityTransaction(f.app, async (db) => {
+    expect(
+      (await db.query("SELECT * FROM confsys.program_verified_alias_conflicts"))
+        .rows,
+    ).toEqual([]);
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [author.id]);
+    expect(
+      (await db.query("SELECT * FROM confsys.program_verified_alias_conflicts"))
+        .rows,
+    ).toEqual([]);
+    await db.query(
+      "SELECT set_config('app.actor_id',$1,true),set_config('app.program_manage','true',true)",
+      [leader.id],
+    );
+    const rows = (
+      await db.query("SELECT * FROM confsys.program_verified_alias_conflicts")
+    ).rows;
+    expect(rows).toHaveLength(1);
+    expect(Object.keys(rows[0]).sort()).toEqual([
+      "first_source_id",
+      "second_source_id",
+    ]);
+    expect(
+      new Set([rows[0].first_source_id, rows[0].second_source_id]),
+    ).toEqual(new Set([firstSlot.id, secondSlot.id]));
+  });
+  await program.slot(
+    leader.raw,
+    {
+      expectedVersion: await version(),
+      item: {
+        ...secondSlot,
+        startsAt: "2041-01-01T02:00:00Z",
+        endsAt: two.endsAt,
+      },
+    },
+    id(),
+  );
+  expect(
+    (
+      await program.publish(
+        leader.raw,
+        { expectedVersion: await version() },
+        id(),
+      )
+    ).publicationId,
+  ).not.toBe(published.publicationId);
 });
 it("only exact published accepted revision can be scheduled; draft outcomes and withdrawn manuscripts cannot publish", async () => {
   const c = await submissions.config(leader.raw);

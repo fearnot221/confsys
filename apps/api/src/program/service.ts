@@ -70,6 +70,11 @@ export function createProgramService(pool: Pool, config: ApiConfig) {
       assertVersion((await repo.state(db, true)).version, version);
       const d = await repo.draft(db);
       await work(db, d);
+      if (
+        ["program.session_saved", "program.slot_saved"].includes(event) &&
+        (await repo.hasVerifiedAliasConflict(db, id))
+      )
+        throw new AuthError("CONFLICT");
       await repo.changed(db, actor, event, id, requestId);
       return repo.draft(db);
     });
@@ -253,6 +258,8 @@ export function createProgramService(pool: Pool, config: ApiConfig) {
           (await repo.state(db, true)).version,
           data.expectedVersion,
         );
+        if (await repo.hasVerifiedAliasConflict(db))
+          throw new AuthError("CONFLICT");
         if (await repo.publishedFor(db, data.expectedVersion))
           return repo.publicProgram(db);
         const d = await repo.draft(db),

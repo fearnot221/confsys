@@ -298,3 +298,15 @@ export async function personalProgram(db: PoolClient, actorId: string) {
       .filter((session) => session.slots.length > 0),
   };
 }
+
+export async function hasVerifiedAliasConflict(
+  db: PoolClient,
+  sourceId: string | null = null,
+) {
+  const r = await db.query(
+    `SELECT 1 FROM confsys.program_verified_alias_conflicts
+    WHERE $1::uuid IS NULL OR first_source_id=$1 OR second_source_id=$1 LIMIT 1`,
+    [sourceId],
+  );
+  return !!r.rowCount;
+}
