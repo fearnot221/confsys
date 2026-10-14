@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { redisOptions } from "@confsys/config";
+import { redisOptions, diagnostic } from "@confsys/config";
 import {
   syntheticJobSchema,
   SYNTHETIC_JOB,
@@ -19,7 +19,7 @@ export function createSyntheticWorker(
     },
     { connection: redisOptions(redisUrl), concurrency: 2 },
   );
-  worker.on("error", () => console.error("Queue connection failed"));
+  worker.on("error", () => diagnostic("synthetic-worker", "queue_unavailable"));
   worker.on("failed", (job) =>
     console.error(
       JSON.stringify({ event: "synthetic_job_failed", jobId: job?.id }),

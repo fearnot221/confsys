@@ -1,7 +1,26 @@
 import { randomBytes } from "node:crypto";
-import { writeFileSync, existsSync } from "node:fs";
+import {
+  writeFileSync,
+  existsSync,
+  appendFileSync,
+  readFileSync,
+} from "node:fs";
+function authDefaults() {
+  return {
+    PUBLIC_APP_ORIGIN: "http://127.0.0.1:25173",
+    MAIL_KEY_VERSION: "v1",
+    MAIL_ENCRYPTION_KEY: randomBytes(32).toString("hex"),
+    CSRF_SIGNING_KEY: randomBytes(32).toString("hex"),
+    SMTP_HOST: "127.0.0.1",
+    SMTP_PORT: "21025",
+  };
+}
 if (existsSync(".env")) {
-  console.log(".env exists; preserved without changes");
+  const existing = readFileSync(".env", "utf8");
+  for (const [key, value] of Object.entries(authDefaults()))
+    if (!new RegExp(`^${key}=`, "m").test(existing))
+      appendFileSync(".env", `${key}=${value}\n`);
+  console.log(".env preserved; missing auth settings added");
   process.exit(0);
 }
 const secret = () => randomBytes(24).toString("hex");
@@ -31,4 +50,6 @@ NODE_ENV=development
 `,
   { mode: 0o600, flag: "wx" },
 );
+for (const [key, value] of Object.entries(authDefaults()))
+  appendFileSync(".env", `${key}=${value}\n`);
 console.log("Created .env with random local credentials");

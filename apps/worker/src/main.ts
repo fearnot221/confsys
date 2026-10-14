@@ -1,9 +1,10 @@
+import { startMailWorker } from "@confsys/notifications/worker";
 import Fastify, { LogController } from "fastify";
 import { Redis } from "ioredis";
-import { loadConfig } from "@confsys/config";
+import { loadWorkerConfig, diagnostic } from "@confsys/config";
 import { createPool, databaseReady } from "@confsys/db";
 import { createSyntheticWorker } from "./worker.js";
-const config = loadConfig();
+const config = loadWorkerConfig();
 const pool = createPool(config.WORKER_DATABASE_URL);
 const redis = new Redis(config.REDIS_URL, {
   maxRetriesPerRequest: 1,
@@ -11,7 +12,10 @@ const redis = new Redis(config.REDIS_URL, {
   connectTimeout: 2000,
   enableOfflineQueue: false,
 });
-redis.on("error", () => {});
+redis.on("error", () => diagnostic("worker", "redis_unavailable"));
+redis.on("ready", () => diagnostic("worker", "redis_ready"));
+await databaseReady(pool, "confsys_worker");
+const mail = startMailWorker(pool, config);
 const worker = createSyntheticWorker(config.REDIS_URL);
 let queueReady = false;
 void worker
@@ -20,7 +24,7 @@ void worker
     queueReady = true;
   })
   .catch(() => {
-    console.error("Queue startup failed");
+    diagnostic("worker", "queue_startup_failed");
   });
 const app = Fastify({
   logger: true,
@@ -34,6 +38,7 @@ app.get("/health/ready", async (_request, reply) => {
       (await redis.ping()) !== "PONG" ||
       !queueReady ||
       !worker.isRunning() ||
+      !mail.worker.isRunning() ||
       worker.isPaused()
     )
       throw new Error("Not ready");
@@ -43,6 +48,7 @@ app.get("/health/ready", async (_request, reply) => {
   }
 });
 app.addHook("onClose", async () => {
+  await mail.close();
   await worker.close();
   redis.disconnect();
   await pool.end();

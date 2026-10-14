@@ -15,6 +15,7 @@ Use pinned Node 24.21.0 and pnpm 10.34.7. Install dependencies, generate local e
 | `pnpm test:e2e` | starts built API/worker + Vite, Chromium real health, locale/refresh/mobile, network failure/retry |
 | `pnpm check` | all seven gates above in order |
 | `pnpm smoke:stack` | running container stack health + Mailpit health + synthetic job through independent worker process |
+| `pnpm smoke:auth` | fixed loopback container Web → real CSRF/register/Mailpit/verify/login/refresh/logout through reverse proxy (Chromium required) |
 
 Playwright requires `pnpm exec playwright install chromium`; Linux CI adds `--with-deps`. E2E intentionally refuses to reuse an existing server, so it cannot accidentally validate unrelated local processes. Stop this project's dev/app stack first. E2E uses built API/worker; run `pnpm build` before standalone E2E. It captures screenshots under ignored `test-results/` and traces only on failure.
 
@@ -64,3 +65,22 @@ Start with README setup, the [architecture entry-point map](ARCHITECTURE.md#entr
 | Built behavior differs from source | Check package-local `dist` and staging `dist`; investigate stale artifacts before changing source or migrations; scheduled build-cleanup work is in ROADMAP |
 
 Log-format limitations currently make some worker/DB failures harder to distinguish; the roadmap schedules sanitized correlation and failure tests. That limitation does not justify exposing raw secrets for debugging.
+
+## Phase 1.1 verification (current)
+
+The Phase 0 coverage limitations above describe its original delivery. Account/CSRF/session/outbox/capture-mail tests now exist; production providers, complete tenancy, MFA and production operations still do not. Run `pnpm db:migrate:test` before standalone E2E. `pnpm check` runs all gates, including the integration suite that prepares the test schema. Existing Phase 0 files/assertions are retained.
+
+| Test entry | Evidence |
+|---|---|
+| `unit/auth.test.ts` | role-specific config, HTTPS/loopback cookie policy, password Unicode/limits/Argon2 parameters, GCM integrity/version/AAD, safe diagnostics |
+| `unit/tooling.test.ts` | absent UI folders, allowed UI imports, forbidden relative/alias/re-export paths; compile/delete/clean/recompile excludes obsolete output |
+| `integration/auth.test.ts` | unique concurrent registration, state/purpose/expiry/reuse/concurrent token consumption, reset/session revocation, controlled reset/login race, controlled idle/absolute deadlines, rollback including outbox failure, actual runtime role grants |
+| `integration/auth-http.test.ts` | actual Fastify CSRF/Origin/cookies, anonymous nonenumeration, real Redis source/account limits, Redis disconnect and DB outage, session/logout independence, captured log secrecy |
+| `integration/mail.test.ts` | real BullMQ/SMTP/Mailpit, queue pause/recovery, reference-only payload, duplicate claims, token eligibility, retry/lease recovery, SIGKILL after real SMTP acceptance → unknown without resend |
+| `integration/migrations.test.ts` | ephemeral blank and Phase 0 databases, unchanged 0001 checksum, preserved fixture data, repeatable forward migration and nonprivileged access |
+| `contract/auth.test.ts` | auth OpenAPI/DTO field exclusion, status codes including 413/415, SDK CSRF/error behavior |
+| `e2e/auth.spec.ts` | real register/verify/login/refresh/logout/reset, old password/session rejection, late A response after logout/B login, invalid link/network retry/mobile layout |
+
+Integration requires Docker Compose access for temporary migration databases. It uses existing local cluster roles and creates only `confsys_test_blank_<random>` / `confsys_test_upgrade_<random>` databases, drops only those it created, never existing app/test DBs or volumes. Auth fixtures delete only their unique email-prefix records. Mailpit queries use unique synthetic recipient addresses; no inbox wipe. No real provider credentials.
+
+E2E starts built API/worker with role-filtered environment, `confsys_test` and Redis DB 1, fresh per-run CSRF key (same actual rate thresholds), plus Vite. No bypass of password hashing, CSRF or sessions. Token links come only from actual Mailpit messages in UI tests. Test-only helper `mail-crash.ts` has no production fault toggle: it signals SMTP acceptance through IPC, and the parent terminates the process before the accepted DB write. Lease expiry is advanced in isolated test records rather than waiting/sleeping for a minute. Race tests use explicit Promise barriers. Final exact results and unverified areas are in [PHASE1_1_DELIVERY](PHASE1_1_DELIVERY.md).

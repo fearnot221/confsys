@@ -1,3 +1,5 @@
+import { useAuth } from "../features/auth/hooks/use-auth.js";
+import { AuthScreen } from "../features/auth/components/auth-screen.js";
 import React, { Component, useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -45,12 +47,17 @@ function App() {
     />
   );
 }
+function AuthApp() {
+  const mode = window.location.pathname.split("/")[2] ?? "login";
+  const state = useAuth(mode);
+  return <AuthScreen {...state} />;
+}
 const queryClient = new QueryClient();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <App />
+        {window.location.pathname.startsWith("/auth/") ? <AuthApp /> : <App />}
       </QueryClientProvider>
     </ErrorBoundary>
   </React.StrictMode>,

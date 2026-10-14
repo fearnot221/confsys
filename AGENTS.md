@@ -88,6 +88,6 @@ Every delivery must include a **Maintainability check / 可維護性檢查** cov
 
 Use Node 24.21.0 and pnpm 10.34.7. Setup: `pnpm install --frozen-lockfile`, `pnpm env:setup`, `pnpm infra:up`, `pnpm db:migrate`; run `pnpm dev`. Do not use `pnpm setup` (pnpm internal command).
 
-Required gates: `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:integration`, `pnpm test:contract`, `pnpm build`, `pnpm test:e2e`; `pnpm check` runs them in order. Install Chromium first with `pnpm exec playwright install chromium`. Container smoke: `pnpm smoke:stack` after starting the app profile. See README and docs/TESTING.md for exact prerequisites and limitations.
+Required gates: `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:integration`, `pnpm test:contract`, `pnpm build`, `pnpm test:e2e`; `pnpm check` runs them in order. Install Chromium first with `pnpm exec playwright install chromium`. Standalone E2E also requires `pnpm db:migrate:test` (local `confsys_test` only). Container smoke: `pnpm smoke:stack` after starting the app profile. See README and docs/TESTING.md for exact prerequisites and limitations.
 
 Do not claim the RLS fixture is a real authenticated tenant resolver. Phase 1 is not authorized by the existence of Phase 0 files.

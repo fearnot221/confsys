@@ -29,7 +29,7 @@ const copy = {
       "即時檢查 API、PostgreSQL、Redis 與背景 worker 的連線狀態。每 15 秒更新，也可手動重試。",
     next: "下一階段 · 等待確認",
     nextText:
-      "帳號、組織、會議設定與基礎官網尚未實作。此畫面沒有登入、報名、付款或投稿功能。",
+      "帳號生命週期可由登入入口使用。組織、會議、報名、付款與投稿仍待後續階段。",
     db: "權威資料儲存",
     redis: "背景佇列與開發快取",
     worker: "獨立背景處理程序",
@@ -55,7 +55,7 @@ const copy = {
       "Live connectivity checks for the API, PostgreSQL, Redis, and background worker. Refreshes every 15 seconds, with manual retry.",
     next: "Next phase · Awaiting approval",
     nextText:
-      "Accounts, organizations, conference settings, and public pages are not implemented. Login, registration, payment, and submission are not available.",
+      "Account lifecycle is available from the sign-in link. Organizations, conferences, payments, and submissions await later phases.",
     db: "Authoritative data storage",
     redis: "Job queue and development cache",
     worker: "Independent background process",
@@ -70,6 +70,7 @@ export function HealthScreen(props: HealthView) {
         <a href="#main-content" className="brand">
           {t.brand}
         </a>
+        <a href="/auth/login">{props.locale === "zh" ? "登入" : "Sign in"}</a>
         <Button
           onClick={props.onLocaleChange}
           aria-label={

@@ -12,7 +12,7 @@ Current vertical slice:
 - `apps/web/src/app`: root providers, locale/document metadata and error boundary.
 - `apps/web/src/design`: current minimal tokens/CSS, deliberately unrelated to legacy screenshots.
 
-`HealthView` exposes phase (`loading | error | ready | degraded`), dependency status, busy, `onRefresh`, locale and `onLocaleChange`. No token, pool, ORM model or fetch function enters UI props. Unknown/unavailable states must remain explicit. Data hooks decide how to load; components decide how to present. Only infrastructure status is usable today; no fictitious conference or user records.
+`HealthView` exposes phase (`loading | error | ready | degraded`), dependency status, busy, `onRefresh`, locale and `onLocaleChange`. No token, pool, ORM model or fetch function enters UI props. Unknown/unavailable states must remain explicit. Data hooks decide how to load; components decide how to present. Infrastructure status and Phase 1.1 account lifecycle are usable; no fictitious conference or user records.
 
 ESLint forbids forbidden packages and network/browser credential globals in UI. AST boundary check restricts presentation imports including relative imports/dynamic calls; new permitted UI modules require updating the allowlist in review. Contracts cannot import DB packages. These static controls help prevent accidental coupling, but do not prove all possible JavaScript behaviors safe; review is still required.
 
@@ -25,3 +25,13 @@ Phase 1 hooks must use keys including organization/conference/subject/permission
 Mutations, server-state transitions, invalidation and error translation belong in feature hooks/data modules using the SDK. Components may manage local presentation state but must not duplicate business rules or decide backend access from hidden controls. DTOs remain explicit projections defined by the core owner; an ORM row or asserted cast is not an API contract.
 
 When a boundary genuinely needs to change, update the contract/view model, its tests and import rules together with core review. Do not relax lint merely to make a presentation import pass. Existing checks are an allowlist, not a complete dependency-graph proof; expansion work and its regression cases are tracked in [ROADMAP.md](ROADMAP.md#phase-0-maintainability-review--2026-10-15). Presentation-only improvements should not trigger unrelated renaming, file moves or format rewrites.
+
+## Phase 1.1 account presentation
+
+Auth routes use the existing primitives and CSS. `AuthScreen` receives mode, busy/loading, safe message/error, optional account email, submit callback and retry callback. Email/password inputs are local form state; no CSRF/session/verification token, DB object, SDK instance or permission policy enters presentation props. The hook reads the verification fragment and passes it directly through SDK on explicit submission.
+
+SDK bootstraps CSRF for every mutation, sends same-origin cookies and validates contract schemas. Auth hook owns cancellation, query removal, mutation outcomes and error translation. Login/logout perform a full navigation to discard the previous query client. Session-expired refetch also clears private data, including stale successful query results. All GET/POST auth responses are no-store. No localStorage/sessionStorage credential or identity persistence.
+
+Forms cover pending submit, accepted-but-not-delivered mail, explicit verification/reset success, invalid/expired links, session expiry, rate limit, temporary failure and retry. Inputs have native labels/autocomplete, associated error/help text and live announcements. Browser E2E tests use real passwords, CSRF, sessions, worker and Mailpit; no fake account fixture renders. Full WCAG/browser-matrix certification remains unverified.
+
+The AST check now resolves relative/aliased imports and re-exports, traverses each presentation source and the contracts sources, accepts UI-to-UI dependencies, and tolerates feature folders without components. Auth is included automatically. Regression fixtures prove forbidden indirect source paths; this does not claim a complete JavaScript security proof.

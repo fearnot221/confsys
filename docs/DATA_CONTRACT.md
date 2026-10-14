@@ -12,7 +12,7 @@ Zod schemas in `packages/contracts/src/index.ts` generate JSON Schemas used by F
 | Undefined route | 404 `{error:{code:"NOT_FOUND",message,requestId}}` |
 | Invalid request / unexpected error | 400 `INVALID_REQUEST` / 500 `INTERNAL_ERROR`, same error envelope |
 
-`x-request-id` is generated server-side. No raw stack, SQL, credentials or internal provider response in errors. Readiness is intentionally anonymous; reverse proxy should restrict operational endpoints as deployment needs evolve. No login/CSRF or business write route exists.
+`x-request-id` is generated server-side. No raw stack, SQL, credentials or internal provider response in errors. Readiness is intentionally anonymous; reverse proxy should restrict operational endpoints as deployment needs evolve. Phase 1.1 identity routes below add CSRF-protected mutations; no conference business write route exists.
 
 SDK returns a typed readiness DTO for both 200 and 503. Network errors, invalid schema and unexpected HTTP status reject; UI displays an error with retry. SDK rejects a ready-status/HTTP-code mismatch. Strict contracts reject unexpected fields. OpenAPI contract output is not an externally hosted Swagger UI.
 
@@ -38,3 +38,27 @@ Catching an error must preserve its failure semantics (for example, dependency d
 - Published/historical results refer to immutable snapshots/revisions. Private file access reauthorizes both task creation and download.
 
 Synthetic queue contract: `synthetic.ping`, `{nonce: UUID}` → `{nonce, processed:true}`. Unsupported jobs fail and retry according to producer policy. No personal or tenant payload; no external effect. Stable job ID deduplicates while job is retained, not forever. Future durable business deduplication belongs in PostgreSQL, not solely BullMQ.
+
+## Phase 1.1 identity API and data
+
+All schemas, error codes and operation definitions live in `packages/contracts/src/auth.ts`; OpenAPI is regenerated from them. SDK owns credentials/CSRF transport. Anonymous mail requests respond **202 accepted**, meaning a valid request was accepted, not that an account exists or mail was delivered. Active/pending/unknown/disabled outcomes do not expose distinct bodies/statuses.
+
+| Method/path | Input | Result |
+|---|---|---|
+| GET `/api/auth/csrf` | none | 200 `{csrfToken}` plus signed HttpOnly secret cookie |
+| POST `/api/auth/register` | email | 202 accepted; eligible pending user/token/outbox atomically persisted |
+| POST `/api/auth/resend` | email | 202 accepted; only pending identity can receive verification |
+| POST `/api/auth/forgot` | email | 202 accepted; only active identity can receive reset |
+| POST `/api/auth/verify` | token, password | 200 complete; activates pending identity; no auto-login |
+| POST `/api/auth/reset` | token, password | 200 complete; replaces credential and revokes all sessions; no auto-login |
+| POST `/api/auth/login` | email, password | 200 `{user:{id,email,verified:true}}` and opaque HttpOnly session cookie |
+| POST `/api/auth/logout` | `{}` | 200 complete; DB revocation and cookie clearing, safe repeat |
+| GET `/api/auth/me` | session cookie | 200 same account projection, or 401 expired/absent session |
+
+Mutation requests require exact configured Origin and `x-csrf-token`. Error envelope remains `{error:{code,message,requestId}}`; messages contain safe stable codes. Auth codes map 400 invalid request/token/weak password, 401 invalid credentials/session expired, 403 CSRF rejected/forbidden, 409 conflict, 413 request too large, 415 unsupported media type, 429 rate limited (Retry-After 900), 503 service unavailable, 500 unexpected internal failure. Unknown routes remain 404. SDK preserves code/status/requestId and rejects malformed DTOs. No raw exception is serialized.
+
+Migration `0002_identity.sql` adds users (global normalized unique email/state/credential version), hashed one-time tokens, hashed sessions, minimal auth audit, notifications and separately restricted encrypted delivery secrets. FK/check constraints enforce identity linkage and allowed states/purposes. Worker eligibility view omits all hashes. Public DTOs expose no DB rows, roles, credential version, internal risks or memberships.
+
+This is an additive upgrade from Phase 0, no user backfill or rewrite of 0001. Stop old app processes, migrate separately, then start matching API/worker. Fresh and isolated Phase 0 upgrade tests preserve checksum/history and existing fixture data. Failed migrations roll back as one transaction. Use a reviewed forward migration to repair; never edit applied SQL/checksums or drop local volumes to recover. Detailed lifetime/cleanup/uncertainty policy: [OPERATIONS](OPERATIONS.md).
+
+Migration `0003_identity_grants.sql` narrows runtime UPDATE privileges to required lifecycle/delivery columns and limits the worker eligibility projection to pending/processing notifications. It is a separate forward migration because 0002 had already been exercised locally; 0001/0002 are not rewritten. Actual-role regression rejects recipient/token reassignment, email edits and expiration/hash rewrites outside the implemented services.

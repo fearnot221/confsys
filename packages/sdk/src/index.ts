@@ -4,15 +4,8 @@ import {
   routes,
   type Readiness,
 } from "@confsys/contracts";
-export class ApiError extends Error {
-  constructor(
-    public readonly code: string,
-    public readonly status: number,
-    public readonly requestId?: string,
-  ) {
-    super(code);
-  }
-}
+import { ApiError } from "./errors.js";
+export { ApiError } from "./errors.js";
 export function createClient(baseUrl = "", transport: typeof fetch = fetch) {
   return {
     async getReadiness(signal?: AbortSignal): Promise<Readiness> {
@@ -37,3 +30,4 @@ export function createClient(baseUrl = "", transport: typeof fetch = fetch) {
     },
   };
 }
+export { createAuthClient } from "./auth.js";

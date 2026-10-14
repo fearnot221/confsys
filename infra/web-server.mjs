@@ -1,7 +1,7 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
-const root = resolve("/app/apps/web/dist");
+const root = resolve("apps/web/dist");
 const server = http.createServer(async (req, res) => {
   if (req.url?.startsWith("/api/")) {
     const upstream = http.request(
@@ -10,7 +10,20 @@ const server = http.createServer(async (req, res) => {
         port: 23000,
         path: req.url,
         method: req.method,
-        headers: { accept: "application/json" },
+        headers: {
+          accept: "application/json",
+          ...Object.fromEntries(
+            [
+              "content-type",
+              "content-length",
+              "cookie",
+              "origin",
+              "x-csrf-token",
+            ]
+              .filter((key) => req.headers[key] !== undefined)
+              .map((key) => [key, req.headers[key]]),
+          ),
+        },
       },
       (response) => {
         res.writeHead(response.statusCode ?? 502, response.headers);
@@ -30,7 +43,13 @@ const server = http.createServer(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
     const file = resolve(
       root,
-      "." + (path === "/" ? "/index.html" : decodeURIComponent(path)),
+      "." +
+        (path === "/" ||
+        /^\/auth\/(login|register|waiting|verify|forgot|reset|account)$/.test(
+          path,
+        )
+          ? "/index.html"
+          : decodeURIComponent(path)),
     );
     if (!file.startsWith(root + sep)) {
       res.writeHead(403);
@@ -47,6 +66,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, {
       "content-type": types[extname(file)] ?? "application/octet-stream",
       "x-content-type-options": "nosniff",
+      "referrer-policy": "no-referrer",
+      "cache-control": "no-store",
       "content-security-policy":
         "default-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'",
     });

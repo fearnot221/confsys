@@ -1,11 +1,12 @@
 # Roadmap
 
-Scope follows SPEC; only Phase 0 is authorized in this change.
+Scope follows SPEC. This delivery is limited to authorized Phase 1.1; Phase 1.2 and later units still require approval.
 
 | Phase | Status / scope |
 |---|---|
 | 0 | Implemented engineering foundation, real service UI, contracts, isolation tests, CI configuration and docs; evidence in PHASE0_DELIVERY |
-| 1 | Not started: identity, tenancy, conference settings/public pages, invitations, audit, outbox/private-file foundations |
+| 1.1 | Implemented identity lifecycle/session plus required identity audit/outbox/worker/Mailpit; see PHASE1_1_DELIVERY |
+| 1.2+ | Not started: memberships/scoped permissions/invitations, conference settings/public pages and private-file foundations |
 | 2 | Not started: registration, pricing, capacity, manual reconciliation, group payments, meals, receipts |
 | 3 | Not started: submission, revisions, private content validation/quarantine |
 | 4 | Not started: assignments, conflicts, review and decision publication |
@@ -13,7 +14,7 @@ Scope follows SPEC; only Phase 0 is authorized in this change.
 | 6 | Not started: check-in/redemption, documents, notifications, exports, selected provider sandboxes |
 | 7 | Not started: Claude read-only UI audit then isolated presentation PRs; end-to-end launch verification |
 
-## Smallest Phase 1 increments (require approval)
+## Phase 1 increments (only 1.1 authorized)
 
 1. **Identity + real session slice:** users/identities, verification/reset/session tables and audit/outbox foundation; register/verify/login/logout UI and APIs; local Mailpit only; password hashing, CSRF/Origin, rotation/revocation tests. No production known-password seeds.
 2. **Organization/conference access slice:** memberships, scoped role templates, two orgs/three synthetic conferences, trusted context resolver replacing test-only assumptions; full RLS/composite constraints; real conference switch with cache/form isolation tests.
@@ -21,7 +22,7 @@ Scope follows SPEC; only Phase 0 is authorized in this change.
 4. **Published site slice:** draft/revision/public projection, Vite-compatible prerender or server-rendered public shell; public HTML validation, locale/SEO basics, no private-data leak.
 5. **Shared reliability completion:** invitations + persisted outbox dispatcher/attempts/unknown outcomes; private file framework, bounded validation/quarantine and authorization; complete Phase 1 acceptance regression.
 
-Each slice needs usable UI, real API, errors, authorization, migrations/tests and docs. Contracts must be coordinated before presentation changes. Stop after Phase 0; do not implement these slices without confirmation.
+Each slice needs usable UI, real API, errors, authorization, migrations/tests and docs. Contracts must be coordinated before presentation changes. Phase 1.1 is authorized in the current request; stop after it. Other slices require separate confirmation.
 
 Open questions that do not block Phase 0: hosting, volumes/traffic, external mail/payment provider, SSO, receipt requirements, data retention and anonymization policy. No provider/production-readiness claim is made.
 
@@ -40,3 +41,27 @@ Current boundaries are explicit: DTO/SDK/data hook/presentation are separated, `
 | M5 — `apps/api/src/app.ts` error handler | All thrown 4xx statuses become 400. Current health-only routes have no business authorization errors; future 401/403/409/429 would lose their semantics. | Before introducing authenticated or business mutation routes: define safe typed error-to-HTTP mappings and contract/regression cases. Do not expose raw framework/provider errors or rely on hidden UI controls. |
 
 Reassess the relevant item before starting its authorized unit. If a reproducible security/correctness failure is found, fix it with regression coverage before dependent feature work; otherwise keep the change scoped. Existing production-hardening/backup/provider limitations remain tracked in the delivery and operations documents, without duplicating them here.
+
+## Phase 1.1 focused recheck — 2026-10-15
+
+Baseline `c10b025` contains `c6f1d5f`; clean status and ancestry checked before branching. The historical M1–M5 descriptions above remain the evidence/acceptance baseline. Only blockers and directly adjacent work were changed:
+
+| Item | Classification | Result and acceptance evidence |
+|---|---|---|
+| M1 | Blocking before identity persistence | Separate API/worker/migration validators and Compose env; host/E2E launcher filters child env. Worker cannot read identity credential tables or reassign notification recipients/tokens; API cannot SELECT delivery secrets or update unsupported identity fields. Additive 0003 narrows column grants. Unit config and actual-role integration tests. |
+| M2 | Directly related; blocking before durable mail | Structured sanitized service/event/request/event-ID/attempt logs; safe public errors, durable minimal audit and explicit delivery states. Captured log secrecy, Redis/DB outage, real SMTP crash/recovery tests. No raw exception/body/query logging. Full metrics/alerting remains pre-launch work. |
+| M3 | Directly related before adding auth feature/package | Resolver-based relative/alias/re-export checks, UI-to-UI allow rules, absent-folder support, automatic auth coverage. Regression fixtures reject escapes without an added dependency-graph framework. |
+| M4 | Directly related to clean builds | Build clears only root staging and known package/app dist before compilation; compile → delete fixture source → clean/recompile test proves obsolete outputs disappear. Container and host build no longer depend on residual dist. |
+| M5 | Blocking before auth mutations | Contract-owned error/status map and SDK preservation; auth regressions for 400/401/403/429/503 plus real framework 413/415. No blanket 4xx→400 behavior for supported statuses. |
+
+## Remaining bounded debt / next treatment point
+
+| Evidence | Practical risk | Acceptance and phase |
+|---|---|---|
+| Identity audit/token/session history has no retention sweep beyond delivery secrets | Long-running deployments grow tables; audit retention obligations are not decided | Before production and during Phase 1 reliability completion: agree retention policy, implement bounded dry-run/real purge preserving audit requirements, test backups/restore/key lifecycle. Do not improvise destructive cleanup now. |
+| API has `trustProxy=false`; local capture proxy masks client IP | Shared source bucket can throttle multiple legitimate users behind the proxy | Deployment preparation before public use: explicit trusted proxy chain, spoofed-forwarded-header tests and per-source/account abuse review. Never enable arbitrary header trust. |
+| Single active delivery-encryption key, capture-only sender, conservative unknown handling | Rotation requires draining; lost keys invalidate pending mail; unknown deliveries require operator diagnosis | Phase 1 reliability/provider unit: managed multi-version key lifecycle if operationally needed, controlled provider integration/metrics/runbook validation. No automatic unknown resend; preserve crash tests. |
+| Local weak-password blocklist and configured Argon2 minimum, no breach corpus/load benchmark | Some common compromised passwords pass; production capacity is unmeasured | Before any production identity use: vetted broader offline/breach screening, password/Argon2 concurrency benchmarks and operational limits; no MFA/high-privilege readiness claim. |
+| Basic auth UI uses existing engineering primitives; Chromium only | Complete accessibility and cross-browser assurance unavailable | Later presentation phase: Claude-owned accessibility/design audit; verify keyboard/assistive tech and browser matrix without moving SDK/permissions into components. |
+
+Next minimal authorized-by-future-approval work should be split: **1.2a** membership schema and trusted scope resolver with two-org/three-conference RLS/permission tests; **1.2b** real scoped membership/switch UI with cache isolation; **1.2c** explicit invitation acceptance/revocation using extended scoped notification policies. None is started by this delivery. High-privilege launch remains conditional on MFA.

@@ -1,6 +1,6 @@
 # Architecture
 
-## Implemented in Phase 0
+## Foundation (Phase 0, retained)
 
 ```mermaid
 flowchart LR
@@ -14,7 +14,7 @@ flowchart LR
   Worker --> PG
 ```
 
-API is a modular monolith, with only infrastructure routes in this phase. Worker is a separate process; it supports only `synthetic.ping` with a UUID nonce and no external effects. There is no job enqueue HTTP endpoint. Mailpit is a local capture service; no production sender or payment adapter is present.
+API remains a modular monolith; Phase 1.1 adds the identity module described below. The independent worker retains `synthetic.ping` and adds durable identity mail through local Mailpit. There is no arbitrary job enqueue HTTP endpoint, external mail sender or payment adapter.
 
 Workspace packages resolve TypeScript source under the `development` condition, and compiled JavaScript under the default condition. Build outputs are distributed to each package's `dist`, preserving pnpm's per-package dependency resolution. Server production entry points are `apps/api/dist/main.js` and `apps/worker/dist/main.js`. No runtime tsx is needed for built apps.
 
@@ -48,16 +48,29 @@ Keep names tied to business intent, comments focused on reasons/constraints, and
 
 ## Isolation boundary
 
-PostgreSQL owns durable state. Migration login `confsys_migrator` owns schemas; `confsys_app` and `confsys_worker` are distinct NOSUPERUSER/NOBYPASSRLS logins, not table owners and not members of elevated roles. Runtime startup probes reject unsafe roles. Initial migration installs only a checksum ledger and its grants; no product entities or seed users exist.
+PostgreSQL owns durable state. Migration login `confsys_migrator` owns schemas; `confsys_app` and `confsys_worker` are distinct NOSUPERUSER/NOBYPASSRLS logins, not table owners and not members of elevated roles. Runtime startup probes reject unsafe roles. Migration 0001 installs the infrastructure ledger/grants; additive 0002 installs platform identity/session/token/audit/notification tables. No seed user is installed.
 
 `withTenant` acquires one pooled connection, begins a transaction, validates UUID scope, sets both context settings with `set_config(..., true)`, executes a Drizzle/client callback on that connection, then commits or rolls back. Failed rollback destroys the connection. Scope cannot be omitted. Integration tests also directly query without context to prove RLS denial. Schema policies use both organization and conference keys, FORCE RLS and WITH CHECK. Composite keys prevent cross-scope references.
 
 **This helper does not authenticate anybody.** Future HTTP services must resolve scope from authenticated memberships and resource ownership, then invoke it. Never map arbitrary request headers/body IDs directly into this helper. RLS is defense in depth against forgotten filters; it does not defeat a compromised application credential that can execute arbitrary SQL and set its own context.
 
-## Planned; not implemented
+## Beyond Phase 1.1; not implemented
 
-Phase 1 introduces identity/session, organization/conference memberships, settings versions, audit, transactional outbox and private file metadata. Domain services/policies will be shared with worker; controllers only validate/map requests. No empty domain package was created because there are no business state machines yet.
+Phase 1.1 implements identity/session and its minimal audit/outbox. Later units introduce organization/conference memberships, settings versions and private file metadata. Domain services/policies will be shared with worker; controllers only validate/map requests. No empty domain package was created because there are no business state machines yet.
 
-Outbox: business state + event commit atomically in PostgreSQL. Dispatcher retries delivery using stable event IDs; handlers re-load trusted scope, re-check current policy, record attempts and deduplicate business outcomes. At-least-once processing does not guarantee exactly-once SMTP/payment effects. See ADR for interface conventions. No notification/outbox tables are claimed in Phase 0.
+Outbox: business state + event commit atomically in PostgreSQL. Dispatcher retries delivery using stable event IDs; handlers re-load trusted scope, re-check current policy, record attempts and deduplicate business outcomes. At-least-once processing does not guarantee exactly-once SMTP/payment effects. See ADR for interface conventions. This was the Phase 0 convention; Phase 1.1 implements identity-only notification records as described below.
 
 Storage will be private and authorized; no upload endpoint, public upload directory or provider exists. Public content requires explicit published DTO projections, not table rows. Redis queue and cache share a single noeviction development instance only; production requires separate instances. Redis logical DBs used in tests do not provide production resource isolation.
+
+## Phase 1.1 entry points and boundaries
+
+- `apps/api/src/auth/routes.ts`: CSRF/Origin, schema parsing, safe cookies and DTO responses; no SMTP or tenant-resolution logic.
+- `auth/service.ts`: user-state policy, credential-version race protection, token/session lifecycle and transaction ownership. `auth/repository.ts`: explicit global identity queries; no generic tenant fallback. Password and rate-limit helpers own their specific bounded security rules.
+- `packages/notifications/src/index.ts`: transaction-bound notification writer. `secrets.ts`: AES-GCM delivery envelope. The `/worker` export owns DB claim/lease/eligibility, BullMQ dispatch and capture SMTP; importing the writer in API does not load the worker/provider path.
+- `packages/db/migrations/0002_identity.sql`: constraints, dedicated role grants and worker-only eligibility projection. No worker access to `users`, `sessions` or `auth_tokens`; no RLS bypass introduced.
+- `packages/contracts/src/auth.ts` → `packages/sdk/src/auth.ts` → `apps/web/src/features/auth/hooks/use-auth.ts` → pure `components/auth-screen.tsx`.
+- `packages/config`: API/worker/migration loaders strip other process settings. Compose has distinct environments; `scripts/run-process.ts` starts host/E2E children with only validated process config. `.env` is read by the local launcher, never passed wholesale to child services.
+
+Business transactions use PostgreSQL. Redis is needed only for public auth abuse protection and queue scheduling; session reads/logout remain DB-only. Persistent notification rows reconstruct lost queue jobs. `notification_eligibility` is an explicitly global identity projection, not authority to access any conference. No membership resolver is implemented. Complete security decisions/tradeoffs: [ADR 0002](adr/0002-identity-session-mail.md).
+
+Migration `0003_identity_grants.sql` narrows runtime UPDATE privileges to required lifecycle/delivery columns and limits the worker eligibility projection to pending/processing notifications. It is a separate forward migration because 0002 had already been exercised locally; 0001/0002 are not rewritten. Actual-role regression rejects recipient/token reassignment, email edits and expiration/hash rewrites outside the implemented services.

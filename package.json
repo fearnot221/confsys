@@ -12,8 +12,8 @@
     "infra:up": "docker compose up -d --wait postgres redis mailpit",
     "infra:down": "docker compose down",
     "dev": "concurrently -k -n api,worker,web \"pnpm dev:api\" \"pnpm dev:worker\" \"pnpm dev:web\"",
-    "dev:api": "node --env-file=.env --watch --conditions=development --import tsx apps/api/src/main.ts",
-    "dev:worker": "node --env-file=.env --watch --conditions=development --import tsx apps/worker/src/main.ts",
+    "dev:api": "node --env-file=.env --conditions=development --import tsx scripts/run-process.ts api dev",
+    "dev:worker": "node --env-file=.env --conditions=development --import tsx scripts/run-process.ts worker dev",
     "dev:web": "pnpm --filter @confsys/web dev",
     "db:migrate": "node --conditions=development --env-file=.env --import tsx packages/db/src/migrate.ts",
     "lint": "eslint . && node scripts/check-boundaries.mjs",
@@ -23,10 +23,12 @@
     "test:contract": "vitest run tests/contract",
     "contract:generate": "tsx --conditions=development scripts/openapi.ts",
     "test:e2e": "node --env-file=.env node_modules/@playwright/test/cli.js test",
-    "build": "tsc -p tsconfig.build.json && node scripts/distribute-build.mjs && pnpm --filter @confsys/web build",
+    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.build.json && node scripts/distribute-build.mjs && pnpm --filter @confsys/web build",
     "check": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:integration && pnpm test:contract && pnpm build && pnpm test:e2e",
     "env:setup": "node scripts/setup.mjs",
-    "smoke:stack": "node --conditions=development --env-file=.env --import tsx scripts/smoke-stack.ts"
+    "smoke:stack": "node --conditions=development --env-file=.env --import tsx scripts/smoke-stack.ts",
+    "db:migrate:test": "node --env-file=.env --conditions=development --import tsx scripts/migrate-test.ts",
+    "smoke:auth": "tsx scripts/smoke-auth.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -42,12 +44,15 @@
     "typescript-eslint": "8.71.2",
     "vitest": "5.0.4",
     "bullmq": "6.3.15",
-    "drizzle-orm": "0.45.4"
+    "drizzle-orm": "0.45.4",
+    "@types/nodemailer": "8.0.2",
+    "ioredis": "5.11.1"
   },
   "dependencies": {
     "@confsys/contracts": "workspace:*",
     "@confsys/sdk": "workspace:*",
     "@confsys/db": "workspace:*",
-    "@confsys/config": "workspace:*"
+    "@confsys/config": "workspace:*",
+    "@confsys/notifications": "workspace:*"
   }
 }

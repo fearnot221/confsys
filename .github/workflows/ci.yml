@@ -1,4 +1,4 @@
-name: Phase 0 quality gates
+name: Platform quality gates
 on:
   pull_request:
   push:
@@ -23,12 +23,14 @@ jobs:
       - run: pnpm env:setup
       - run: pnpm infra:up
       - run: pnpm db:migrate
+      - run: pnpm db:migrate:test
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm check
       - run: docker compose --profile app build
       - run: docker compose --profile app run --rm migrate
       - run: docker compose --profile app up -d --no-build --wait api worker web
       - run: pnpm smoke:stack
+      - run: pnpm smoke:auth
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:

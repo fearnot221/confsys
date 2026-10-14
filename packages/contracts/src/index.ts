@@ -1,3 +1,10 @@
+import {
+  authOperations,
+  accountSchema,
+  csrfSchema,
+  errorCodeSchema,
+} from "./auth.js";
+export * from "./auth.js";
 import { z } from "zod";
 export const dependencyStatus = z.enum(["up", "down"]);
 export const readinessSchema = z.strictObject({
@@ -12,7 +19,7 @@ export type Readiness = z.infer<typeof readinessSchema>;
 export const liveSchema = z.strictObject({ status: z.literal("alive") });
 export const errorSchema = z.strictObject({
   error: z.strictObject({
-    code: z.enum(["NOT_FOUND", "INVALID_REQUEST", "INTERNAL_ERROR"]),
+    code: errorCodeSchema,
     message: z.string(),
     requestId: z.string(),
   }),
@@ -34,6 +41,7 @@ export function openApiDocument() {
     openapi: "3.1.0",
     info: { title: "Conference Platform Infrastructure API", version: "0.0.0" },
     paths: {
+      ...authPaths(),
       [routes.live]: {
         get: {
           operationId: "getLiveness",
@@ -64,5 +72,80 @@ export function openApiDocument() {
       },
     },
     components: { schemas: { Error: jsonSchemas.error } },
+  };
+}
+
+function authPaths() {
+  const response = (schema: z.ZodType, description: string) => ({
+    description,
+    content: {
+      "application/json": {
+        schema: z.toJSONSchema(schema, { target: "draft-7" }),
+      },
+    },
+  });
+  return {
+    ...Object.fromEntries(
+      Object.entries(authOperations).map(([operationId, op]) => [
+        op.path,
+        {
+          post: {
+            operationId,
+            parameters: [
+              {
+                in: "header",
+                name: "x-csrf-token",
+                required: true,
+                schema: { type: "string" },
+              },
+              {
+                in: "header",
+                name: "Origin",
+                required: true,
+                schema: { type: "string" },
+              },
+            ],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: z.toJSONSchema(op.input, { target: "draft-7" }),
+                },
+              },
+            },
+            responses: {
+              [op.status]: response(op.output, "Result"),
+              ...Object.fromEntries(
+                [400, 401, 403, 429, 500, 503].map((code) => [
+                  code,
+                  response(errorSchema, "Safe error"),
+                ]),
+              ),
+            },
+          },
+        },
+      ]),
+    ),
+    "/api/auth/csrf": {
+      get: {
+        operationId: "csrf",
+        responses: {
+          200: response(
+            csrfSchema,
+            "Anonymous or authenticated CSRF bootstrap",
+          ),
+        },
+      },
+    },
+    "/api/auth/me": {
+      get: {
+        operationId: "me",
+        responses: {
+          200: response(accountSchema, "Own account"),
+          401: response(errorSchema, "Session expired"),
+          503: response(errorSchema, "Database unavailable"),
+        },
+      },
+    },
   };
 }

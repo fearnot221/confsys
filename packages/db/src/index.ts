@@ -1,3 +1,4 @@
+import { diagnostic } from "@confsys/config";
 import pg, { type PoolClient } from "pg";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -16,7 +17,7 @@ export function createPool(connectionString: string, max = 10) {
     query_timeout: 4000,
   });
   // Avoid unhandled idle socket errors; never log connection strings or query data.
-  pool.on("error", () => console.error("Database idle connection failed"));
+  pool.on("error", () => diagnostic("database", "idle_connection_failed"));
   return pool;
 }
 export async function assertRuntimeRole(
@@ -38,7 +39,7 @@ export async function databaseReady(
 ) {
   await assertRuntimeRole(pool, role);
   const result = await pool.query(
-    `SELECT version FROM confsys.schema_migrations WHERE version = '0001_foundation.sql'`,
+    `SELECT version FROM confsys.schema_migrations WHERE version = '0003_identity_grants.sql'`,
   );
   if (result.rowCount !== 1) throw new Error("Database migrations required");
 }
@@ -66,6 +67,31 @@ export async function withTenant<T>(
       await client.query("ROLLBACK");
     } catch {
       broken = true;
+    }
+    throw error;
+  } finally {
+    client.release(broken);
+  }
+}
+
+// Explicitly for global identity/notification services; does not relax withTenant.
+export async function withIdentityTransaction<T>(
+  pool: pg.Pool,
+  work: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+  let broken = false;
+  try {
+    await client.query("BEGIN");
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      broken = true;
+      diagnostic("database", "rollback_failed");
     }
     throw error;
   } finally {

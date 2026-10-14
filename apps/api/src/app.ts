@@ -1,14 +1,44 @@
+import type { Writable } from "node:stream";
+import { AuthError } from "./auth/errors.js";
 import Fastify, { LogController, type FastifyError } from "fastify";
 import { randomUUID } from "node:crypto";
-import { jsonSchemas, routes, type Readiness } from "@confsys/contracts";
+import {
+  jsonSchemas,
+  routes,
+  type Readiness,
+  type ErrorCode,
+  errorStatuses,
+} from "@confsys/contracts";
+const httpErrors: Partial<Record<number, ErrorCode>> = {
+  400: "INVALID_REQUEST",
+  401: "SESSION_EXPIRED",
+  403: "FORBIDDEN",
+  404: "NOT_FOUND",
+  409: "CONFLICT",
+  413: "REQUEST_TOO_LARGE",
+  415: "UNSUPPORTED_MEDIA_TYPE",
+  429: "RATE_LIMITED",
+  503: "SERVICE_UNAVAILABLE",
+};
+function publicErrorCode(error: FastifyError): ErrorCode {
+  if (error instanceof AuthError) return error.code;
+  if (error.code?.startsWith("FST_CSRF")) return "CSRF_REJECTED";
+  if (error.validation) return "INVALID_REQUEST";
+  const mapped = error.statusCode && httpErrors[error.statusCode];
+  if (mapped) return mapped;
+  if (error.code && /^(08|53|57|ECONN|ETIMEDOUT)/.test(error.code))
+    return "SERVICE_UNAVAILABLE";
+  return "INTERNAL_ERROR";
+}
 export type Probe = () => Promise<void>;
 export function buildApp(
   probes: { postgres: Probe; redis: Probe; worker: Probe },
-  logging = false,
+  logging: boolean | Writable = false,
 ) {
   const app = Fastify({
     logger: logging
       ? {
+          ...(typeof logging === "object" ? { stream: logging } : {}),
           redact: [
             "req.headers.authorization",
             "req.headers.cookie",
@@ -26,7 +56,8 @@ export function buildApp(
     reply
       .header("x-request-id", request.id)
       .header("cache-control", "no-store")
-      .header("x-content-type-options", "nosniff");
+      .header("x-content-type-options", "nosniff")
+      .header("referrer-policy", "no-referrer");
   });
   app.addHook("onResponse", async (request, reply) => {
     request.log.info(
@@ -39,35 +70,24 @@ export function buildApp(
     );
   });
   app.setNotFoundHandler((request, reply) =>
-    reply
-      .code(404)
-      .send({
-        error: {
-          code: "NOT_FOUND",
-          message: "Route not found",
-          requestId: request.id,
-        },
-      }),
+    reply.code(404).send({
+      error: {
+        code: "NOT_FOUND",
+        message: "Route not found",
+        requestId: request.id,
+      },
+    }),
   );
   app.setErrorHandler<FastifyError>((error, request, reply) => {
-    const invalid =
-      !!error.validation ||
-      (error.statusCode !== undefined &&
-        error.statusCode >= 400 &&
-        error.statusCode < 500);
+    const code = publicErrorCode(error);
     request.log.error(
-      { code: invalid ? "INVALID_REQUEST" : "INTERNAL_ERROR" },
+      { service: "api", event: "request_failed", code, requestId: request.id },
       "request failed",
     );
+    if (code === "RATE_LIMITED") reply.header("retry-after", "900");
     return reply
-      .code(invalid ? 400 : 500)
-      .send({
-        error: {
-          code: invalid ? "INVALID_REQUEST" : "INTERNAL_ERROR",
-          message: invalid ? "Invalid request" : "Internal error",
-          requestId: request.id,
-        },
-      });
+      .code(errorStatuses[code])
+      .send({ error: { code, message: code, requestId: request.id } });
   });
   app.get(
     routes.live,

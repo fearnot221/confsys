@@ -1,8 +1,11 @@
+import { registerAuthRoutes } from "./auth/routes.js";
+import { createAuthService } from "./auth/service.js";
+import { createRateLimiter } from "./auth/rate-limit.js";
 import { Redis } from "ioredis";
-import { loadConfig } from "@confsys/config";
+import { loadApiConfig, diagnostic } from "@confsys/config";
 import { createPool, databaseReady } from "@confsys/db";
 import { buildApp } from "./app.js";
-const config = loadConfig();
+const config = loadApiConfig();
 const pool = createPool(config.DATABASE_URL);
 const redis = new Redis(config.REDIS_URL, {
   maxRetriesPerRequest: 1,
@@ -10,7 +13,8 @@ const redis = new Redis(config.REDIS_URL, {
   connectTimeout: 2000,
   enableOfflineQueue: false,
 });
-redis.on("error", () => {}); // Readiness reports failures without leaking connection details.
+redis.on("error", () => diagnostic("api", "rate_store_unavailable"));
+redis.on("ready", () => diagnostic("api", "rate_store_ready"));
 const app = buildApp(
   {
     postgres: () => databaseReady(pool, "confsys_app"),
@@ -26,6 +30,12 @@ const app = buildApp(
   },
   true,
 );
+await databaseReady(pool, "confsys_app");
+await registerAuthRoutes(app, {
+  config,
+  service: createAuthService(pool, config),
+  limit: createRateLimiter(redis, config.CSRF_SIGNING_KEY),
+});
 app.addHook("onClose", async () => {
   redis.disconnect();
   await pool.end();
