@@ -1,0 +1,9 @@
+# Explicit macOS Docker Desktop development override; native scanner remains loopback-only.
+# Use together with compose.yaml. Never changes the default deployment topology.
+services:
+  clamav:
+    profiles: [container-scanner]
+  api:
+    environment:
+      CLAMAV_HOST: host.docker.internal
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
