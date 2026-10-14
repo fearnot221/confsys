@@ -330,7 +330,7 @@ export function SubmissionsScreen(p: Props) {
         <section>
           <h2>{p.admin ? "檢視稿件" : "編輯稿件"}</h2>
           <p>
-            稿件識別碼：{current.id} ·{" "}
+            稿件編號：{current.number || "尚未儲存"} · 識別碼：{current.id} ·{" "}
             {p.dirty ? "有未儲存內容" : "已載入伺服器版本"}
           </p>
           <fieldset disabled={readOnly}>
@@ -350,6 +350,15 @@ export function SubmissionsScreen(p: Props) {
                 maxLength={20000}
                 value={d.abstract}
                 onChange={(e) => change({ abstract: e.target.value })}
+              />
+            </label>
+            <label>
+              關鍵字（每行一筆）
+              <textarea
+                value={d.keywords.join("\n")}
+                onChange={(e) =>
+                  change({ keywords: e.target.value.split("\n") })
+                }
               />
             </label>
             <label>
@@ -439,6 +448,15 @@ export function SubmissionsScreen(p: Props) {
                   <label>
                     <input
                       type="radio"
+                      name="corresponding-author"
+                      checked={d.correspondingAuthorIndex === i}
+                      onChange={() => change({ correspondingAuthorIndex: i })}
+                    />
+                    此作者為通訊作者
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
                       name="presenter"
                       checked={d.presenterIndex === i}
                       onChange={() => change({ presenterIndex: i })}
@@ -450,6 +468,7 @@ export function SubmissionsScreen(p: Props) {
                       change({
                         authors: d.authors.filter((_, n) => n !== i),
                         presenterIndex: 0,
+                        correspondingAuthorIndex: 0,
                       })
                     }
                   >

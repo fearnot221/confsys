@@ -38,7 +38,7 @@ export async function configure(db: PoolClient, config: SubmissionConfig) {
   if (!r.rowCount) throw new AuthError("CONFLICT");
   return configuration(db);
 }
-const fields = `id,owner_id AS "ownerId",state,version,submitted_version AS "submittedVersion",current_revision_id AS "currentRevisionId",document,to_char(updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "updatedAt"`;
+const fields = `id,number::text AS number,owner_id AS "ownerId",state,version,submitted_version AS "submittedVersion",current_revision_id AS "currentRevisionId",document,to_char(updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "updatedAt"`;
 export async function one(db: PoolClient, id: string, lock = false) {
   const row = (
     await db.query(

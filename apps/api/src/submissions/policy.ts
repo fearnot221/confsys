@@ -68,6 +68,8 @@ export function assertSubmissionDocument(
     !document.abstract ||
     !document.authors.length ||
     document.presenterIndex >= document.authors.length ||
+    document.correspondingAuthorIndex === null ||
+    document.correspondingAuthorIndex >= document.authors.length ||
     document.authors.some((a) => !a.name || !a.email || !a.affiliation) ||
     document.topicIds.some((id) => !track.topics.some((t) => t.id === id)) ||
     (config.requireAttachment && !document.attachmentIds.length)

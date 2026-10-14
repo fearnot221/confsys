@@ -21,6 +21,8 @@ const client = createSubmissionClient(),
 const blank = (): SubmissionDocument => ({
   title: "",
   abstract: "",
+  keywords: [],
+  correspondingAuthorIndex: 0,
   trackId: "",
   topicIds: [],
   authors: [{ name: "", email: "", affiliation: "" }],
@@ -200,6 +202,7 @@ export function useSubmissions(admin = false) {
       setRevisionOffset(0);
       setDraft({
         id: crypto.randomUUID(),
+        number: "",
         ownerId: account.data!.user.id,
         state: "draft",
         version: 0,

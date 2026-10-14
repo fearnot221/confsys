@@ -29,6 +29,8 @@ const config: SubmissionConfig = {
 const doc: SubmissionDocument = {
   title: "Synthetic research",
   abstract: "Synthetic abstract",
+  keywords: [],
+  correspondingAuthorIndex: 0,
   trackId: "science",
   topicIds: ["physics"],
   authors: [

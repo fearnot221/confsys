@@ -28,6 +28,8 @@ let leader: Awaited<ReturnType<typeof account>>,
 const doc = (): SubmissionDocument => ({
   title: "Synthetic title",
   abstract: "Synthetic abstract",
+  keywords: [],
+  correspondingAuthorIndex: 0,
   trackId: "science",
   topicIds: ["physics"],
   authors: [
@@ -472,6 +474,7 @@ it("HTTP enforces CSRF, strict payloads and no-store private responses", async (
       [
         "id",
         "ownerId",
+        "number",
         "state",
         "version",
         "submittedVersion",
@@ -604,6 +607,86 @@ it("reviewer RLS grants never grant primary author detail, draft editing or with
     ]);
     await f.admin.query("DELETE FROM confsys.review_forms WHERE id=$1", [
       formId,
+    ]);
+  }
+});
+
+it("only a current published revision request extends a closed window and it is fulfilled atomically", async () => {
+  const paper = await draft(),
+    submitted = await service.transition(
+      author.raw,
+      { id: paper.id, expectedVersion: 1, action: "submit" },
+      rid(),
+    ),
+    decisionId = rid(),
+    requestId = rid();
+  const deadline = new Date(Date.now() + 60000).toISOString();
+  await f.admin.query(
+    "INSERT INTO confsys.review_decisions(id,submission_id,revision_id,version,outcome,author_message,internal_reason,revision_deadline,decided_by) VALUES($1,$2,$3,1,'revision_requested','Synthetic revision','Synthetic decision',$4,$5)",
+    [decisionId, paper.id, submitted.currentRevisionId, deadline, leader.id],
+  );
+  await f.admin.query(
+    "INSERT INTO confsys.submission_revision_requests(id,submission_id,revision_id,decision_id,deadline) VALUES($1,$2,$3,$4,$5)",
+    [requestId, paper.id, submitted.currentRevisionId, decisionId, deadline],
+  );
+  try {
+    await configure({ closesAt: new Date(Date.now() - 1000).toISOString() });
+    await expect(
+      service.save(
+        author.raw,
+        {
+          id: paper.id,
+          expectedVersion: 1,
+          document: { ...doc(), title: "Not published" },
+        },
+        rid(),
+      ),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    await f.admin.query(
+      "INSERT INTO confsys.review_publications(submission_id,decision_id,published_by) VALUES($1,$2,$3)",
+      [paper.id, decisionId, leader.id],
+    );
+    const revised = await service.save(
+      author.raw,
+      {
+        id: paper.id,
+        expectedVersion: 1,
+        document: { ...doc(), title: "Requested revision" },
+      },
+      rid(),
+    );
+    const next = await service.transition(
+      author.raw,
+      { id: paper.id, expectedVersion: revised.version, action: "submit" },
+      rid(),
+    );
+    expect(next.currentRevisionId).not.toBe(submitted.currentRevisionId);
+    expect(
+      (
+        await f.admin.query(
+          "SELECT new_revision_id FROM confsys.submission_revision_requests WHERE id=$1",
+          [requestId],
+        )
+      ).rows[0].new_revision_id,
+    ).toBe(next.currentRevisionId);
+    await expect(
+      service.save(
+        author.raw,
+        { id: paper.id, expectedVersion: next.version, document: doc() },
+        rid(),
+      ),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  } finally {
+    await f.admin.query(
+      "DELETE FROM confsys.submission_revision_requests WHERE id=$1",
+      [requestId],
+    );
+    await f.admin.query(
+      "DELETE FROM confsys.review_publications WHERE submission_id=$1",
+      [paper.id],
+    );
+    await f.admin.query("DELETE FROM confsys.review_decisions WHERE id=$1", [
+      decisionId,
     ]);
   }
 });

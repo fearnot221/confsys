@@ -8,6 +8,14 @@ export const submissionAuthorSchema = z.strictObject({
 export const submissionDocumentSchema = z.strictObject({
   title: text(500),
   abstract: text(20000),
+  keywords: z.array(text(100)).max(20).default([]),
+  correspondingAuthorIndex: z
+    .number()
+    .int()
+    .min(0)
+    .max(29)
+    .nullable()
+    .default(null),
   trackId: z.string().max(80),
   topicIds: z.array(z.string().max(80)).max(20),
   authors: z.array(submissionAuthorSchema).max(30),
@@ -42,6 +50,7 @@ export const submissionConfigSchema = z.strictObject({
 export type SubmissionConfig = z.infer<typeof submissionConfigSchema>;
 export const submissionSchema = z.strictObject({
   id: z.uuid(),
+  number: z.string().regex(/^[1-9][0-9]*$/),
   ownerId: z.uuid(),
   state: z.enum(["draft", "submitted", "withdrawn"]),
   version: z.number().int().min(1),

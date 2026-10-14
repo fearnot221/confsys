@@ -8,6 +8,7 @@ import {
   submissionTransitionInput,
   submissionConfigInput,
   type SubmissionDocument,
+  type Submission,
 } from "@confsys/contracts";
 import { sessionActor } from "../auth/session.js";
 import { AuthError } from "../auth/errors.js";
@@ -26,6 +27,15 @@ export type SubmissionDependencies = {
     db: PoolClient,
     actorId: string,
     document: SubmissionDocument,
+  ) => Promise<void>;
+  activeRevisionRequest: (
+    db: PoolClient,
+    submission: Submission,
+  ) => Promise<string | null>;
+  fulfillRevisionRequest: (
+    db: PoolClient,
+    requestId: string,
+    revisionId: string,
   ) => Promise<void>;
   referenceFiles: (
     db: PoolClient,
@@ -112,11 +122,14 @@ export function createSubmissionService(
       const data = submissionSaveInput.parse(input);
       return authenticated(raw, undefined, async (db, actor) => {
         const settings = await repo.configuration(db, "share");
-        assertSubmissionWindow(settings, new Date());
         assertSubmissionDocument(data.document, settings, false);
         const before = await repo.one(db, data.id, true);
         if (before && before.ownerId !== actor)
           throw new AuthError("NOT_FOUND");
+        const request = before
+          ? await dependencies.activeRevisionRequest(db, before)
+          : null;
+        if (!request) assertSubmissionWindow(settings, new Date());
         if (!before) {
           if (data.expectedVersion !== 0) throw new AuthError("NOT_FOUND");
           await dependencies.assertFiles(db, actor, data.document);
@@ -159,7 +172,8 @@ export function createSubmissionService(
             before.submittedVersion === before.version
           )
             return before;
-          assertSubmissionWindow(settings, new Date());
+          const request = await dependencies.activeRevisionRequest(db, before);
+          if (!request) assertSubmissionWindow(settings, new Date());
           assertSubmissionDocument(before.document, settings, true);
           if (
             settings.requireRegistration &&
@@ -176,6 +190,8 @@ export function createSubmissionService(
             settings,
           );
           await dependencies.referenceFiles(db, before.document, revisionId);
+          if (request)
+            await dependencies.fulfillRevisionRequest(db, request, revisionId);
         }
         const result = await required(db, data.id);
         const brand = await effectivePublicSite(db, config.CONFERENCE_NAME);

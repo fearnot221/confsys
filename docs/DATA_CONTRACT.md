@@ -122,3 +122,7 @@ The additive migration grants runtime updates only for acceptance/revocation tim
 - RLS 使用 transaction-local `app.actor_id`／`app.submissions_admin`；missing context 無資料。Runtime 無 UPDATE/DELETE revision 權限。權限 shared fence → actor → config → manuscript 鎖順序；外部檔案掃描不在投稿交易內執行。
 
 `tests/unit/submissions.test.ts` 覆蓋窗口邊界與完整性；`tests/integration/submissions.test.ts` 使用實際非特權 PostgreSQL role 驗證 owner/admin、並發保存、重送、immutable history、outbox 回滾、RLS context 與附件引用。附件 fixture 測試 ready 狀態與所有權，並不宣稱掃描器已驗證；掃描由 files suite 負責。
+
+投稿修訂補充：稿件 `number` 由 PostgreSQL identity 發號，以字串 DTO 避免整數精度損失；UUID 仍作資源鍵。`keywords` 及 `correspondingAuthorIndex` 分開保存；舊歷史缺通訊作者時保留 unknown/null，不推測為第一作者。正式提交要求有效通訊作者。已正式發布且仍為目前決議的補件要求，可在原投稿截止後允許作者保存及正式提交；只適用原 `currentRevisionId`，以 DB 時鐘判斷補件截止，提交新版本同交易填入 `new_revision_id`，不可重用。單純未發布的決議或補件 request row 不會開放窗口。
+
+審查角色新增 RLS 可見性後，投稿作者入口仍明確驗證 primary owner；不把「資料庫可以讀到」當作作者授權。此防線有 reviewer RLS 可見但 own detail/save/withdraw 全拒絕的真 PostgreSQL 回歸測試。
