@@ -4,7 +4,7 @@ import { ApiError, createAuthClient } from "@confsys/sdk";
 const client = createAuthClient();
 export function useEmailChange() {
   const queries = useQueryClient();
-  const [token] = useState(
+  const [token, setToken] = useState(
     () => new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "",
   );
   const [busy, setBusy] = useState(false),
@@ -13,9 +13,27 @@ export function useEmailChange() {
     [error, setError] = useState("");
   const controller = useRef<AbortController | null>(null);
   useEffect(() => {
-    if (token) window.history.replaceState(null, "", window.location.pathname);
-    return () => controller.current?.abort();
-  }, [token]);
+    const consumeFragment = () => {
+      const incoming = new URLSearchParams(window.location.hash.slice(1)).get(
+        "token",
+      );
+      if (!incoming) return;
+      controller.current?.abort();
+      setToken(incoming);
+      setBusy(false);
+      setComplete(false);
+      setError("");
+      setMessage("");
+      window.history.replaceState(null, "", window.location.pathname);
+    };
+    consumeFragment();
+    // Opening a mail link in the requesting tab may only change its fragment.
+    window.addEventListener("hashchange", consumeFragment);
+    return () => {
+      window.removeEventListener("hashchange", consumeFragment);
+      controller.current?.abort();
+    };
+  }, []);
   const account = useQuery({
     queryKey: ["private", "account"],
     queryFn: ({ signal }) => client.me(signal),

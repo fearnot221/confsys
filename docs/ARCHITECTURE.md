@@ -79,7 +79,7 @@ Migration `0003_identity_grants.sql` narrows runtime UPDATE privileges to requir
 
 `packages/config` validates server-only connection/secrets and canonical `PUBLIC_APP_ORIGIN`, plus `CONFERENCE_NAME`. API `instance.ts` exposes only `{conferenceName}`; contracts → SDK `getInstance` → `useInstance` → props-only UI. API and capture worker receive the same display setting; this describes the 1.1b baseline; Phase 1.3 authority below supersedes runtime-only branding. There is no build-time VITE identity/config value. Web ingress validates Host and forwards canonical Host to API, never trusts forwarded host/IP. Health endpoints permit internal probes; all other API routes require canonical Host.
 
-One image contains Web/API/worker builds and can run multiple independent Compose projects. Compose's project name is sufficient operational identification; no redundant INSTANCE_ID field is added to account rows. Project-specific networks have no shared external network; only loopback development ports are published. No file adapter/metadata/storage volume exists yet: private upload/download is explicitly unimplemented.
+One image contains Web/API/worker builds and can run multiple independent Compose projects. Compose's project name is sufficient operational identification; no redundant INSTANCE_ID field is added to account rows. Project-specific networks have no shared external network; only loopback development ports are published. Private uploads now use per-instance storage volumes and scoped metadata; see ADR0006 and the private file API contracts.
 
 ## Phase 1.2 entry points and responsibility boundaries
 
@@ -148,3 +148,7 @@ without performing network calls or reconstructing business permissions.
 `verified_email_history` is append-only for the application's current verified address. Its owner-scoped RLS and boolean-only `submission_author_conflicts` projection retain prior verified aliases solely to deny review/judging conflicts. They never link coauthors to an account or authorize manuscript access. Reviews use the shared conflict query for actions and candidates; competition assignment and the persisted judging eligibility view use the same projection. Source email/epoch checks suppress obsolete email-change notifications. Mailpit remains the development transport; provider acceptance is not proof of delivery.
 
 The `/auth/email-change` presentation receives hook state/callbacks; the hook uses the shared auth SDK, reauthenticates explicitly and removes the fragment from browser history. Confirmation requires the original account to remain logged in; after success every old session is invalid and the user signs in with the new email. Migration 0040 backfills already verified addresses and preserves existing token fields; no dependency or environment variable is added.
+
+## Continuous Phase1–6 domain architecture
+
+[ADR0006](adr/0006-continuous-domain-workflows.md) records the domain boundaries, shared permission registry, transaction/outbox rules, immutable artifacts, actual dependency choices and isolated recovery constraints. Current verification and remaining scope are maintained in [CONTINUOUS_RUN](CONTINUOUS_RUN.md), rather than inferred from the existence of modules.

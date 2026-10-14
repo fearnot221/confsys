@@ -142,17 +142,17 @@ export async function processNotification(
   // retract a notification that was already authorized for the recipient.
   const sending = await withIdentityTransaction(pool, async (db) => {
     await db.query("SELECT singleton FROM confsys.access_control FOR SHARE");
-    if (!(await batchEligible(db, row))) return false;
-    const changed = await db.query(
+    if (!(await batchEligible(db, row))) return null;
+    const changed = await db.query<{ email: string }>(
       `UPDATE confsys.notifications n SET stage='sending',released_at=coalesce(n.released_at,clock_timestamp())
        FROM confsys.notification_eligibility e
        WHERE n.id=$1 AND n.claim_id=$2 AND n.status='processing' AND n.lease_until>now()
        AND n.id=e.id AND e.eligible AND n.available_at<=clock_timestamp()
        AND (n.batch_id IS NULL OR EXISTS(SELECT 1 FROM confsys.notification_batch_authority a WHERE a.id=n.id AND a.active))
-       RETURNING n.id`,
+       RETURNING e.email`,
       [id, row.claim_id],
     );
-    return !!changed.rowCount;
+    return changed.rows[0]?.email ?? null;
   });
   if (!sending) {
     await finish(pool, row, "cancelled", "INELIGIBLE");
@@ -161,7 +161,7 @@ export async function processNotification(
   let receipt: { messageId: string };
   try {
     receipt = await send({
-      to: entry.email,
+      to: sending,
       subject:
         row.kind === "business"
           ? `[${row.conference_name ?? config.CONFERENCE_NAME}] ${row.message_subject}`
@@ -170,11 +170,11 @@ export async function processNotification(
               ? "確認信箱 / Verify email"
               : row.kind === "email_change"
                 ? "確認新信箱 / Confirm new email"
-              : row.kind === "reset"
-                ? "重設密碼 / Reset password"
-                : row.kind === "role_invitation"
-                  ? "本研討會角色邀請 / Conference role invitation"
-                  : "密碼已變更 / Password changed"),
+                : row.kind === "reset"
+                  ? "重設密碼 / Reset password"
+                  : row.kind === "role_invitation"
+                    ? "本研討會角色邀請 / Conference role invitation"
+                    : "密碼已變更 / Password changed"),
       text:
         row.kind === "business"
           ? `${row.conference_name ?? config.CONFERENCE_NAME}\n\n${row.message_text}\n\nRequest: ${row.request_id}`
@@ -225,7 +225,14 @@ export async function dispatchNotifications(pool: Pool, queue: Queue) {
     );
 }
 export function createMailSender(
-  config: Pick<WorkerConfig, "SMTP_HOST" | "SMTP_PORT" | "MAIL_FROM_ADDRESS" | "MAIL_REPLY_TO_ADDRESS" | "MAIL_ENVELOPE_FROM">,
+  config: Pick<
+    WorkerConfig,
+    | "SMTP_HOST"
+    | "SMTP_PORT"
+    | "MAIL_FROM_ADDRESS"
+    | "MAIL_REPLY_TO_ADDRESS"
+    | "MAIL_ENVELOPE_FROM"
+  >,
 ) {
   const transport = nodemailer.createTransport({
     host: config.SMTP_HOST,
@@ -241,9 +248,9 @@ export function createMailSender(
   const send: SendMail = async (mail) => {
     const result = await transport.sendMail({
       ...mail,
-      from: {name: "Conference", address: config.MAIL_FROM_ADDRESS},
+      from: { name: "Conference", address: config.MAIL_FROM_ADDRESS },
       replyTo: config.MAIL_REPLY_TO_ADDRESS,
-      envelope: {from: config.MAIL_ENVELOPE_FROM, to: mail.to},
+      envelope: { from: config.MAIL_ENVELOPE_FROM, to: mail.to },
     });
     return { messageId: result.messageId };
   };

@@ -140,17 +140,18 @@ export function NotificationBatchesScreen(p: Props) {
             }}
           >
             <h2>建立通知批次</h2>
-            <label>
+            <label htmlFor="notification-recipients">
               收件人本地帳號 UUID（每行一個）
-              <textarea
-                required
-                value={recipients}
-                onChange={(e) => {
-                  setRecipients(e.target.value);
-                  setAudience(null);
-                }}
-              />
             </label>
+            <textarea
+              id="notification-recipients"
+              required
+              value={recipients}
+              onChange={(e) => {
+                setRecipients(e.target.value);
+                setAudience(null);
+              }}
+            />
             <label>
               通知主旨
               <input
@@ -163,18 +164,17 @@ export function NotificationBatchesScreen(p: Props) {
                 }}
               />
             </label>
-            <label>
-              通知本文
-              <textarea
-                required
-                maxLength={4000}
-                value={text}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  setTemplateVersionId(null);
-                }}
-              />
-            </label>
+            <label htmlFor="notification-message-text">通知本文</label>
+            <textarea
+              id="notification-message-text"
+              required
+              maxLength={4000}
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                setTemplateVersionId(null);
+              }}
+            />
             {audience && (
               <p>
                 此批次使用已預覽並明確採用的受眾；送出時將重新核對每位收件者仍符合篩選。
