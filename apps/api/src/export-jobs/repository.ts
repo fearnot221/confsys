@@ -4,6 +4,7 @@ import { AuthError } from "../auth/errors.js";
 type Row = {
   id: string;
   kind: string;
+  purpose: string;
   status: string;
   result_code: string | null;
   row_count: string | null;
@@ -14,11 +15,12 @@ type Row = {
   expired: boolean;
 };
 const fields =
-  "id,kind,CASE WHEN expires_at<=clock_timestamp() THEN 'expired' ELSE status END AS status,result_code,row_count::text,snapshot_at,created_at,completed_at,expires_at,expires_at<=clock_timestamp() AS expired";
+  "id,kind,purpose,CASE WHEN expires_at<=clock_timestamp() THEN 'expired' ELSE status END AS status,result_code,row_count::text,snapshot_at,created_at,completed_at,expires_at,expires_at<=clock_timestamp() AS expired";
 const dto = (r: Row) =>
   exportJobSchema.parse({
     id: r.id,
     kind: r.kind,
+    purpose: r.purpose,
     status: r.status,
     resultCode: r.expired ? "EXPIRED" : r.result_code,
     rows: r.row_count,
@@ -79,10 +81,11 @@ export async function insert(
   kind: string,
   key: string,
   hash: string,
+  purpose: string,
 ) {
   await db.query(
-    "INSERT INTO confsys.export_jobs(id,kind,requester_id,requester_credential_version,idempotency_key,request_hash) SELECT $1,$2,id,credential_version,$4,$5 FROM confsys.users WHERE id=$3",
-    [id, kind, actor, key, hash],
+    "INSERT INTO confsys.export_jobs(id,kind,requester_id,requester_credential_version,idempotency_key,request_hash,purpose) SELECT $1,$2,id,credential_version,$4,$5,$6 FROM confsys.users WHERE id=$3",
+    [id, kind, actor, key, hash, purpose],
   );
   return detail(db, id);
 }
@@ -90,11 +93,12 @@ export async function content(db: PoolClient, id: string) {
   return (
     await db.query<{
       kind: string;
+      purpose: string;
       csv: Buffer | null;
       sha256: string | null;
       valid: boolean;
     }>(
-      "SELECT j.kind,j.csv,j.sha256,(j.status='ready' AND j.expires_at>clock_timestamp() AND e.requester_active) AS valid FROM confsys.export_jobs j JOIN confsys.export_job_eligibility e ON e.id=j.id WHERE j.id=$1",
+      "SELECT j.kind,j.purpose,j.csv,j.sha256,(j.status='ready' AND j.expires_at>clock_timestamp() AND e.requester_active) AS valid FROM confsys.export_jobs j JOIN confsys.export_job_eligibility e ON e.id=j.id WHERE j.id=$1",
       [id],
     )
   ).rows[0];

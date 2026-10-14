@@ -12,7 +12,9 @@ export function useExportJobs() {
   const queries = useQueryClient(),
     request = useRef<AbortController | null>(null),
     epoch = useRef(0),
-    attempt = useRef<{ kind: string; key: string } | null>(null);
+    attempt = useRef<{ kind: string; purpose: string; key: string } | null>(
+      null,
+    );
   const [offset, setOffset] = useState(0),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -130,11 +132,21 @@ export function useExportJobs() {
         (signal) => auth.mutate("reauthenticate", { password }, signal),
         "密碼已驗證。",
       ),
-    create: (kind: "registrations" | "submissions" | "emails") =>
+    create: (
+      kind: "registrations" | "submissions" | "emails",
+      purpose: string,
+    ) =>
       run((signal) => {
-        if (attempt.current?.kind !== kind)
-          attempt.current = { kind, key: crypto.randomUUID() };
-        return client.create(kind, attempt.current.key, signal);
+        if (
+          attempt.current?.kind !== kind ||
+          attempt.current.purpose !== purpose.trim()
+        )
+          attempt.current = {
+            kind,
+            purpose: purpose.trim(),
+            key: crypto.randomUUID(),
+          };
+        return client.create(kind, attempt.current.key, purpose, signal);
       }, "匯出工作已保存；請重新整理查看背景處理結果。"),
     newRequest: () => {
       attempt.current = null;

@@ -12,7 +12,10 @@ type Props = {
   page: (offset: number) => void;
   refresh: () => void;
   reauthenticate: (password: string) => Promise<void>;
-  create: (kind: "registrations" | "submissions" | "emails") => Promise<void>;
+  create: (
+    kind: "registrations" | "submissions" | "emails",
+    purpose: string,
+  ) => Promise<void>;
   newRequest: () => void;
   fetchDownload: (job: ExportJob) => Promise<void>;
 };
@@ -25,6 +28,7 @@ const labels = {
   expired: "已到期",
 };
 export function ExportJobsScreen(p: Props) {
+  const [purpose, setPurpose] = useState("");
   const [kind, setKind] = useState<"registrations" | "submissions" | "emails">(
       "registrations",
     ),
@@ -71,7 +75,7 @@ export function ExportJobsScreen(p: Props) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void p.create(kind);
+              void p.create(kind, purpose);
             }}
           >
             <label htmlFor="export-job-kind">完整匯出資料集</label>
@@ -92,6 +96,18 @@ export function ExportJobsScreen(p: Props) {
               <option value="submissions">投稿摘要</option>
               <option value="emails">已驗證啟用帳號 Email</option>
             </select>
+            <label htmlFor="export-job-purpose">匯出用途</label>
+            <textarea
+              id="export-job-purpose"
+              required
+              minLength={3}
+              maxLength={300}
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+            />
+            <p>
+              請填寫具體用途，勿填入不必要個資。用途會與下載稽核一併保存；用途改變請建立新要求。
+            </p>
             <button disabled={p.busy}>建立背景匯出工作</button>
             <button disabled={p.busy} type="button" onClick={p.newRequest}>
               準備另一份新快照
@@ -120,6 +136,7 @@ export function ExportJobsScreen(p: Props) {
                   建立：{new Date(j.createdAt).toLocaleString()} · 到期：
                   {new Date(j.expiresAt).toLocaleString()}
                 </p>
+                <p>用途：{j.purpose}</p>
                 {j.snapshotAt && (
                   <p>
                     資料快照：{new Date(j.snapshotAt).toLocaleString()} ·{" "}

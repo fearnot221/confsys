@@ -127,10 +127,11 @@ export function useReporting() {
     exportPage: (
       kind: "registrations" | "submissions" | "emails",
       next: number,
+      purpose: string,
     ) =>
       run(async (signal) => {
         setExported(null);
-        const result = await client.export(kind, next, signal);
+        const result = await client.export(kind, next, purpose, signal);
         if (!signal.aborted) {
           setExported(result);
           setExportKind(kind);

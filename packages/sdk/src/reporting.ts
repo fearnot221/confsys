@@ -70,8 +70,14 @@ export function createReportingClient(
     export: (
       kind: "registrations" | "submissions" | "emails",
       offset: number,
+      purpose: string,
       signal: AbortSignal,
-    ) => call(reportingEndpoints.reportingExport, { kind, offset }, signal),
+    ) =>
+      call(
+        reportingEndpoints.reportingExport,
+        { kind, offset, purpose },
+        signal,
+      ),
     preview: (userId: string, reason: string, signal: AbortSignal) =>
       call(reportingEndpoints.authorPreview, { userId, reason }, signal),
   };

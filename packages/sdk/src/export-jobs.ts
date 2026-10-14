@@ -66,11 +66,12 @@ export function createExportJobsClient(
     create: (
       kind: "registrations" | "submissions" | "emails",
       idempotencyKey: string,
+      purpose: string,
       signal: AbortSignal,
     ) =>
       call(
         exportJobEndpoints.exportJobCreate,
-        { kind, idempotencyKey },
+        { kind, idempotencyKey, purpose },
         signal,
       ),
     async download(id: string, signal: AbortSignal) {

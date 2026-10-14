@@ -106,7 +106,11 @@ it("requires current admin permission and recent proof for exports/preview, audi
     code: "FORBIDDEN",
   });
   await expect(
-    service.export(owner.raw, { kind: "emails" }, rid()),
+    service.export(
+      owner.raw,
+      { purpose: "Synthetic operational reconciliation", kind: "emails" },
+      rid(),
+    ),
   ).rejects.toMatchObject({ code: "FORBIDDEN" });
   await expect(
     service.preview(
@@ -153,7 +157,11 @@ it("requires current admin permission and recent proof for exports/preview, audi
     reason: "Synthetic support check",
     after_value: JSON.stringify({ readOnly: true }),
   });
-  const data = await service.export(admin.raw, { kind: "submissions" }, rid());
+  const data = await service.export(
+    admin.raw,
+    { purpose: "Synthetic operational reconciliation", kind: "submissions" },
+    rid(),
+  );
   expect(data.csv).toContain("'=PRIVATE_FORMULA()");
   expect(data.csv).not.toContain("SECRET_COAUTHOR");
   const stat = await service.stats(admin.raw);
@@ -165,7 +173,11 @@ it("requires current admin permission and recent proof for exports/preview, audi
     [tokenHash(admin.raw)],
   );
   await expect(
-    service.export(admin.raw, { kind: "emails" }, rid()),
+    service.export(
+      admin.raw,
+      { purpose: "Synthetic operational reconciliation", kind: "emails" },
+      rid(),
+    ),
   ).rejects.toMatchObject({ code: "REAUTH_REQUIRED" });
   await expect(
     service.preview(
@@ -209,7 +221,11 @@ it("bounds exports and feed pagination and rejects revoked sessions", async () =
   );
   const data = await service.export(
     admin.raw,
-    { kind: "emails", offset: 0 },
+    {
+      purpose: "Synthetic operational reconciliation",
+      kind: "emails",
+      offset: 0,
+    },
     rid(),
   );
   expect(data.rows).toBeLessThanOrEqual(100);
@@ -259,7 +275,7 @@ it("validates HTTP inputs and CSRF before exports and preview", async () => {
       (
         await post(
           "/api/reporting/export",
-          { kind: "emails" },
+          { purpose: "Synthetic operational reconciliation", kind: "emails" },
           { origin: "http://evil.invalid" },
         )
       ).statusCode,
@@ -268,7 +284,7 @@ it("validates HTTP inputs and CSRF before exports and preview", async () => {
       (
         await post(
           "/api/reporting/export",
-          { kind: "emails" },
+          { purpose: "Synthetic operational reconciliation", kind: "emails" },
           { "x-csrf-token": "" },
         )
       ).statusCode,
@@ -291,7 +307,12 @@ it("validates HTTP inputs and CSRF before exports and preview", async () => {
       ).statusCode,
     ).toBe(400);
     expect(
-      (await post("/api/reporting/export", { kind: "emails" })).statusCode,
+      (
+        await post("/api/reporting/export", {
+          purpose: "Synthetic operational reconciliation",
+          kind: "emails",
+        })
+      ).statusCode,
     ).toBe(200);
     expect(
       (await server.inject("/api/reporting/author-preview")).statusCode,
@@ -339,4 +360,34 @@ it("reports one timestamped cross-domain snapshot with exact currency values and
   expect(JSON.stringify(result)).not.toMatch(
     /password_hash|credential|reference|authorComment|privateComment/,
   );
+});
+
+it("personal data export requires an operator purpose and records it without adding historic/coauthor emails", async () => {
+  await auth.reauthenticate(admin.raw, password, rid());
+  for (const purpose of [undefined, "  ", "x".repeat(301)])
+    await expect(
+      service.export(admin.raw, { kind: "emails", purpose }, rid()),
+    ).rejects.toBeDefined();
+  const requestId = rid(),
+    purpose = "Synthetic participant contact reconciliation";
+  const result = await service.export(
+    admin.raw,
+    { kind: "emails", purpose },
+    requestId,
+  );
+  expect(result.csv).toContain('"user_id","email"');
+  const audit = (
+    await f.admin.query(
+      "SELECT reason FROM confsys.auth_audit WHERE request_id=$1 AND event='reporting.export'",
+      [requestId],
+    )
+  ).rows;
+  expect(audit).toEqual([{ reason: purpose }]);
+  await expect(
+    service.export(
+      admin.raw,
+      { kind: "emails", purpose },
+      "invalid-audit-uuid",
+    ),
+  ).rejects.toBeDefined();
 });

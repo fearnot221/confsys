@@ -33,13 +33,14 @@ export function createExportJobsService(pool: Pool, config: ApiConfig) {
     id: string,
     event: string,
     requestId: string,
+    purpose: string,
   ) {
     await recordAccess(db, {
       actorId: actor,
       targetId: actor,
       action: event,
       source: "session",
-      reason: "Explicit private CSV export action",
+      reason: purpose,
       before: "null",
       after: JSON.stringify({ jobId: id }),
       requestId,
@@ -56,7 +57,9 @@ export function createExportJobsService(pool: Pool, config: ApiConfig) {
     create: (raw: string | undefined, input: unknown, requestId: string) =>
       transaction(raw, true, async (db, actor) => {
         const data = exportJobInput.parse(input),
-          hash = createHash("sha256").update(data.kind).digest("hex"),
+          hash = createHash("sha256")
+            .update(JSON.stringify({ kind: data.kind, purpose: data.purpose }))
+            .digest("hex"),
           old = await repo.prior(db, actor, data.idempotencyKey);
         if (old) {
           if (old.request_hash !== hash) throw new AuthError("CONFLICT");
@@ -71,8 +74,9 @@ export function createExportJobsService(pool: Pool, config: ApiConfig) {
             data.kind,
             data.idempotencyKey,
             hash,
+            data.purpose,
           );
-        await audit(db, actor, id, "export.requested", requestId);
+        await audit(db, actor, id, "export.requested", requestId, data.purpose);
         return job;
       }),
     download: (raw: string | undefined, id: string, requestId: string) =>
@@ -83,7 +87,7 @@ export function createExportJobsService(pool: Pool, config: ApiConfig) {
           throw new AuthError("CONFLICT");
         if (createHash("sha256").update(row.csv).digest("hex") !== row.sha256)
           throw new AuthError("CONFLICT");
-        await audit(db, actor, id, "export.downloaded", requestId);
+        await audit(db, actor, id, "export.downloaded", requestId, row.purpose);
         return { bytes: row.csv, name: `export-${row.kind}-${id}.csv` };
       }),
   };

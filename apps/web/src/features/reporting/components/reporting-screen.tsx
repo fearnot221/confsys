@@ -24,6 +24,7 @@ type Props = {
   exportPage: (
     kind: "registrations" | "submissions" | "emails",
     offset: number,
+    purpose: string,
   ) => Promise<void>;
   previewAuthor: (id: string, reason: string) => Promise<void>;
   closePreview: () => void;
@@ -38,6 +39,7 @@ const statuses = {
   cancelled: "寄送已取消",
 };
 export function ReportingScreen(p: Props) {
+  const [purpose, setPurpose] = useState("");
   const [password, setPassword] = useState("");
   const [kind, setKind] = useState<"registrations" | "submissions" | "emails">(
       "registrations",
@@ -221,9 +223,18 @@ export function ReportingScreen(p: Props) {
                   <option value="emails">已驗證且啟用的帳號 Email</option>
                 </select>
               </label>{" "}
+              <label htmlFor="export-purpose">匯出用途</label>
+              <textarea
+                id="export-purpose"
+                minLength={3}
+                maxLength={300}
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+              />
+              <p>用途將保存於個資存取稽核。請勿填入不必要個資。</p>
               <button
-                disabled={p.busy}
-                onClick={() => void p.exportPage(kind, 0)}
+                disabled={p.busy || purpose.trim().length < 3}
+                onClick={() => void p.exportPage(kind, 0, purpose)}
               >
                 產生第一頁 CSV
               </button>
@@ -240,7 +251,11 @@ export function ReportingScreen(p: Props) {
                     <button
                       disabled={p.busy}
                       onClick={() =>
-                        void p.exportPage(p.exportKind, p.exported!.nextOffset!)
+                        void p.exportPage(
+                          p.exportKind,
+                          p.exported!.nextOffset!,
+                          purpose,
+                        )
                       }
                     >
                       產生下一頁 CSV

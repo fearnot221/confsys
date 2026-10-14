@@ -32,6 +32,9 @@ test("administrator creates durable full CSV export, observes real worker comple
   await page
     .getByRole("combobox", { name: "完整匯出資料集", exact: true })
     .selectOption("emails");
+  await page
+    .getByLabel("匯出用途", { exact: true })
+    .fill("Synthetic conference operations reconciliation");
   await page.getByRole("button", { name: "建立背景匯出工作" }).click();
   await expect(page.getByRole("status")).toContainText("匯出工作已保存");
   await expect

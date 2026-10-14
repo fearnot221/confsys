@@ -68,14 +68,22 @@ export function createReportingService(pool: Pool, config: ApiConfig) {
       transaction(raw, "reporting.read", false, (db) => repo.stats(db)),
     export: (raw: string | undefined, input: unknown, requestId: string) =>
       transaction(raw, "reporting.export", true, async (db, actor) => {
-        const { kind, offset } =
+        const { kind, offset, purpose } =
             reportingEndpoints.reportingExport.input.parse(input),
           result = await repo.exportRows(db, kind, offset);
-        await audit(db, actor.id, "reporting.export", requestId, {
-          kind,
-          offset,
-          rows: result.rows,
-        });
+        await audit(
+          db,
+          actor.id,
+          "reporting.export",
+          requestId,
+          {
+            kind,
+            offset,
+            rows: result.rows,
+          },
+          actor.id,
+          purpose,
+        );
         return result;
       }),
     preview: (raw: string | undefined, input: unknown, requestId: string) =>

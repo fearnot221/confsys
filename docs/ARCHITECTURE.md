@@ -152,3 +152,8 @@ The `/auth/email-change` presentation receives hook state/callbacks; the hook us
 ## Continuous Phase1–6 domain architecture
 
 [ADR0006](adr/0006-continuous-domain-workflows.md) records the domain boundaries, shared permission registry, transaction/outbox rules, immutable artifacts, actual dependency choices and isolated recovery constraints. Current verification and remaining scope are maintained in [CONTINUOUS_RUN](CONTINUOUS_RUN.md), rather than inferred from the existence of modules.
+### Private export purpose
+
+Both bounded CSV pages and durable background export requests require an explicit 3–300 character purpose. The API records this purpose in the access audit; durable jobs persist it immutably and reuse the original purpose for download audit after fresh authorization. Idempotency binds both dataset and trimmed purpose. Changing the purpose requires a new request, rather than silently reinterpreting an old snapshot. Migration 0047 labels existing jobs `Legacy export: purpose not recorded`; it does not invent historic user intent and provides no default for new jobs. Legacy idempotency keys should not be reused for new requests after this change.
+
+Email exports remain the unique, normalized, currently active and verified account addresses. Historical verified aliases and arbitrary manuscript coauthor strings are excluded. Every dataset has an explicit fixed column list; formula-injection protection, 64MiB hard limit, single database snapshot, credential/role rechecks and 24-hour expiry remain enforced. No marketing subscription model is inferred from administrative operational email exports.

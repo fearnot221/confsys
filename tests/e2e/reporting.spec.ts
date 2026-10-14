@@ -80,6 +80,9 @@ test("business notification read state, CSV page and controlled author preview o
     await login(p, adminEmail);
     await p.goto("/notifications");
     await p.getByLabel("匯出資料").selectOption("submissions");
+    await p
+      .getByLabel("匯出用途", { exact: true })
+      .fill("Synthetic author support reconciliation");
     await p.getByRole("button", { name: "產生第一頁 CSV" }).click();
     await expect(
       p.getByRole("link", { name: /下載 submissions/ }),

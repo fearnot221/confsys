@@ -29,7 +29,15 @@ let admin: Awaited<ReturnType<typeof active>>,
   other: Awaited<ReturnType<typeof active>>,
   ordinary: Awaited<ReturnType<typeof active>>;
 const make = (kind = "submissions") =>
-  service.create(admin.raw, { kind, idempotencyKey: rid() }, rid());
+  service.create(
+    admin.raw,
+    {
+      purpose: "Synthetic operational reconciliation",
+      kind,
+      idempotencyKey: rid(),
+    },
+    rid(),
+  );
 const get = async (id: string) =>
   (await service.list(admin.raw, {})).items.find((j) => j.id === id)!;
 beforeAll(async () => {
@@ -56,7 +64,11 @@ afterAll(async () => {
   await f.cleanup();
 });
 it("requires fresh current authority, binds idempotency, scopes jobs and denies worker source rows without a real claim", async () => {
-  const data = { kind: "emails", idempotencyKey: rid() };
+  const data = {
+    purpose: "Synthetic operational reconciliation",
+    kind: "emails",
+    idempotencyKey: rid(),
+  };
   await expect(service.create(ordinary.raw, data, rid())).rejects.toMatchObject(
     { code: "FORBIDDEN" },
   );
@@ -262,7 +274,11 @@ it("expires database output, bounds concurrent requests and recovers abandoned l
     Array.from({ length: 6 }, () =>
       service.create(
         other.raw,
-        { kind: "emails", idempotencyKey: rid() },
+        {
+          purpose: "Synthetic operational reconciliation",
+          kind: "emails",
+          idempotencyKey: rid(),
+        },
         rid(),
       ),
     ),
@@ -277,7 +293,15 @@ it("expires database output, bounds concurrent requests and recovers abandoned l
     reason: { code: "CONFLICT" },
   });
   await expect(
-    service.create(other.raw, { kind: "emails", idempotencyKey: rid() }, rid()),
+    service.create(
+      other.raw,
+      {
+        purpose: "Synthetic operational reconciliation",
+        kind: "emails",
+        idempotencyKey: rid(),
+      },
+      rid(),
+    ),
   ).rejects.toMatchObject({ code: "CONFLICT" });
   await f.admin.query(
     "UPDATE confsys.export_jobs SET status='cancelled' WHERE requester_id=$1 AND status='pending'",
@@ -301,4 +325,51 @@ it("dispatches and processes a persisted job through real Redis/BullMQ", async (
   } finally {
     await worker.close();
   }
+});
+
+it("requires explicit purpose, preserves it for download audit and binds retries to the same purpose", async () => {
+  await auth.reauthenticate(admin.raw, password, rid());
+  for (const purpose of [undefined, "", "  ", "x".repeat(301)])
+    await expect(
+      service.create(
+        admin.raw,
+        { kind: "emails", idempotencyKey: rid(), purpose },
+        rid(),
+      ),
+    ).rejects.toBeDefined();
+  const data = {
+    kind: "emails",
+    idempotencyKey: rid(),
+    purpose: "  Synthetic attendance reconciliation  ",
+  };
+  const job = await service.create(admin.raw, data, rid());
+  expect(job.purpose).toBe(data.purpose.trim());
+  await expect(
+    service.create(
+      admin.raw,
+      { ...data, purpose: "Different intended use" },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await processExportJob(f.worker, job.id);
+  await service.download(admin.raw, job.id, rid());
+  const events = (
+    await f.admin.query(
+      "SELECT event,reason FROM confsys.auth_audit WHERE after_value::jsonb->>'jobId'=$1 ORDER BY created_at",
+      [job.id],
+    )
+  ).rows;
+  expect(
+    events
+      .filter((e) =>
+        ["export.requested", "export.downloaded"].includes(e.event),
+      )
+      .map((e) => e.reason),
+  ).toEqual([data.purpose.trim(), data.purpose.trim()]);
+  await expect(
+    f.worker.query("UPDATE confsys.export_jobs SET purpose=$2 WHERE id=$1", [
+      job.id,
+      "Changed purpose",
+    ]),
+  ).rejects.toMatchObject({ code: "42501" });
 });
