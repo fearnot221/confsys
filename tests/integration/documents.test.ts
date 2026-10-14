@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
+import { withIdentityTransaction } from "@confsys/db";
 import { authFixture, password } from "../helpers/auth.js";
 import { createAuthService } from "../../apps/api/src/auth/service.js";
 import { bootstrapAdministrator } from "../../apps/api/src/access/bootstrap.js";
@@ -337,6 +338,17 @@ it("reissue uses a new linked number exactly once; rejects unauthorized, changed
     },
     rid(),
   );
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await db.query(
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.finance_admin','true',true)",
+        [finance.id],
+      );
+      await db.query("UPDATE confsys.receipts SET state='issued' WHERE id=$1", [
+        source.id,
+      ]);
+    }),
+  ).rejects.toMatchObject({ code: "23514" });
   const allocation = (
     await f.admin.query(
       "SELECT id FROM confsys.payment_allocations WHERE order_id=$1",

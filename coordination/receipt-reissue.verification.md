@@ -12,3 +12,7 @@ Typecheck passed. Existing registration-finance browser E2E extended after real 
 Central0037 supplied by main; local516b772 only consumes central migrations/browser baseline and must not be cherry-picked. Forward0039 terminal-state guard proposed separately; do not rewrite applied0037.
 
 Maintainability: same finance permission, lock, balance helper, snapshot schema, outbox and PDF renderer. SDK owns network; hooks own current linked receipt, presentation receives callbacks. No new dependency. DTO additive fields defaultnull for older fixture compatibility, and old PDF snapshots retain compatibility via optional source number.
+
+Forward terminal regression authored after0039 proposal: actual nonprivileged app-role finance context attempts old VOID→issued after its successor is also VOID, expecting23514. Pending shared PG slot for this additional assertion.
+
+Actual reissue PDF `output/pdf/receipt-reissued.pdf` rendered with Poppler and visually inspected; Traditional Chinese source-number line is visible and `pdftotext` confirms `重開來源（已作廢）：R-00000001`.
