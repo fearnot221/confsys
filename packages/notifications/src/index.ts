@@ -42,3 +42,4 @@ export async function enqueueIdentityMail(
   );
   return id;
 }
+export { enqueueBusinessNotification } from './business.js';

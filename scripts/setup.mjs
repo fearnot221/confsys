@@ -22,6 +22,9 @@ const pgPort = number("POSTGRES_PORT"),
   mailPort = number("MAILPIT_PORT");
 function authDefaults() {
   return {
+    PRIVATE_STORAGE_ROOT: process.env.PRIVATE_STORAGE_ROOT ?? resolve(".private-storage"),
+    CLAMAV_HOST: "127.0.0.1",
+    CLAMAV_PORT: process.env.CLAMAV_PORT ?? "3310",
     PUBLIC_APP_ORIGIN:
       process.env.PUBLIC_APP_ORIGIN ?? `http://127.0.0.1:${webPort}`,
     CONFERENCE_NAME: process.env.CONFERENCE_NAME ?? "研討會",
