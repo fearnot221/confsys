@@ -412,7 +412,10 @@ function Manage({
       <select
         id="review-paper"
         value={paperId}
-        onChange={(e) => setPaperId(e.target.value)}
+        onChange={(e) => {
+          setPaperId(e.target.value);
+          setAnonymous(false);
+        }}
       >
         <option value="">請選擇稿件</option>
         {board.papers.map((p) => (
@@ -453,7 +456,10 @@ function Manage({
           id="review-form"
           required
           value={formId}
-          onChange={(e) => setFormId(e.target.value)}
+          onChange={(e) => {
+            setFormId(e.target.value);
+            setAnonymous(false);
+          }}
         >
           <option value="">請選擇評分表</option>
           {board.forms.map((f) => (
