@@ -5,9 +5,11 @@ import type { Pool, PoolClient } from "pg";
 import { diagnostic, redisOptions, type WorkerConfig } from "@confsys/config";
 import { withIdentityTransaction } from "@confsys/db";
 import { unseal } from "./secrets.js";
+import { permissionsFor } from "@confsys/policy";
 const queueName = "identity-notifications-v1";
 type Notification = {
   id: string;
+  batch_id: string | null;
   user_id: string;
   request_id: string;
   kind: string;
@@ -70,6 +72,20 @@ export async function recoverNotifications(pool: Pool) {
       WHERE s.notification_id=n.id AND (s.expires_at<now() OR n.status IN ('accepted','failed','unknown','cancelled'))`);
   });
 }
+// Batches retain their issuing authority. Pending sends fail closed if the
+// issuer is disabled, credentials change, permission is removed, or cancelled.
+async function batchEligible(pool: Pool, row: Notification) {
+  if (!row.batch_id) return true;
+  const result = await pool.query<{ active: boolean; roles: string[] }>(
+    "SELECT active,roles FROM confsys.notification_batch_authority WHERE id=$1",
+    [row.id],
+  );
+  const authority = result.rows[0];
+  return (
+    !!authority?.active &&
+    permissionsFor(authority.roles).includes("notifications.manage")
+  );
+}
 export async function processNotification(
   pool: Pool,
   config: Pick<
@@ -98,7 +114,7 @@ export async function processNotification(
     [id],
   );
   const entry = data.rows[0];
-  if (!entry?.eligible) {
+  if (!entry?.eligible || !(await batchEligible(pool, row))) {
     await finish(pool, row, "cancelled", "INELIGIBLE");
     return;
   }
@@ -119,6 +135,10 @@ export async function processNotification(
     }
   } catch {
     await finish(pool, row, "failed", "SECRET_UNAVAILABLE");
+    return;
+  }
+  if (!(await batchEligible(pool, row))) {
+    await finish(pool, row, "cancelled", "BATCH_AUTHORITY_REVOKED");
     return;
   }
   const sending = await pool.query(

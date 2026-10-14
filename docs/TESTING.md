@@ -162,3 +162,12 @@ Review verified checkpoint (2026-10-15 06:32 Asia/Taipei): `PATH=/tmp/confsys-to
   safe export/preview projections, audited principal preservation, pagination and HTTP CSRF.
 - Reporting exports are bounded live pages, not an asynchronous snapshot export job.
   Large snapshot exports and richer aggregation remain distinct follow-up scope.
+
+### Bounded bulk mail
+
+`node --env-file=/path/to/synthetic.env node_modules/vitest/vitest.mjs run tests/integration/notification-batches.test.ts`
+exercises3 cases with real PostgreSQL and Mailpit SMTP: current permission/recent
+proof, recipient eligibility, concurrent idempotency, immutable body/key binding,
+accepted status, explicit cancellation, issuer-role/credential revocation and disabled
+recipient cancellation. `tests/e2e/notification-batches.spec.ts` exercises the browser
+queue command, actual worker-to-Mailpit capture and the recipient's notification center.

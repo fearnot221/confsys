@@ -73,3 +73,12 @@ from SMTP acceptance and labels uncertain delivery truthfully. Admin exports off
 individual bounded CSV pages. Controlled preview has an explicit read-only banner,
 a required reason, no impersonated principal and a close action. All form controls
 have native labels; asynchronous failures/status use alert/status announcements.
+
+### Bounded notification batches
+
+Mount `NotificationBatchesScreen` with `useNotificationBatches()` at
+`/admin/notifications`. Operators paste explicit local UUIDs from the Email export,
+enter a subject/body, and explicitly queue the batch. Recent-password proof is
+available in the workspace. The hook preserves request identity across ambiguous
+retries of the same form. The page lists bounded batch pages, real worker status
+counts, refresh and cancellation, with explicit non-recall/uncertain-delivery labels.

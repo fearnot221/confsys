@@ -182,3 +182,20 @@ Schema is centrally managed by migrations 0020 (competition records/composite ow
 Verification: `node --env-file=<synthetic-env> node_modules/vitest/vitest.mjs run tests/integration/competitions.test.ts` passed 6/6 at 06:46 Asia/Taipei; program shared-projection regression passed 5/5. `pnpm exec vitest run tests/unit/competitions.test.ts tests/unit/competitions-sdk.test.ts` passed 4/4. Tests cover real non-bypass PostgreSQL RLS, qualification privacy, final immutability/replay, exact ties, withdrawal/revoked roles, CSRF, strict DTOs, private no-store responses and explicit public projection. Browser coverage is a separate pending integration gate.
 
 Maintainability: handlers validate and route only; service owns transactions, authorization, lifecycle and notifications; repository scopes persistence; policy computes scores/ties independently. No second permission registry or money engine was added. Shared accepted-revision lookup removes program/competition rule duplication. Qualification views are deliberately narrow dependencies on registration/submission rather than raw privilege escalation. Current limitation: rules are frozen after assignments; modifying them requires a new competition, retaining historical review integrity. Assignment count is bounded including cancelled assignments; a future archival workflow must preserve audit history before raising this bound.
+### Bounded notification batches
+
+`notification-batches` owns explicit1–100-recipient batch commands. The service checks
+`notifications.manage`, recent proof and every selected active/verified local account;
+no external Email addresses or implicit directory expansion are accepted. Stable
+idempotency keys bind a sorted recipient set and immutable subject/body. Batch,
+business outbox rows and audit commit atomically. Only a narrow status projection is
+readable; no secret tokens, SMTP credentials or raw recipient arrays enter the batch DTO.
+
+The worker uses the shared `@confsys/policy` registry and a narrow unfinished-batch
+authority view to recheck the issuer's credential epoch, active state, current grant
+and cancellation before SMTP begins, in addition to existing recipient eligibility.
+Transport remains capture-only Mailpit. Cancellation stops pending attempts; external
+SMTP effects already begun cannot be recalled. Accepted means SMTP acceptance,
+unknown means potentially sent and is never blindly retried. Read receipts are
+independent of delivery state. Subject/body are ordinary announcements, not a channel
+for manuscript contents, secrets or unpublished decisions.
