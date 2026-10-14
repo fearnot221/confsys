@@ -163,9 +163,11 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
   await page.getByLabel("分組代碼").fill("science");
   await page.getByRole("button", { name: "授予分組範圍" }).click();
   await expect(page.getByRole("status")).toContainText("主席分組範圍已更新");
-  await page.getByLabel("正式投稿", { exact: true }).selectOption(paper.id);
   await page
-    .getByLabel("審查委員", { exact: true })
+    .getByRole("combobox", { name: "正式投稿", exact: true })
+    .selectOption(paper.id);
+  await page
+    .getByRole("combobox", { name: "審查委員", exact: true })
     .selectOption(id(reviewerEmail));
   const formId = (
     await f.admin.query(
@@ -173,7 +175,9 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
       [id(adminEmail)],
     )
   ).rows[0].id;
-  await page.getByLabel("評分表版本", { exact: true }).selectOption(formId);
+  await page
+    .getByRole("combobox", { name: "評分表版本", exact: true })
+    .selectOption(formId);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "指派此不可變版本" }).click();
   await expect(page.getByRole("status")).toContainText("已指派不可變投稿版本");
@@ -227,7 +231,7 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
       .first()
       .waitFor();
     await chairPage
-      .getByLabel("正式投稿", { exact: true })
+      .getByRole("combobox", { name: "正式投稿", exact: true })
       .selectOption(paper.id);
     await chairPage
       .getByLabel("發布後給作者的訊息")

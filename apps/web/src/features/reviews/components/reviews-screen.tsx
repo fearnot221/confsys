@@ -264,24 +264,21 @@ function Configure({
             onChange={(e) => setName(e.target.value)}
           />
         </label>
-        <label>
-          審查模式
-          <select
-            value={mode}
-            onChange={(e) =>
-              setMode(
-                e.target.value === "single_blind"
-                  ? "single_blind"
-                  : "double_blind",
-              )
-            }
-          >
-            <option value="double_blind">雙盲（須人工確認匿名稿）</option>
-            <option value="single_blind">
-              單盲（審查者可見作者名稱／單位）
-            </option>
-          </select>
-        </label>
+        <label htmlFor="review-mode">審查模式</label>
+        <select
+          id="review-mode"
+          value={mode}
+          onChange={(e) =>
+            setMode(
+              e.target.value === "single_blind"
+                ? "single_blind"
+                : "double_blind",
+            )
+          }
+        >
+          <option value="double_blind">雙盲（須人工確認匿名稿）</option>
+          <option value="single_blind">單盲（審查者可見作者名稱／單位）</option>
+        </select>
         <label>
           審查截止（本機時區）
           <input
@@ -411,17 +408,19 @@ function Manage({
   return (
     <section className="auth-panel">
       <h2>指派與決議</h2>
-      <label>
-        正式投稿
-        <select value={paperId} onChange={(e) => setPaperId(e.target.value)}>
-          <option value="">請選擇稿件</option>
-          {board.papers.map((p) => (
-            <option key={p.submissionId} value={p.submissionId}>
-              {p.title} · {p.trackId}
-            </option>
-          ))}
-        </select>
-      </label>
+      <label htmlFor="review-paper">正式投稿</label>
+      <select
+        id="review-paper"
+        value={paperId}
+        onChange={(e) => setPaperId(e.target.value)}
+      >
+        <option value="">請選擇稿件</option>
+        {board.papers.map((p) => (
+          <option key={p.submissionId} value={p.submissionId}>
+            {p.title} · {p.trackId}
+          </option>
+        ))}
+      </select>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -435,36 +434,34 @@ function Manage({
             );
         }}
       >
-        <label>
-          審查委員
-          <select
-            required
-            value={reviewerId}
-            onChange={(e) => setReviewerId(e.target.value)}
-          >
-            <option value="">請選擇委員</option>
-            {board.reviewers.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.email}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          評分表版本
-          <select
-            required
-            value={formId}
-            onChange={(e) => setFormId(e.target.value)}
-          >
-            <option value="">請選擇評分表</option>
-            {board.forms.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.document.name} v{f.version} · {f.document.mode}
-              </option>
-            ))}
-          </select>
-        </label>
+        <label htmlFor="review-reviewer">審查委員</label>
+        <select
+          id="review-reviewer"
+          required
+          value={reviewerId}
+          onChange={(e) => setReviewerId(e.target.value)}
+        >
+          <option value="">請選擇委員</option>
+          {board.reviewers.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.email}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="review-form">評分表版本</label>
+        <select
+          id="review-form"
+          required
+          value={formId}
+          onChange={(e) => setFormId(e.target.value)}
+        >
+          <option value="">請選擇評分表</option>
+          {board.forms.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.document.name} v{f.version} · {f.document.mode}
+            </option>
+          ))}
+        </select>
         <label>
           <input
             type="checkbox"
@@ -518,27 +515,26 @@ function Manage({
           }}
         >
           <h3>主席決議草稿</h3>
-          <label>
-            決議
-            <select
-              value={outcome}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (
-                  v === "accept_oral" ||
-                  v === "accept_poster" ||
-                  v === "reject" ||
-                  v === "revision_requested"
-                )
-                  setOutcome(v);
-              }}
-            >
-              <option value="accept_oral">口頭錄取</option>
-              <option value="accept_poster">壁報錄取</option>
-              <option value="reject">不錄取</option>
-              <option value="revision_requested">補件</option>
-            </select>
-          </label>
+          <label htmlFor="review-outcome">決議</label>
+          <select
+            id="review-outcome"
+            value={outcome}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (
+                v === "accept_oral" ||
+                v === "accept_poster" ||
+                v === "reject" ||
+                v === "revision_requested"
+              )
+                setOutcome(v);
+            }}
+          >
+            <option value="accept_oral">口頭錄取</option>
+            <option value="accept_poster">壁報錄取</option>
+            <option value="reject">不錄取</option>
+            <option value="revision_requested">補件</option>
+          </select>
           {outcome === "revision_requested" && (
             <label>
               補件截止（本機時區）
