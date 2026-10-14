@@ -2,7 +2,7 @@
 
 Compose services are project-namespaced, persistent volumes are local, mapped ports bind to 127.0.0.1 only. PostgreSQL official entrypoint bootstraps roles before accepting application use; app images run as node (non-root). Redis is persistent AOF/noeviction; cache and queues share only the development instance. Mailpit has no relay configuration. No real email sender or payment adapter exists.
 
-Migration is a separate command/container under confsys_migrator, serialized by a PostgreSQL advisory transaction lock. The ledger tracks SHA-256 checksums, rejecting edited applied migrations. Migrations are forward-only; write an explicit repair/forward migration after review, not automatic down migrations. API and worker readiness require the access control migration (0004) and safe database roles. Applications never get migrator/admin credentials through Compose service env.
+Migration is a separate command/container under confsys_migrator, serialized by a PostgreSQL advisory transaction lock. The ledger tracks SHA-256 checksums, rejecting edited applied migrations. Migrations are forward-only; write an explicit repair/forward migration after review, not automatic down migrations. API and worker readiness require the current `REQUIRED_SCHEMA_VERSION` in `packages/db/src/index.ts` and safe database roles. Run all migrations supplied with the matched image before starting applications. Applications never get migrator/admin credentials through Compose service env.
 
 Development app images contain build dependencies; do not treat them as hardened production images. Before production: separate queue/cache instances, TLS/reverse-proxy controls, managed secrets, restricted network access, backup policy, object storage, logs/metrics/alerts, vulnerability review, public rendering, capacity testing, provider sandbox verification and local business authorization. `NODE_ENV=production` is a runtime optimization, not a production-readiness certification.
 
@@ -12,18 +12,13 @@ Development app images contain build dependencies; do not treat them as hardened
 
 Restart infrastructure with `pnpm infra:up`; restart app containers with `pnpm compose --profile app up -d --no-build --wait api worker web`. Readiness must recover; liveness is intentionally independent of dependency outages. Host `pnpm dev` and container Web share the selected WEB_PORT (default 25173); choose one at a time. Never stop unrelated host processes to free these ports.
 
-## Backup/restore procedure (documented, restore drill unverified)
+## Isolated synthetic backup and restore
 
-For an isolated local rehearsal, after generating local credentials and starting the matching Compose project:
+Use the guarded [same-instance backup drill](BACKUP_DRILL.md) for this repository's generated synthetic environments. It requires a successfully completed `test:instances` run and its exact private env file; pause only that source instance's API/worker, then validate and restore into new named resources. It never overwrites the source database or mounts source private files writable. The local backup directory and secret files use restricted permissions; it is not encrypted at rest by the script.
 
-```sh
-pnpm compose exec -T postgres pg_dump -U postgres -Fc confsys > /tmp/confsys-local.dump
-# Create a separate restore database; never overwrite the source database.
-pnpm compose exec -T postgres createdb -U postgres -O confsys_migrator confsys_restore
-pnpm compose exec -T postgres pg_restore -U postgres -d confsys_restore --exit-on-error < /tmp/confsys-local.dump
-```
+The07:42 drill restored one actual private attachment/reference and verified database counts, sequences, migrations, app-role RLS and pooled-context reset. That fixture had no generated PDF/CSV/QR or retained encrypted mail, so populated-artifact recovery remains pending until separately recorded in CONTINUOUS_RUN. A probe did verify the restored mail key. Do not infer production disaster-recovery objectives, retention, encryption-at-rest or a tested production rollout from this synthetic result.
 
-A real production plan must also back up cluster roles/ownership, encrypted secrets and private storage with coordinated retention. Validate checksums, migration state, counts, referenced objects, keys and authorization in the restored isolated environment. Define RPO/RTO with the organization; no values or successful restore claim is invented here. Dumps contain sensitive data once real records exist and need encryption/access controls. Do not commit backups. Account/audit/outbox data is now durable; object storage is not implemented.
+A production plan must coordinate database/private bytes/signing and encryption keys, preserve exact role ownership/grants, restrict and encrypt backups, and define RPO/RTO with the organization. Never use a recovered account/database/key set to create a different conference. New conferences require fresh accounts, credentials, volumes and keys.
 
 ## Phase 1.1 local identity/mail operations
 
@@ -73,9 +68,9 @@ New local port settings and `MAILPIT_URL` are validated in packages/config's loc
 
 Host-only cookies have no Domain and are not port-isolated. Use different hostnames for different conferences; browsers resolve run-specific a-<run>.localhost/b-<run>.localhost in the executable dual-instance test. Node test transport maps only local names to loopback while preserving Host. This is test runner code, never a product DNS/tenant resolver. Web checks Host and forwards canonical Host; API checks it except internal health probes. Links always use server config; forwarded host/IP are untrusted. Current trustProxy=false still has the shared-IP rate limit limitation in ROADMAP.
 
-The template uses independent project bridges with no shared external network, no explicit global volume names and no shared data bind mounts. The sole source bind is read-only bootstrap SQL. Each project owns PostgreSQL, Redis/AOF and Mailpit data volumes. No storage adapter or file metadata exists; its future private volume/bucket and authorization remain unimplemented. For production remove local infra port publication, design private backend and ingress networks deliberately, separate queue/cache Redis and restrict operators. Shared host root/Docker admins can access containers; projects do not provide VM-level isolation or resource availability guarantees.
+The template uses independent project bridges with no shared external network, no explicit global volume names and no shared data bind mounts. The sole source bind is read-only bootstrap SQL. Each project owns PostgreSQL, Redis/AOF and Mailpit data volumes. Private file metadata, quarantine and a project-local private-storage volume are now implemented; scanner health and authorized access are required before download. For production remove local infra port publication, design private backend and ingress networks deliberately, separate queue/cache Redis and restrict operators. Shared host root/Docker admins can access containers; projects do not provide VM-level isolation or resource availability guarantees.
 
-Upgrade one instance at a time: choose version/digest, review required env changes, make and verify an instance-specific backup, stop only its app processes as needed, run its migration, start its matching image, then smoke that instance. Phase 1.1b preserves 0001–0003 byte-for-byte and requires no schema/data backfill; old hashes/sessions/outbox remain valid. Rollback to an earlier image requires compatible settings and image-specific review; do not rewrite migration history. Actual disaster restore/TLS/provider/load drills remain unverified.
+Upgrade one instance at a time: choose version/digest, review required env changes, make and verify an instance-specific backup, stop only its app processes as needed, run its migration, start its matching image, then smoke that instance. Phase 1.1b preserves 0001–0003 byte-for-byte and requires no schema/data backfill; old hashes/sessions/outbox remain valid. Rollback to an earlier image requires compatible settings and image-specific review; do not rewrite migration history. Synthetic same-instance restore evidence is recorded separately above; production disaster recovery, TLS, provider and load drills remain unverified.
 
 A new conference is always a fresh instance with new credentials. Future whitelisted settings export/import is separate from disaster recovery and must exclude accounts, sessions, tokens, manuscripts, payments and secrets. No central auto-upgrade/control plane exists.
 
