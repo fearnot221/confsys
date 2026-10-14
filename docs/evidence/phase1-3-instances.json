@@ -1,0 +1,43 @@
+{
+  "run": "dc3f0715",
+  "image": "confsys:p13-dc3f0715",
+  "checks": [
+    "Same immutable image for both Web/API/worker; independent credentials, networks and data volumes; process config separation",
+    "Same browser context resolves both localhost hostnames; runtime display/title and public DTO/bundle secrecy",
+    "A-only identity absent in B; identical email independent passwords; verification token rejection in B does not consume A; host-only cookies coexist; foreign session rejected",
+    "Reset/revoke/logout A leave B password/session/audit unchanged; foreign reset token invalid; forged Host rejected and forwarded Host cannot poison canonical mail URL",
+    "A-only CLI bootstrap, reauthentication, grants/revokes/disable/restore/session revocation preserve B roles, bootstrap marker, accounts, sessions and audit; foreign admin cookie and wrong CLI origin rejected",
+    "Stopped A worker retains durable mail; live B worker processes only B; restarting A delivers only to A Mailpit",
+    "A-only stop/restart/migration/smoke leaves B available and B schema/data unchanged",
+    "Same image A/B publish independent multilingual initial HTML and canonical URLs; A draft/publish/history restore leaves B site/accounts/roles/audit and container IDs unchanged; foreign admin preview/publication denied; new worker/Mailpit mail uses each official brand without rebuilding"
+  ],
+  "imageId": "sha256:b30350f8265a8fa5c97c2e8c1e78a811707fcb45287d7837564dd9ef525c18dd",
+  "resources": [
+    {
+      "project": "confsys-p13-dc3f0715-a",
+      "origin": "http://a-dc3f0715.localhost:55180",
+      "envFile": ".instances/dc3f0715/a.env",
+      "networks": [
+        "confsys-p13-dc3f0715-a_default"
+      ],
+      "volumes": [
+        "confsys-p13-dc3f0715-a_redis-data",
+        "confsys-p13-dc3f0715-a_postgres-data",
+        "confsys-p13-dc3f0715-a_mailpit-data"
+      ]
+    },
+    {
+      "project": "confsys-p13-dc3f0715-b",
+      "origin": "http://b-dc3f0715.localhost:55181",
+      "envFile": ".instances/dc3f0715/b.env",
+      "networks": [
+        "confsys-p13-dc3f0715-b_default"
+      ],
+      "volumes": [
+        "confsys-p13-dc3f0715-b_postgres-data",
+        "confsys-p13-dc3f0715-b_mailpit-data",
+        "confsys-p13-dc3f0715-b_redis-data"
+      ]
+    }
+  ]
+}

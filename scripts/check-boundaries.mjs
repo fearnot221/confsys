@@ -35,7 +35,12 @@ export function checkBoundaries(root = process.cwd()) {
     ts.sys,
     root,
   ).options;
-  for (const file of [...presentation.flatMap(files), ...files(contracts)]) {
+  const serverEntry = resolve(root, "apps/web/src/entry-server.tsx");
+  for (const file of [
+    ...presentation.flatMap(files),
+    ...files(contracts),
+    ...(existsSync(serverEntry) ? [serverEntry] : []),
+  ]) {
     const source = ts.createSourceFile(
       file,
       readFileSync(file, "utf8"),
@@ -46,6 +51,7 @@ export function checkBoundaries(root = process.cwd()) {
     const fail = (reason) =>
       failures.push(`${relative(root, file)}: ${reason}`);
     const presentationFile = uiFile(file);
+    const serverFile = file === serverEntry;
     function visit(node) {
       if (
         (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
@@ -58,17 +64,29 @@ export function checkBoundaries(root = process.cwd()) {
           ? resolve(dirname(file), spec.replace(/\.js$/, ".ts"))
           : undefined;
         const target = resolved ?? localFallback;
-        const allowed = presentationFile
-          ? ["react", "react/jsx-runtime", "@confsys/ui"].includes(spec) ||
-            (target && uiFile(target))
-          : spec === "zod" || (target && inside(target, contracts));
+        const allowed = serverFile
+          ? spec === "react-dom/server" ||
+            (spec === "@confsys/contracts" &&
+              ts.isImportDeclaration(node) &&
+              node.importClause?.isTypeOnly) ||
+            (target && uiFile(target)) ||
+            /^\.\/design\/[a-z-]+\.css$/.test(spec)
+          : presentationFile
+            ? ["react", "react/jsx-runtime", "@confsys/ui"].includes(spec) ||
+              (spec === "@confsys/contracts" &&
+                ts.isImportDeclaration(node) &&
+                node.importClause?.isTypeOnly) ||
+              (target && uiFile(target))
+            : spec === "zod" || (target && inside(target, contracts));
         if (!allowed) fail(`import/re-export forbidden: ${spec}`);
       }
       if (
         ts.isCallExpression(node) &&
-        ["import", "require", ...(presentationFile ? ["fetch"] : [])].includes(
-          node.expression.getText(source),
-        )
+        [
+          "import",
+          "require",
+          ...(presentationFile || serverFile ? ["fetch"] : []),
+        ].includes(node.expression.getText(source))
       )
         fail("dynamic/network call forbidden");
       if (

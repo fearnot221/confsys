@@ -1,4 +1,8 @@
 import {
+  siteEndpoints,
+  siteSaveInput,
+  siteVersionInput,
+  siteRestoreInput,
   accountSchema,
   directorySchema,
   directoryAccountSchema,
@@ -36,7 +40,45 @@ export function createAuthClient(
     }
     return body;
   }
+  async function siteRequest<K extends keyof typeof siteEndpoints>(
+    operation: K,
+    input: unknown,
+    signal: AbortSignal,
+  ) {
+    const spec = siteEndpoints[operation];
+    if (spec.method === "get") {
+      const query =
+        operation === "siteHistory"
+          ? `?offset=${Number(input)}`
+          : operation === "sitePreview"
+            ? `?version=${Number(input)}`
+            : "";
+      return spec.output.parse(await request(spec.path + query, { signal }));
+    }
+    const data = (
+      operation === "siteSave"
+        ? siteSaveInput
+        : operation === "siteRestore"
+          ? siteRestoreInput
+          : siteVersionInput
+    ).parse(input);
+    const { csrfToken } = csrfSchema.parse(
+      await request("/api/auth/csrf", { signal }),
+    );
+    return spec.output.parse(
+      await request(spec.path, {
+        method: "POST",
+        signal,
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken,
+        },
+        body: JSON.stringify(data),
+      }),
+    );
+  }
   return {
+    site: siteRequest,
     async directory(
       input: {
         search?: string;

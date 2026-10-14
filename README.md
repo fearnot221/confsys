@@ -2,7 +2,7 @@
 
 **一份程式碼，每場研討會獨立部署，每個實例只服務一場。** 帳號、Session、token、資料、佇列與郵件各自獨立；不是全域帳號跨研討會平台。主辦單位是介紹／聯絡資料，不是 tenant。產品決策見 [SPEC](docs/SPEC.md)／[ADR 0003](docs/adr/0003-single-conference.md)。
 
-目前有 Phase 0 工程底座、Phase 1.1 帳號生命週期、Phase 1.1b 單研討會校正，以及 Phase 1.2 固定角色、權限與受控管理員初始化。CMS、邀請、報名、付款、投稿尚未實作；後續單元需要另行授權。
+目前有 Phase 0 工程底座、Phase 1.1 帳號生命週期、Phase 1.1b 單研討會校正，Phase 1.2 固定角色、權限與受控管理員初始化，以及 Phase 1.3 會議設定／基本官網草稿與發布。邀請、上傳、報名、付款、投稿尚未實作；後續單元需要另行授權。
 
 ## 本地啟動
 
@@ -22,7 +22,7 @@ pnpm dev
 
 預設 Web 25173、API 23000、worker 23001、PostgreSQL 25432、Redis 26379、Mailpit UI 28025／SMTP 21025，全部本地。可用 `WEB_PORT`、`API_PORT`、`WORKER_PORT`、`POSTGRES_PORT`、`REDIS_PORT`、`MAILPIT_PORT`、`SMTP_PORT` 避免衝突；canonical `PUBLIC_APP_ORIGIN` 必須對應 Web URL。不同實例必須使用不同 hostname，僅換 port 不隔離 Cookie。範例雙實例由 `pnpm test:instances` 建立。
 
-開啟 `/auth/register` → 使用合成 `@example.invalid` 信箱 → 在該實例 Mailpit 找驗證信 → 明確送出新密碼 → `/auth/login` → `/auth/account`。支援重寄、重設與登出。頁面標題、登入頁、帳號頁與郵件由 runtime `CONFERENCE_NAME` 呈現；`/` 保留服務診斷頁。一般新帳號沒有管理角色，也不代表已完成研討會報名。管理員由部署者明確執行一次性 CLI 初始化，見下方及 [OPERATIONS](docs/OPERATIONS.md#phase-12-controlled-administrator-bootstrap-and-handoff)。
+開啟 `/auth/register` → 使用合成 `@example.invalid` 信箱 → 在該實例 Mailpit 找驗證信 → 明確送出新密碼 → `/auth/login` → `/auth/account`。支援重寄、重設與登出。`/` 是官網（未發布時準備中），診斷頁移至 `/system/status`。頁面標題、登入頁及新郵件品牌由正式發布內容決定；從未發布時才使用 runtime `CONFERENCE_NAME`。一般新帳號沒有管理角色，也不代表已完成研討會報名。管理員由部署者明確執行一次性 CLI 初始化，見下方及 [OPERATIONS](docs/OPERATIONS.md#phase-12-controlled-administrator-bootstrap-and-handoff)。
 
 ## 全容器啟動與選擇實例
 
@@ -51,7 +51,7 @@ pnpm check
 pnpm test:instances
 ```
 
-`check` 依序執行 lint、typecheck、unit、真實 PostgreSQL／Redis／Mailpit integration、contract、clean build、Playwright E2E。E2E 不重用已佔用服務，host E2E 與選定容器 Web 不能同時使用相同 port。雙實例入口使用 45173–45174、45432–45433、46379–46380、48025–48026、41025–41026，需先確認空閒。精確步驟、測試替換對照與安全清理見 [TESTING](docs/TESTING.md)；本輪證據見 [PHASE1_2_DELIVERY](docs/PHASE1_2_DELIVERY.md)。
+`check` 依序執行 lint、typecheck、unit、真實 PostgreSQL／Redis／Mailpit integration、contract、clean build、Playwright E2E。E2E 不重用已佔用服務，host E2E 與選定容器 Web 不能同時使用相同 port。雙實例入口使用 55180–55181、55440–55441、56390–56391、58030–58031、51030–51031，需先確認空閒。精確步驟、測試替換對照與安全清理見 [TESTING](docs/TESTING.md)；本輪證據見 [PHASE1_3_DELIVERY](docs/PHASE1_3_DELIVERY.md)。
 
 API/DB/policy/contracts/SDK/hooks/CI 由 Codex 負責；後期 Claude 改善純呈現元件、layout、tokens 與 accessibility。`presentation → hooks → SDK → contracts/API`，元件不讀 token、不 fetch、不定義業務授權。[ARCHITECTURE](docs/ARCHITECTURE.md)、[PERMISSIONS](docs/PERMISSIONS.md)、[UI_CONTRACT](docs/UI_CONTRACT.md)、[DATA_CONTRACT](docs/DATA_CONTRACT.md) 提供入口與責任邊界。
 
@@ -68,4 +68,10 @@ CONFSYS_ENV_FILE=/absolute/path/instance.env pnpm admin:bootstrap --user-id <loc
 
 使用實際 env 路徑、UUID 與該實例 origin。成功後重新登入 → 帳號管理 → 搜尋已驗證的本地帳號 → 確認角色／狀態、理由與 Session 失效效果 → 執行。只有 conference_admin 可寫與讀稽核；conference_staff 只能查目錄。高風險操作要求五分鐘內密碼驗證；不可改自己的角色／停用自己，不能失去最後管理員。bootstrap 永不自動重開。完整矩陣見 PERMISSIONS，鎖與升級限制見 ADR 0004，維運步驟見 OPERATIONS。
 
-`pnpm test:access` 是可重跑的真 PostgreSQL／Redis／CLI 存取控制驗證入口，限定此輪合成 `confsys_test`。`pnpm check` 包含它所用的整合案例與完整 UI E2E。沒有新增依賴／環境變數；需要向前 migration 0004。MFA 尚未實作，本地測試不代表高權限 production ready。
+`pnpm test:access` 是可重跑的真 PostgreSQL／Redis／CLI 存取控制驗證入口，限定此輪合成 `confsys_test`。`pnpm check` 包含它所用的整合案例與完整 UI E2E。沒有新增依賴／環境變數；Phase 1.2 使用 migration 0004，現行啟動亦需 0005。MFA 尚未實作，本地測試不代表高權限 production ready。
+
+## 會議設定與基本官網
+
+管理員登入 →「會議設定與官網」(`/admin/site`) → 填基本資訊與四頁 metadata／內容 → 儲存草稿 → 預覽與發布 → 明確確認。一般訪客在 `/` 或 `/zh-Hant/home` 閱讀真實初始 HTML，英文啟用後可用 `/en/home`。修改草稿不影響官網；歷史版本可載入為新草稿，再另行發布。版本衝突會保留未儲存內容以供人工比對。
+
+`pnpm test:site` 是真 PostgreSQL 官網／SSR／撤權／交易驗證入口；`pnpm check` 包含完整回歸。`pnpm dev` 先建公開 renderer，修改共用呈現後可用 `pnpm --filter @confsys/web build:public` 更新；production build 自動包含兩種 artifact。部署設定與 DB 內容權威、舊郵件品牌相容政策見 [OPERATIONS](docs/OPERATIONS.md#phase-13-settings-authority-and-upgrade)。需向前 migration 0005；沒有新依賴／環境變數。

@@ -1,3 +1,4 @@
+import { request as httpRequest } from "node:http";
 import { promisify } from "node:util";
 import { execFile, execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -5,11 +6,12 @@ import { parseEnv } from "node:util";
 import { randomUUID } from "node:crypto";
 import { chromium, expect, type Page } from "@playwright/test";
 import { createPool } from "@confsys/db";
+import { initialSite, siteLocales, sitePages } from "@confsys/contracts";
 import { localFetch } from "./local-http.js";
 
 // Own fresh resources only. No global cleanup and no reuse of user volumes.
 const run = randomUUID().slice(0, 8);
-const image = `confsys:p12-${run}`;
+const image = `confsys:p13-${run}`;
 const directory = `.instances/${run}`;
 mkdirSync(directory, { recursive: true });
 const evidence: Record<string, unknown> = { run, image, checks: [] };
@@ -23,21 +25,21 @@ function command(args: string[], env: NodeJS.ProcessEnv = process.env) {
 }
 const instances = ["a", "b"].map((letter, i) => {
   const file = `${directory}/${letter}.env`;
-  const origin = `http://${letter}.localhost:${45173 + i}`;
+  const origin = `http://${letter}-${run}.localhost:${55180 + i}`;
   command(
     ["--conditions=development", "--import", "tsx", "scripts/setup.mjs"],
     {
       ...process.env,
       CONFSYS_ENV_FILE: file,
-      COMPOSE_PROJECT_NAME: `confsys-p12-${run}-${letter}`,
+      COMPOSE_PROJECT_NAME: `confsys-p13-${run}-${letter}`,
       APP_IMAGE: image,
       PUBLIC_APP_ORIGIN: origin,
       CONFERENCE_NAME: `Synthetic Conference ${letter.toUpperCase()}`,
-      WEB_PORT: String(45173 + i),
-      POSTGRES_PORT: String(45432 + i),
-      REDIS_PORT: String(46379 + i),
-      MAILPIT_PORT: String(48025 + i),
-      SMTP_PORT: String(41025 + i),
+      WEB_PORT: String(55180 + i),
+      POSTGRES_PORT: String(55440 + i),
+      REDIS_PORT: String(56390 + i),
+      MAILPIT_PORT: String(58030 + i),
+      SMTP_PORT: String(51030 + i),
     },
   );
   const env = parseEnv(readFileSync(file, "utf8"));
@@ -178,7 +180,7 @@ async function snapshotB() {
   // Read-only snapshots exclude mutable last_seen_at (session read intentionally updates it).
   return (
     await b.db.query(
-      `SELECT jsonb_build_object('users',(SELECT jsonb_agg(u) FROM confsys.users u),'sessions',(SELECT jsonb_agg(jsonb_build_object('id',s.id,'token_hash',s.token_hash,'revoked_at',s.revoked_at)) FROM confsys.sessions s),'roles',(SELECT jsonb_agg(r) FROM confsys.user_roles r),'bootstrap',(SELECT jsonb_agg(c) FROM confsys.access_control c),'audit',(SELECT count(*) FROM confsys.auth_audit),'migrations',(SELECT jsonb_agg(m) FROM confsys.schema_migrations m)) AS state`,
+      `SELECT jsonb_build_object('site',(SELECT jsonb_agg(s) FROM confsys.site_state s),'publications',(SELECT jsonb_agg(p) FROM confsys.site_publications p),'users',(SELECT jsonb_agg(u) FROM confsys.users u),'sessions',(SELECT jsonb_agg(jsonb_build_object('id',s.id,'token_hash',s.token_hash,'revoked_at',s.revoked_at)) FROM confsys.sessions s),'roles',(SELECT jsonb_agg(r) FROM confsys.user_roles r),'bootstrap',(SELECT jsonb_agg(c) FROM confsys.access_control c),'audit',(SELECT count(*) FROM confsys.auth_audit),'migrations',(SELECT jsonb_agg(m) FROM confsys.schema_migrations m)) AS state`,
     )
   ).rows[0].state;
 }
@@ -329,7 +331,30 @@ try {
       r.json(),
     );
     expect(dto).toEqual({ conferenceName: instance.env.CONFERENCE_NAME });
-    const html = await localFetch(instance.origin).then((r) => r.text());
+    const invalidTargetStatus = await new Promise<number>((resolve, reject) => {
+      const url = new URL(instance.origin);
+      const request = httpRequest(
+        {
+          hostname: "127.0.0.1",
+          port: Number(url.port),
+          path: "http://[",
+          headers: { host: url.host },
+        },
+        (response) => {
+          response.resume();
+          resolve(response.statusCode ?? 0);
+        },
+      );
+      request.on("error", reject);
+      request.end();
+    });
+    expect(invalidTargetStatus).toBe(400);
+    expect(
+      (await localFetch(`${instance.origin}/api/health/live`)).status,
+    ).toBe(200);
+    const html = await localFetch(`${instance.origin}/auth/login`).then((r) =>
+      r.text(),
+    );
     for (const asset of html.matchAll(/(?:src|href)="([^" ]+\.(?:js|css))"/g)) {
       const bundle = await localFetch(`${instance.origin}${asset[1]}`).then(
         (r) => r.text(),
@@ -391,10 +416,12 @@ try {
   await login(pb, b, email, passB);
   const cookies = await context.cookies();
   const sa = cookies.find(
-      (c) => c.name === "dev-session" && c.domain === "a.localhost",
+      (c) =>
+        c.name === "dev-session" && c.domain === new URL(a.origin).hostname,
     )!,
     sb = cookies.find(
-      (c) => c.name === "dev-session" && c.domain === "b.localhost",
+      (c) =>
+        c.name === "dev-session" && c.domain === new URL(b.origin).hostname,
     )!;
   expect(sa).toBeDefined();
   expect(sb).toBeDefined();
@@ -499,7 +526,7 @@ try {
   expect(JSON.parse((await bootstrap(true)).stdout).changed).toBe(true);
   await login(pa, a, email, newA);
   const cookieA = (await context.cookies()).find(
-    (c) => c.name === "dev-session" && c.domain === "a.localhost",
+    (c) => c.name === "dev-session" && c.domain === new URL(a.origin).hostname,
   )!;
   expect(
     (
@@ -647,7 +674,206 @@ try {
   record(
     "A-only stop/restart/migration/smoke leaves B available and B schema/data unchanged",
   );
+  // Site acceptance follows all retained auth/access/worker/smoke cases so their original bootstrap branding assertions remain intact.
+  const bAdminEmail = `site-admin-b-${run}@example.invalid`;
+  expect((await post(b, "register", { email: bAdminEmail })).status).toBe(202);
+  const bLink = await mail(b, bAdminEmail, "verify");
+  expect(
+    (await post(b, "verify", { token: bLink.token, password: passB })).status,
+  ).toBe(200);
+  const bAdminId = (
+    await b.db.query("SELECT id FROM confsys.users WHERE email=$1", [
+      bAdminEmail,
+    ])
+  ).rows[0].id;
+  command([
+    "--conditions=development",
+    `--env-file=${b.file}`,
+    "--import",
+    "tsx",
+    "scripts/bootstrap-admin.ts",
+    "--user-id",
+    bAdminId,
+    "--apply",
+    "--reason",
+    "synthetic B site bootstrap",
+    "--confirm-origin",
+    b.origin,
+  ]);
+  await login(pa, a, email, newA);
+  await login(pb, b, bAdminEmail, passB);
+  const sitePost = async (
+    page: Page,
+    instance: typeof a,
+    path: string,
+    body: object,
+  ) => {
+    const csrf = await (
+      await page.request.get(`${instance.origin}/api/auth/csrf`)
+    ).json();
+    const response = await page.request.post(`${instance.origin}${path}`, {
+      data: body,
+      headers: { origin: instance.origin, "x-csrf-token": csrf.csrfToken },
+    });
+    expect(response.status()).toBe(200);
+    return response.json();
+  };
+  const document = (name: string) => {
+    const d = initialSite(name);
+    d.enabledLocales = [...siteLocales];
+    d.startDate = "2027-10-15";
+    d.endDate = "2027-10-16";
+    d.contactEmail = "site@example.invalid";
+    for (const lang of siteLocales) {
+      d.translations[lang].name = `${name} ${lang}`;
+      for (const page of sitePages) {
+        d.translations[lang].pages[page].title = `${name} ${page}`;
+        d.translations[lang].pages[page].description =
+          `${name} ${page} description`;
+        d.translations[lang].pages[page].body = `${name} ${page} content`;
+      }
+    }
+    return d;
+  };
+  for (const [page, instance] of [
+    [pa, a],
+    [pb, b],
+  ] as const) {
+    await sitePost(page, instance, "/api/site/draft", {
+      expectedVersion: 0,
+      document: document(`Published ${instance.letter.toUpperCase()}`),
+    });
+    await sitePost(page, instance, "/api/site/publish", { expectedVersion: 1 });
+    const html = await localFetch(`${instance.origin}/en/home`);
+    expect(html.headers.get("cache-control")).toBe("no-store");
+    const body = await html.text();
+    expect(body).toContain(`Published ${instance.letter.toUpperCase()} en`);
+    expect(body).toContain(`${instance.origin}/en/home`);
+    expect(body).toContain('lang="en"');
+    expect(body).toContain("2027-10-15");
+    await page.goto(`${instance.origin}/admin/site`);
+    await expect(page.getByLabel("會議名稱", { exact: true })).toHaveValue(
+      `Published ${instance.letter.toUpperCase()} zh-Hant`,
+    );
+  }
+  expect(
+    (
+      await b.db.query(
+        "SELECT role FROM confsys.user_roles WHERE user_id=(SELECT id FROM confsys.users WHERE email=$1)",
+        [email],
+      )
+    ).rowCount,
+  ).toBe(0);
+  const bSiteBaseline = await snapshotB(),
+    bContainers = inspect(b).map((c) => ({
+      id: c.Id,
+      started: c.State.StartedAt,
+      image: c.Image,
+    }));
+  const firstA = await (await localFetch(`${a.origin}/api/site`)).json();
+  await sitePost(pa, a, "/api/site/draft", {
+    expectedVersion: 1,
+    document: document("Secret A draft"),
+  });
+  expect(
+    (await (await localFetch(`${a.origin}/api/instance`)).json())
+      .conferenceName,
+  ).toBe("Published A zh-Hant");
+  expect(await (await localFetch(`${a.origin}/`)).text()).not.toContain(
+    "Secret A draft",
+  );
+  await sitePost(pa, a, "/api/site/publish", { expectedVersion: 2 });
+  expect(await (await localFetch(`${a.origin}/`)).text()).toContain(
+    "Secret A draft",
+  );
+  await sitePost(pa, a, "/api/site/restore", {
+    expectedVersion: 2,
+    publicationId: firstA.publicationId,
+  });
+  expect(await (await localFetch(`${a.origin}/`)).text()).toContain(
+    "Secret A draft",
+  );
+  expect(await snapshotB()).toEqual(bSiteBaseline);
+  expect(
+    inspect(b).map((c) => ({
+      id: c.Id,
+      started: c.State.StartedAt,
+      image: c.Image,
+    })),
+  ).toEqual(bContainers);
+  const newCookieA = (await context.cookies()).find(
+    (c) => c.name === "dev-session" && c.domain === new URL(a.origin).hostname,
+  )!;
+  for (const path of [
+    "/api/site/draft",
+    "/api/site/preview?version=1",
+    "/api/site/history",
+  ])
+    expect(
+      (
+        await localFetch(`${b.origin}${path}`, {
+          headers: { cookie: `dev-session=${newCookieA.value}` },
+        })
+      ).status,
+    ).toBe(401);
+  const foreignCsrf = await localFetch(`${b.origin}/api/auth/csrf`);
+  const foreignCsrfToken = (await foreignCsrf.json()).csrfToken;
+  const foreignWrite = await localFetch(`${b.origin}/api/site/publish`, {
+    method: "POST",
+    headers: {
+      origin: b.origin,
+      "content-type": "application/json",
+      "x-csrf-token": foreignCsrfToken,
+      cookie:
+        foreignCsrf.headers
+          .getSetCookie()
+          .map((v) => v.split(";")[0])
+          .join("; ") + `; dev-session=${newCookieA.value}`,
+    },
+    body: JSON.stringify({ expectedVersion: 1 }),
+  });
+  expect(foreignWrite.status).toBe(401);
+  expect(await snapshotB()).toEqual(bSiteBaseline);
+  for (const [instance, name] of [
+    [a, "Secret A draft zh-Hant"],
+    [b, "Published B zh-Hant"],
+  ] as const) {
+    const recipient = `published-mail-${instance.letter}-${run}@example.invalid`;
+    expect(
+      (await post(instance, "register", { email: recipient })).status,
+    ).toBe(202);
+    let found: { ID: string; Subject: string } | undefined;
+    await expect
+      .poll(
+        async () => {
+          found = (await messages(instance, recipient)).find((m) =>
+            m.Subject.includes("Verify email"),
+          );
+          return !!found;
+        },
+        { timeout: 20000 },
+      )
+      .toBe(true);
+    const captured = await (
+      await fetch(`${instance.env.MAILPIT_URL}/api/v1/message/${found!.ID}`)
+    ).json();
+    expect(captured.Subject).toContain(name);
+    expect(captured.Text).toContain(`${instance.origin}/auth/verify#token=`);
+  }
+  await pa.goto(`${a.origin}/zh-Hant/home`);
+  await pa.screenshot({ path: `${directory}/site-a.png`, fullPage: true });
+  await pb.goto(`${b.origin}/en/home`);
+  await pb.screenshot({ path: `${directory}/site-b.png`, fullPage: true });
+  record(
+    "Same image A/B publish independent multilingual initial HTML and canonical URLs; A draft/publish/history restore leaves B site/accounts/roles/audit and container IDs unchanged; foreign admin preview/publication denied; new worker/Mailpit mail uses each official brand without rebuilding",
+  );
   await pa.goto(`${a.origin}/auth/login`);
+  await expect(
+    pa.getByRole("heading", {
+      name: "登入 Secret A draft zh-Hant",
+      exact: true,
+    }),
+  ).toBeVisible();
   await pa.screenshot({ path: `${directory}/a.png`, fullPage: true });
   await pb.screenshot({ path: `${directory}/b.png`, fullPage: true });
   evidence.checks = checks;

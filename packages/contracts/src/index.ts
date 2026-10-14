@@ -1,3 +1,5 @@
+import { siteEndpoints } from "./site.js";
+export * from "./site.js";
 import { accessEndpoints } from "./access.js";
 export * from "./access.js";
 import {
@@ -50,6 +52,7 @@ export function openApiDocument() {
     paths: {
       ...authPaths(),
       ...accessPaths(),
+      ...sitePaths(),
       [routes.instance]: {
         get: {
           operationId: "getInstance",
@@ -252,4 +255,68 @@ function accessPaths() {
       },
     ]),
   );
+}
+
+function sitePaths() {
+  const paths: Record<string, Record<string, unknown>> = {};
+  for (const [operationId, spec] of Object.entries(siteEndpoints)) {
+    const input = "input" in spec ? spec.input : null;
+    const operation = {
+      operationId,
+      ...(spec.method === "post"
+        ? {
+            parameters: [
+              {
+                in: "header",
+                name: "Origin",
+                required: true,
+                schema: { type: "string" },
+              },
+              {
+                in: "header",
+                name: "x-csrf-token",
+                required: true,
+                schema: { type: "string" },
+              },
+            ],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": { schema: z.toJSONSchema(input!) },
+              },
+            },
+          }
+        : input
+          ? {
+              parameters: [
+                {
+                  in: "query",
+                  name: "query",
+                  style: "form",
+                  explode: true,
+                  schema: z.toJSONSchema(input),
+                },
+              ],
+            }
+          : {}),
+      responses: Object.fromEntries(
+        [200, 400, 401, 403, 404, 409, 413, 500, 503].map((code) => [
+          code,
+          {
+            description:
+              code === 200 ? "Explicit site projection" : "Safe error",
+            content: {
+              "application/json": {
+                schema: z.toJSONSchema(
+                  code === 200 ? spec.output : errorSchema,
+                ),
+              },
+            },
+          },
+        ]),
+      ),
+    };
+    paths[spec.path] = { ...paths[spec.path], [spec.method]: operation };
+  }
+  return paths;
 }

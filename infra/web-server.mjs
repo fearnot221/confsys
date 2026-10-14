@@ -11,7 +11,20 @@ const server = http.createServer(async (req, res) => {
     res.end("Unrecognized host");
     return;
   }
-  if (req.url?.startsWith("/api/")) {
+  let pathname;
+  try {
+    pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+  } catch {
+    res.writeHead(400, { "cache-control": "no-store" });
+    res.end("Invalid request target");
+    return;
+  }
+  const spa =
+    /^\/auth\/(login|register|waiting|verify|forgot|reset|account)$/.test(
+      pathname,
+    ) ||
+    ["/access/accounts", "/admin/site", "/system/status"].includes(pathname);
+  if (!spa && !pathname.startsWith("/assets/")) {
     const upstream = http.request(
       {
         host: "api",
@@ -49,16 +62,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   try {
-    const path = new URL(req.url ?? "/", "http://localhost").pathname;
     const file = resolve(
       root,
-      "." +
-        (path === "/" ||
-        /^\/auth\/(login|register|waiting|verify|forgot|reset|account)$/.test(
-          path,
-        )
-          ? "/index.html"
-          : decodeURIComponent(path)),
+      "." + (spa ? "/index.html" : decodeURIComponent(pathname)),
     );
     if (!file.startsWith(root + sep)) {
       res.writeHead(403);
@@ -76,7 +82,10 @@ const server = http.createServer(async (req, res) => {
       "content-type": types[extname(file)] ?? "application/octet-stream",
       "x-content-type-options": "nosniff",
       "referrer-policy": "no-referrer",
-      "cache-control": "no-store",
+      "cache-control": pathname.startsWith("/assets/")
+        ? "public, max-age=31536000, immutable"
+        : "no-store",
+      "x-robots-tag": "noindex, nofollow",
       "content-security-policy":
         "default-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'",
     });

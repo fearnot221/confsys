@@ -6,6 +6,9 @@ export const permissionSchema = z.enum([
   "accounts.status.manage",
   "accounts.sessions.revoke",
   "security_audit.read",
+  "site.draft.read",
+  "site.draft.write",
+  "site.publish",
 ]);
 export type Role = z.infer<typeof roleSchema>;
 export type Permission = z.infer<typeof permissionSchema>;

@@ -6,6 +6,7 @@ export const AUTH_MAIL_QUEUE = "identity-notifications-v1";
 export async function enqueueIdentityMail(
   client: PoolClient,
   input: {
+    conferenceName: string;
     userId: string;
     tokenId: string | null;
     kind: "verify" | "reset" | "password_changed";
@@ -18,8 +19,8 @@ export async function enqueueIdentityMail(
 ) {
   const id = randomUUID();
   await client.query(
-    `INSERT INTO confsys.notifications(id, scope, user_id, token_id, kind, request_id, expires_at)
-    VALUES ($1, 'identity', $2, $3, $4, $5, $6)`,
+    `INSERT INTO confsys.notifications(id, scope, user_id, token_id, kind, request_id, expires_at, conference_name)
+    VALUES ($1, 'identity', $2, $3, $4, $5, $6, $7)`,
     [
       id,
       input.userId,
@@ -27,6 +28,7 @@ export async function enqueueIdentityMail(
       input.kind,
       input.requestId,
       input.expiresAt,
+      input.conferenceName,
     ],
   );
   await client.query(

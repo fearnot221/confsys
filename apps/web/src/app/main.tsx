@@ -1,3 +1,5 @@
+import { useSite } from "../features/site/hooks/use-site.js";
+import { SiteScreen } from "../features/site/components/site-screen.js";
 import { useAccess } from "../features/access/hooks/use-access.js";
 import { AccessScreen } from "../features/access/components/access-screen.js";
 import { useInstance } from "../features/instance/hooks/use-instance.js";
@@ -97,12 +99,18 @@ function AccessApp() {
     <AccessScreen {...state} conferenceName={instance.data.conferenceName} />
   );
 }
+function SiteApp() {
+  const state = useSite();
+  return <SiteScreen {...state} />;
+}
 const queryClient = new QueryClient();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        {window.location.pathname.startsWith("/access/") ? (
+        {window.location.pathname === "/admin/site" ? (
+          <SiteApp />
+        ) : window.location.pathname.startsWith("/access/") ? (
           <AccessApp />
         ) : window.location.pathname.startsWith("/auth/") ? (
           <AuthApp />

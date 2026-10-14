@@ -6,14 +6,14 @@ Zod schemas in `packages/contracts/src/index.ts` generate JSON Schemas used by F
 
 | Endpoint | Response |
 |---|---|
-| GET `/api/instance` | 200 `{conferenceName:string}`; runtime display only, no secrets or server env |
+| GET `/api/instance` | 200 `{conferenceName:string}`; effective official/bootstrap identity, no secrets or server env |
 | GET `/api/health/live` | 200 `{status:"alive"}` |
 | GET `/api/health/ready` | 200 `{status:"ready",dependencies:{postgres:"up",redis:"up",worker:"up"}}` |
 | GET `/api/health/ready` when unavailable | 503 `{status:"not_ready",dependencies:{...}}`, each `up` or `down` |
 | Undefined route | 404 `{error:{code:"NOT_FOUND",message,requestId}}` |
 | Invalid request / unexpected error | 400 `INVALID_REQUEST` / 500 `INTERNAL_ERROR`, same error envelope |
 
-`x-request-id` is generated server-side. No raw stack, SQL, credentials or internal provider response in errors. Readiness is intentionally anonymous; reverse proxy should restrict operational endpoints as deployment needs evolve. Phase 1.1 identity routes below add CSRF-protected mutations; no conference business write route exists.
+`x-request-id` is generated server-side. No raw stack, SQL, credentials or internal provider response in errors. Readiness is intentionally anonymous; reverse proxy should restrict operational endpoints as deployment needs evolve. Phase 1.1 identity routes below add CSRF-protected mutations; site write contracts appear below.
 
 SDK returns a typed readiness DTO for both 200 and 503. Network errors, invalid schema and unexpected HTTP status reject; UI displays an error with retry. SDK rejects a ready-status/HTTP-code mismatch. Strict contracts reject unexpected fields. OpenAPI contract output is not an externally hosted Swagger UI.
 
@@ -83,3 +83,20 @@ Pages return `{items,nextOffset}`; pagination is not a frozen snapshot. Mutation
 Audit projection contains event ID/action, targetId/actorId (nullable), source, reason (nullable), bounded before/after strings of state/roles, server timestamp and requestId. Existing auth events have source authentication and nullable added fields. No raw DB payload, credential/session/token identifier, secret, IP/email dump or export endpoint. Audit data is append-only to runtime roles; migrations/operator ownership remains trusted.
 
 0004 adds composite primary key `user_roles(user_id,role)`, a one-row persistent bootstrap marker, session `password_verified_at`, and audit actor/source/reason/before/after plus pagination index. FKs/checks enforce supported roles/references/marker pairing; no organization/conference columns, no inferred admin, no credential hash rewrite or forced global logout. Old sessions have NULL proof and must reauthenticate for management. Applied 0001–0003 remain unchanged. Upgrade test covers prior schema records including password hash/verified status/tokens/session/outbox/encrypted-envelope fixture/audit. Full production backup restore and downgrade remain unverified.
+
+## Phase 1.3 site contracts
+
+| Method/path | Input and result |
+|---|---|
+| GET `/api/site` | `{publicationId,conferenceName,document}`; one official immutable document (disabled-language text omitted), or null document before publication |
+| GET `/api/instance` | Existing `{conferenceName}` DTO, now through effective official brand resolver; 503 on DB failure |
+| GET `/api/site/draft` | read permission; `{draftVersion,document,activePublicationId,publishedDraftVersion}`; version 0 seeds an unpersisted form from bootstrap name |
+| POST `/api/site/draft` | write permission; strict `{expectedVersion,document}`; atomic save/audit → new draft DTO |
+| GET `/api/site/preview?version=N` | read permission; exact current saved version only; stale version conflicts |
+| POST `/api/site/publish` | publish permission + recent password proof; strict `{expectedVersion}`; `{publicationId,draftVersion,publishedAt,publishedBy,changedFields}` |
+| GET `/api/site/history?offset=N` | read permission; max offset 100000, fixed 20 per page, descending publishedAt/id, `{items,nextOffset}` |
+| POST `/api/site/restore` | write permission; strict `{expectedVersion,publicationId}`; new draft DTO, public pointer unchanged |
+
+No arbitrary PATCH, deployment setting assignment or history deletion. `CONFLICT` 409 means reload/compare before retry; save never silently overwrites. Structural/semantic validation is server-side; SDK/hook provides field-path feedback. Site write body limit 128 KiB; auth retains 16 KiB. Text lengths, arrays and locale/page keys are bounded. Dates are exact YYYY-MM-DD, IANA timezone, start ≤ end. HTTPS/enum internal links only; no HTML engine. Every enabled language needs name plus all four metadata title/descriptions to publish. Other missing text/list/link fields fall back to default-language fields with actual lang attributes.
+
+0005 adds `site_state` (singleton, draft version/document, active publication FK) and `site_publications` (UUID, unique source draft version, immutable document, actor FK/time/changed-field summary). Publication and minimal auth_audit row commit together. `notifications.conference_name` is nullable only for preserved legacy jobs, immutable to runtime update grants; all new identity notifications capture effective official name. No change to credentials/epoch/bootstrap or canonical URL/provider identity. Applied 0001–0004 stay unchanged. See OPERATIONS for upgrade/recovery policy.

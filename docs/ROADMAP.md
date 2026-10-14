@@ -1,6 +1,6 @@
 # Roadmap
 
-Scope follows SPEC. This delivery is limited to authorized Phase 1.2; later units still require approval.
+Scope follows SPEC. This delivery is limited to authorized Phase 1.3; later units still require approval.
 
 | Phase | Status / scope |
 |---|---|
@@ -8,7 +8,8 @@ Scope follows SPEC. This delivery is limited to authorized Phase 1.2; later unit
 | 1.1 | Implemented identity lifecycle/session plus required identity audit/outbox/worker/Mailpit; see PHASE1_1_DELIVERY |
 | 1.1b | Single-conference deployment correction; runtime display, isolated resource template and dual-instance regression |
 | 1.2 | Implemented fixed local roles/permissions, one-time operator CLI bootstrap, account management UI/API, reauthentication and audit; see PHASE1_2_DELIVERY |
-| Later Phase 1 | Not started: invitations, versioned settings/public pages, private files and resource-specific permissions |
+| 1.3 | Implemented bounded settings/site draft, protected preview, immutable publication/history, initial HTML and official mail branding; see PHASE1_3_DELIVERY |
+| Later Phase 1 | Not started: private files/media safety lifecycle, invitations and resource-specific permissions |
 | 2 | Not started: registration, pricing, capacity, manual reconciliation, group payments, meals, receipts |
 | 3 | Not started: submission, revisions, private content validation/quarantine |
 | 4 | Not started: assignments, conflicts, review and decision publication |
@@ -16,15 +17,15 @@ Scope follows SPEC. This delivery is limited to authorized Phase 1.2; later unit
 | 6 | Not started: check-in/redemption, documents, notifications, exports, selected provider sandboxes |
 | 7 | Not started: Claude read-only UI audit then isolated presentation PRs; end-to-end launch verification |
 
-## Phase 1 increments (only 1.2 currently authorized)
+## Phase 1 increments (only 1.3 currently authorized)
 
 1. **1.1 retained:** local registration/verification/reset/session, CSRF/Origin, audit/outbox/worker/Mailpit, race and crash recovery.
 2. **1.1b retained:** correct single-conference model in contracts/config/Compose/UI/mail/docs/tests, same-build dual-instance isolation. No role/CMS/business modules.
 3. **1.2 implemented:** fixed roles, explicit policies, one-time operator CLI bootstrap, bounded account UI/API, audited grant/revoke/status/session management and recent password proof. Resource/assignment/self-review exclusions await their real business modules. Administrator MFA remains a launch gate. Membership/scope-resolver and conference-switch plans remain cancelled.
-4. **Later settings/site:** versioned local conference configuration, dates/timezone/currency/locales, public draft/revision/projection and locale/SEO. Future reuse exports/imports whitelisted settings into a fresh instance; never clone account/business DBs.
+4. **1.3 implemented:** bounded versioned conference/site configuration, dates/timezone/locales, protected saved-draft preview, immutable publications/history and public initial HTML/metadata. Currency/fees/deadlines belong to later business modules. Future reuse exports/imports whitelisted settings into a fresh instance; never clone account/business DBs.
 5. **Later reliability:** local invitations and resource-specific notification policy; private file framework with validation/quarantine/download authorization. Preserve all original registration/finance/submission/review/competition/program/on-site/mail/statistics phases above.
 
-Each unit needs real UI/API/errors/permissions/tests/docs. Stop after Phase 1.2 local commit; no implicit approval for invitations, CMS or later business work.
+Each unit needs real UI/API/errors/permissions/tests/docs. Stop after Phase 1.3 local commit; no implicit approval for files, invitations or later business work.
 
 Open questions that do not block Phase 0: hosting, volumes/traffic, external mail/payment provider, SSO, receipt requirements, data retention and anonymization policy. No provider/production-readiness claim is made.
 
@@ -86,3 +87,16 @@ Verified 520607e contains ab7120f, f1126ad, c10b025 and c6f1d5f before creating 
 | Account UI has email/UUID and no profile/name editing | Directory can only search actual existing identity fields | Future profile/settings unit: define owned fields and privacy rules before adding names; do not mislabel registration as conference participation. |
 
 All previous debt remains: MFA launch gate, rotation, trusted proxy/IP limits, stronger password screening/Argon2 capacity, retention, TLS, backup restore, external-provider readiness, full accessibility/browser matrix and shared-host limits. Next minimal unit proposed for approval: versioned local conference settings/public website; invitations and other business phases remain separate authorization decisions.
+
+## Phase 1.3 focused Phase 0 baseline recheck — 2026-10-15
+
+Read code/config/migrations/CI and confirmed 9d3e788 contains cc2361d, 520607e, ab7120f, f1126ad, c10b025, c6f1d5f. M1–M5 remain effective; no broad architecture rewrite needed. 0004's control/user/session lock and recent proof can be reused without a second revocation mechanism. An evidenced adjacent correctness issue: production ingress did not map `/access/accounts` to its SPA; fixed and exercised via the container route path. Malformed URL parsing remains contained as a 400 response (not an unhandled process rejection); container regression verifies subsequent liveness. The dual-instance harness now uses run-specific localhost names to avoid retained-test Cookie hostname collisions. Public-only SSR now has a precise separate import boundary; the existing checks were not globally relaxed.
+
+| Evidence / debt | Practical risk | Acceptance / phase |
+|---|---|---|
+| All site private operations share the access singleton; publication history uses bounded 20-row offset pages | Long admin transactions block others; pages shift on concurrent insertions | Before measured administrative scale: bounded lock/timeout monitoring and load tests; keep post-lock revalidation and exact-version conflict tests. Keyset pagination only if measured need. |
+| JSON snapshot schema version 1, no arbitrary renderer or import | Future schema changes need deliberate compatibility; archives cannot silently change meaning | At the next authorized schema change: decoder/migration strategy, immutable historical fixtures and roll-forward tests; never edit old snapshots in place. |
+| Public-only renderer rebuilt as an artifact in host dev | Shared presentation edits need build:public; stale local artifact can confuse developers | Documented developer command; future developer-experience work may automate rebuilding with tested watcher lifecycle. Production already builds both artifacts together. |
+| Minimal native editing forms and text history summary | Field comparison is manual; no full accessibility/browser audit | Later Claude presentation unit: keyboard/assistive-tech audit, ergonomic comparison, keep SDK/data/permission ownership and regression assertions. |
+
+All prior security/operations debt remains: MFA, TLS, trustProxy/IP limits, encryption-key rotation, password screening/Argon2 capacity, retention, backup restore, real providers, load, WCAG and shared-host resource risks. Next minimal unit for new approval: private files/media metadata, bounded content validation/quarantine, authorized access and lifecycle; then invitations/registration per the existing roadmap. None implemented here.

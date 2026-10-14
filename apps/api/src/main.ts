@@ -8,6 +8,9 @@ import { Redis } from "ioredis";
 import { loadApiConfig, diagnostic } from "@confsys/config";
 import { createPool, databaseReady } from "@confsys/db";
 import { buildApp } from "./app.js";
+import { createSiteService } from "./site/service.js";
+import { registerSiteRoutes } from "./site/routes.js";
+import { registerPublicRoutes } from "./site/public-routes.js";
 const config = loadApiConfig();
 const pool = createPool(config.DATABASE_URL);
 const redis = new Redis(config.REDIS_URL, {
@@ -33,7 +36,8 @@ const app = buildApp(
   },
   true,
 );
-registerInstanceRoute(app, config);
+const site = createSiteService(pool, config);
+registerInstanceRoute(app, config, site.public);
 await databaseReady(pool, "confsys_app");
 await registerAuthRoutes(app, {
   config,
@@ -41,6 +45,8 @@ await registerAuthRoutes(app, {
   limit: createRateLimiter(redis, config.CSRF_SIGNING_KEY),
 });
 registerAccessRoutes(app, config, createAccessService(pool, config));
+registerSiteRoutes(app, config, site);
+await registerPublicRoutes(app, config, site);
 app.addHook("onClose", async () => {
   redis.disconnect();
   await pool.end();

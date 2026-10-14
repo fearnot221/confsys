@@ -18,6 +18,9 @@ API and worker are actual non-owner NOSUPERUSER/NOBYPASSRLS roles, unable to SET
 | `accounts.status.manage` | No | No | Yes |
 | `accounts.sessions.revoke` | No | No | Yes |
 | `security_audit.read` | No | No | Yes |
+| `site.draft.read` | No | No | Yes |
+| `site.draft.write` | No | No | Yes |
+| `site.publish` | No | No | Yes |
 
 The sole mapping is `access/policy.ts`; unknown permission/role/missing actor denies. Each service receives an opaque server-session credential, resolves current account/version/roles in this database, and performs its own policy check. No caller-supplied actor DTO, role, permission or tenant selects authority. The UI consumes capability keys only for visibility. Directory/detail disclose ID/email/state/verified/roles, with no passwords, credential versions, raw session IDs or detailed login history for staff.
 
@@ -43,3 +46,9 @@ Operator CLI bootstrap is preview by default, explicitly applies once to a local
 Resolve session → local subject → resource relationship and action policy; fail closed on missing/revoked permission. One person may be author and reviewer but never self-review. Fixed templates and granular actions precede arbitrary policy engines. Private downloads reauthorize on creation and download; published DTOs exclude drafts; ID substitution and revoked permissions require tests. Browser visibility is never authorization.
 
 The future-role table is planning only: those roles are not assignable. MFA remains a high-privilege launch gate. Production cookies require HTTPS/Secure/HttpOnly/SameSite and no Domain; local HTTP development exception and Chromium tests do not verify production TLS.
+
+## Phase 1.3 site permissions
+
+`site.draft.read` covers current draft, exact saved-version preview and paged history. `site.draft.write` covers save and loading history into a new draft. `site.publish` additionally requires existing five-minute session password proof. Staff retains only directory.read. All site private service entry points resolve and revalidate the opaque session after the shared access lock, then check the same role registry. CSRF/exact Origin protect every write. No anonymous preview token/query flag exists; `GET /api/site` always selects the official snapshot even with an admin Cookie.
+
+App can SELECT/update the singleton's editable columns and INSERT/read publications; no publication UPDATE/DELETE. Worker cannot SELECT site tables or edit brand snapshots. Public snapshot projection excludes publishedBy, audit, draftVersion and history metadata. Deployment isolation remains separate DB/Redis/mail/secrets, without a tenant resolver or cross-conference accounts.

@@ -38,7 +38,7 @@ Redis integration uses a unique queue in local test DB 1; it executes a real wor
 
 ## Coverage limits
 
-Account/login/CSRF/session/outbox and capture-mail regression exists. No CMS/payment/submission/upload/private-download or external provider is implemented. Network-error E2E deliberately aborts requests while healthy flows use real services. TLS, full browser/WCAG, load/penetration, backup restore and cloud CI are unverified. Historical counts in PHASE0/PHASE1_1 delivery files are not current evidence; see PHASE1_2_DELIVERY.
+Account/login/CSRF/session/outbox and capture-mail regression exists. Bounded Phase 1.3 site settings/publication is implemented; no payment/submission/upload/private-download or external provider is implemented. Network-error E2E deliberately aborts requests while healthy flows use real services. TLS, full browser/WCAG, load/penetration, backup restore and cloud CI are unverified. Historical counts in PHASE0/PHASE1_1 delivery files are not current evidence; see PHASE1_3_DELIVERY.
 
 ## Test and documentation maintenance
 
@@ -86,7 +86,7 @@ E2E starts built API/worker with role-filtered environment, `confsys_test` and R
 
 ## Dual-instance same-build acceptance
 
-`pnpm test:instances` creates fresh `.instances/<random-run>/a.env` and `b.env`, distinct `confsys-p12-<run>-a/b` projects, one versioned `confsys:p12-<run>` image and actual independent PostgreSQL/Redis/Mailpit/API/worker/Web. It refuses to replace existing containers by using fresh names; occupied ports cause failure, never stop other services. Required free ports: Web 45173/45174, DB 45432/45433, Redis 46379/46380, Mailpit 48025/48026, SMTP 41025/41026. Browser canonical origins are `http://a.localhost:45173` and `http://b.localhost:45174`. Install Chromium first.
+`pnpm test:instances` creates fresh `.instances/<random-run>/a.env` and `b.env`, distinct `confsys-p13-<run>-a/b` projects, one versioned `confsys:p13-<run>` image and actual independent PostgreSQL/Redis/Mailpit/API/worker/Web. It refuses to replace existing containers by using fresh names; occupied ports cause failure, never stop other services. Required free ports: Web 55180/55181, DB 55440/55441, Redis 56390/56391, Mailpit 58030/58031, SMTP 51030/51031. Each run has unique hostnames, avoiding Cookie collisions with retained test projects. Browser canonical origins are `http://a-<run>.localhost:55180` and `http://b-<run>.localhost:55181`. Install Chromium first.
 
 The suite checks runtime titles/names, explicit DTO/bundle secrecy, distinct random secrets, same image IDs, mounts/networks, A-only registration, same-email separate passwords, browser host-only cookies in one context, manually cross-sent Session/verification/reset tokens, A reset/revoke/logout versus B password/session/audit, canonical capture mail and forged Host, stopped A worker while B processes mail, restart A, A-only migration and both original smoke commands with unchanged B state. Existing browser regression separately proves late responses/private cache invalidation. Output `.instances/<run>/evidence.json` contains no secrets; screenshots are supplementary. Raw env/tokens/traces remain ignored and must not be published.
 
@@ -105,7 +105,7 @@ CONFSYS_ENV_FILE=.instances/<run>/a.env pnpm smoke:stack
 CONFSYS_ENV_FILE=.instances/<run>/a.env pnpm smoke:auth
 ```
 
-For host full regression while the user's 25173/28025 are occupied, initialize this worktree with COMPOSE_PROJECT_NAME=confsys-p12-regression, WEB_PORT=45175, API_PORT=43000, WORKER_PORT=43001, POSTGRES_PORT=45434, REDIS_PORT=46381, MAILPIT_PORT=48027, SMTP_PORT=41027 before env:setup. Then infra:up/db:migrate/check use only those resources. Standalone E2E requires db:migrate:test and build first. No production data is used.
+For host full regression while the user's 25173/28025 are occupied, initialize this worktree with COMPOSE_PROJECT_NAME=confsys-p13-regression, WEB_PORT=55179, API_PORT=53000, WORKER_PORT=53001, POSTGRES_PORT=55442, REDIS_PORT=56392, MAILPIT_PORT=58032, SMTP_PORT=51032 before env:setup. Then infra:up/db:migrate/check use only those resources. Standalone E2E requires db:migrate:test and build first. No production data is used.
 
 ## Phase 1.2 verification additions
 
@@ -120,4 +120,23 @@ For host full regression while the user's 25173/28025 are occupied, initialize t
 | e2e/access | real UI registration → Mailpit → verification → real CLI preview/apply → old-session rejection → admin grant/staff read-only/revoke/disable/restore/second admin/forced logout/audit/reauth; private late-response cancellation; direct ordinary URL/API denial; mobile overflow assertion/screenshots |
 | test:instances | all retained auth/token/mail/worker/network/isolation assertions plus A-only bootstrap, origin mismatch, foreign admin cookie, grants/revoke/disable/restore/reauth/forced logout preserving B roles/marker/accounts/sessions/audit |
 
-The dual-instance runner now uses the 45xxx/46xxx/48xxx/41xxx port ranges above so retained Phase 1.1b containers are untouched. Same source and one built image still run all six Web/API/worker containers. It invokes original `smoke:stack` and `smoke:auth` against A. `pnpm check` runs the extended integration/E2E suites; CI already runs check/build/migrations/smokes/instances, so no duplicate or weakened gate is added. Exact counts/results and run/image IDs are recorded only in PHASE1_2_DELIVERY and sanitized evidence after execution. No cloud CI run is implied.
+The dual-instance runner now uses the 55xxx/56xxx/58xxx/51xxx port ranges above so retained Phase 1.1b containers are untouched. Same source and one built image still run all six Web/API/worker containers. It invokes original `smoke:stack` and `smoke:auth` against A. `pnpm check` runs the extended integration/E2E suites; CI already runs check/build/migrations/smokes/instances, so no duplicate or weakened gate is added. Exact counts/results and run/image IDs are recorded only in PHASE1_2_DELIVERY and sanitized evidence after execution. No cloud CI run is implied.
+
+## Phase 1.3 verification and site troubleshooting
+
+`pnpm test:site` runs the dedicated real PostgreSQL/Redis site suite (also included in `pnpm test:integration`). `pnpm check` includes all previous and new unit/contract/integration/E2E tests. `pnpm test:instances` builds a single current image and tests the original auth/access/worker/smokes plus independent A/B publications, HTML/canonical/languages, immutable history load, official mail brand and unchanged B containers/data during A updates. Runner creates fresh names, never replaces prior projects; free ports are prerequisites. Stop only your own prior synthetic run if needed; never stop user-retained environments to make ports available. Exact delivery counts/image/run IDs are in PHASE1_3_DELIVERY.
+
+| Entry | Protection exercised |
+|---|---|
+| unit/site | date-only leap/order, IANA timezone, enabled-language metadata, strict/length constraints, script/data/userinfo/protocol-relative URL denial |
+| unit/tooling | presentation type-only DTO import allowed; runtime contract import and server-entry DB import denied, existing relative/alias/re-export regression retained |
+| integration/site | real first-save race/stale version, staff/user/anonymous denial, recent proof, duplicate concurrent publication, draft secrecy, history new draft, audit-trigger rollback for all writes, actual grants, retry/legacy mail snapshots, queued publish vs revoke/disable/session revocation, public consistency under concurrent publication, real HTTP CSRF/Origin/mass assignment/size/SSR/XSS/canonical/no-store/404/failure |
+| integration/migrations | blank, Phase 0, Phase 1.1b and 0004 Phase 1.2 upgrade; preserved accounts/hash/credential version/role/marker/session/token/outbox/audit, old reset token actually usable, repeat migration |
+| contract/site | OpenAPI GET+POST coexist on draft route, private-field rejection, SDK existing CSRF transport and conflict preservation |
+| e2e/site | real UI account/Mailpit/CLI admin → edit/save/reload → competing editor conflict retains input → same-component preview → confirm publish → JS-disabled anonymous HTML/date/canonical → private new draft → republish/history load; late private response after session expiry, ordinary direct URL denial, desktop/mobile captures |
+
+Public source renderer is exercised in HTTP integration, built artifact in E2E and same-image containers. Earlier test doubles remain unit/contract boundary checks, never evidence for PostgreSQL/SMTP. E2E fixtures remove only their own prefix accounts/publications and restore the prior singleton; no global data wipe. Site tests run sequentially against this project's guarded `confsys_test`; do not concurrently run independent suites against the same singleton.
+
+On `/admin/site` save 409, keep local input and fetch server version for manual comparison, then explicitly discard/reapply. On 403 REAUTH_REQUIRED, enter current password and separately confirm publication again. On Session revoked, private queries/forms/preview/history clear. Public 503 means check database/migration and safe request ID logs; never change env to force a draft fallback. Public renderer changes in host dev require `pnpm --filter @confsys/web build:public`; normal clean build always creates both artifacts.
+
+The old root health assertions remain at `/system/status`; production ingress now serves `/access/accounts` and `/admin/site` SPA directly. Static hash assets may cache, dynamic content/auth/private previews cannot. No service worker. No complete search-engine indexing, TLS, provider, WCAG, load or production restore claim.

@@ -129,6 +129,10 @@ export function useAuth(mode: string) {
     loading: mode === "account" && account.isPending && !hidden,
     email: !hidden && !account.error ? account.data?.user.email : undefined,
     userId: !hidden && !account.error ? account.data?.user.id : undefined,
+    canSite:
+      !hidden &&
+      !account.error &&
+      !!account.data?.user.permissions.includes("site.draft.read"),
     canDirectory:
       !hidden &&
       !account.error &&

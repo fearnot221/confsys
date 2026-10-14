@@ -47,6 +47,28 @@ it("boundary checker accepts absent folders/UI imports and rejects relative, ali
     };
     expect(await check()).toEqual([]);
     await writeFile(
+      join(root, "apps/web/src/features/auth/components/dto.ts"),
+      "import type { PublicSite } from '@confsys/contracts'; export type View = PublicSite;",
+    );
+    await writeFile(
+      join(root, "apps/web/src/entry-server.tsx"),
+      "import {renderToStaticMarkup} from 'react-dom/server'; import type {PublicSite} from '@confsys/contracts';",
+    );
+    expect(await check()).toEqual([]);
+    await writeFile(
+      join(root, "apps/web/src/entry-server.tsx"),
+      "import {createPool} from '@confsys/db';",
+    );
+    expect(await check()).toHaveLength(1);
+    await rm(join(root, "apps/web/src/entry-server.tsx"));
+    await writeFile(
+      join(root, "apps/web/src/features/auth/components/dto.ts"),
+      "import {siteDocumentSchema} from '@confsys/contracts';",
+    );
+    expect(await check()).toHaveLength(1);
+    await rm(join(root, "apps/web/src/features/auth/components/dto.ts"));
+
+    await writeFile(
       join(root, "apps/web/src/features/auth/components/screen.ts"),
       "export * from '../hooks/data.js'; import {data} from '@hidden/data';",
     );

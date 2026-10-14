@@ -13,6 +13,7 @@ type Notification = {
   kind: string;
   attempts: number;
   claim_id: string;
+  conference_name: string | null;
 };
 type Mail = { to: string; subject: string; text: string; messageId: string };
 export type SendMail = (mail: Mail) => Promise<{ messageId: string }>;
@@ -127,13 +128,13 @@ export async function processNotification(
     receipt = await send({
       to: entry.email,
       subject:
-        `[${config.CONFERENCE_NAME}] ` +
+        `[${row.conference_name ?? config.CONFERENCE_NAME}] ` +
         (row.kind === "verify"
           ? "確認信箱 / Verify email"
           : row.kind === "reset"
             ? "重設密碼 / Reset password"
             : "密碼已變更 / Password changed"),
-      text: `${config.CONFERENCE_NAME} — 本研討會帳號 / Conference account\n\n${row.kind === "password_changed" ? "Your password changed. Existing sessions were revoked." : "Open the link and explicitly submit the form. Opening it does not change your account."}\n\n${link}\n\nRequest: ${row.request_id}`,
+      text: `${row.conference_name ?? config.CONFERENCE_NAME} — 本研討會帳號 / Conference account\n\n${row.kind === "password_changed" ? "Your password changed. Existing sessions were revoked." : "Open the link and explicitly submit the form. Opening it does not change your account."}\n\n${link}\n\nRequest: ${row.request_id}`,
       messageId: `<${id}@confsys.invalid>`,
     });
   } catch (error) {

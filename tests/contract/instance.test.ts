@@ -16,7 +16,9 @@ const settings = {
 it("serves only explicit runtime display configuration through SDK; rejects forged Host", async () => {
   const up = async () => {};
   const app = buildApp({ postgres: up, redis: up, worker: up });
-  registerInstanceRoute(app, loadApiConfig(settings));
+  registerInstanceRoute(app, loadApiConfig(settings), async () => ({
+    conferenceName: settings.CONFERENCE_NAME,
+  }));
   try {
     const sdk = createClient("", async (input) => {
       const res = await app.inject({

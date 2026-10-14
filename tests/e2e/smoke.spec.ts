@@ -9,7 +9,7 @@ test("real Web/API/worker readiness, language switch and refresh", async ({
     status: "ready",
     dependencies: { postgres: "up", redis: "up", worker: "up" },
   });
-  await page.goto("/");
+  await page.goto("/system/status");
   await expect(
     page.getByRole("heading", { name: "系統服務狀態" }),
   ).toBeVisible();
@@ -34,7 +34,7 @@ test("real Web/API/worker readiness, language switch and refresh", async ({
 });
 test("network error is visible and manual retry recovers", async ({ page }) => {
   await page.route("**/api/health/ready", (route) => route.abort());
-  await page.goto("/");
+  await page.goto("/system/status");
   await expect(page.getByRole("status")).toContainText("無法取得服務狀態");
   await page.unroute("**/api/health/ready");
   await page.getByRole("button", { name: "重新檢查" }).click();

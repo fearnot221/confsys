@@ -3,6 +3,7 @@ import { Button, Input, Layout } from "@confsys/ui";
 export type AuthView = {
   conferenceName: string;
   canDirectory?: boolean;
+  canSite?: boolean;
   userId?: string | undefined;
   mode: string;
   busy: boolean;
@@ -61,6 +62,11 @@ export function AuthScreen(view: AuthView) {
           <>
             {view.email && (
               <>
+                {view.canSite && (
+                  <p>
+                    <a href="/admin/site">會議設定與官網</a>
+                  </p>
+                )}
                 {view.canDirectory && <a href="/access/accounts">帳號管理</a>}
                 <p>已驗證的信箱</p>
                 <p data-testid="account-email">{view.email}</p>

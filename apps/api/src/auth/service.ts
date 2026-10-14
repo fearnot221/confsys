@@ -1,3 +1,4 @@
+import { effectivePublicSite } from "../site/branding.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import type { ApiConfig } from "@confsys/config";
@@ -101,6 +102,9 @@ export function createAuthService(
         });
         await enqueueIdentityMail(db, {
           ...mailSettings,
+          conferenceName: (
+            await effectivePublicSite(db, config.CONFERENCE_NAME)
+          ).conferenceName,
           userId: user.id,
           tokenId,
           kind: purpose,
@@ -153,6 +157,9 @@ export function createAuthService(
         if (purpose === "reset")
           await enqueueIdentityMail(db, {
             ...mailSettings,
+            conferenceName: (
+              await effectivePublicSite(db, config.CONFERENCE_NAME)
+            ).conferenceName,
             userId: user.id,
             tokenId: null,
             kind: "password_changed",
