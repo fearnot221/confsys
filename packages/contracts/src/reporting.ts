@@ -25,6 +25,8 @@ export const notificationPage = z.strictObject({
   nextOffset: count.nullable(),
 });
 export const reportingStats = z.strictObject({
+  program:z.strictObject({draft:z.array(z.strictObject({kind:z.enum(["oral","poster","invited"]),count})),published:z.array(z.strictObject({kind:z.enum(["oral","poster","invited"]),count})),publishedAt:z.iso.datetime().nullable()}),
+  groupPayments:z.array(z.strictObject({state:z.string(),currency:z.string(),payments:count,payers:count,participants:count,declaredAmount:z.string(),allocatedAmount:z.string(),refundedAmount:z.string()})),
   asOf: z.iso.datetime(),
   timezone: z.literal("UTC"),
   registrationDates: z.array(z.strictObject({ date: z.string(), count })),
