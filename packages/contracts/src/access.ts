@@ -9,6 +9,11 @@ export const permissionSchema = z.enum([
   "site.draft.read",
   "site.draft.write",
   "site.publish",
+  "files.media.manage",
+  "registration.configure",
+  "registration.manage",
+  "submissions.manage",
+  "submissions.read_all",
 ]);
 export type Role = z.infer<typeof roleSchema>;
 export type Permission = z.infer<typeof permissionSchema>;

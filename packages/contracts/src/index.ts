@@ -1,3 +1,11 @@
+import { invitationEndpoints } from "./invitations.js";
+export * from "./invitations.js";
+import { fileEndpoints } from "./files.js";
+export * from "./files.js";
+import { submissionEndpoints } from "./submissions.js";
+export * from "./submissions.js";
+import { registrationEndpoints } from "./registration.js";
+export * from "./registration.js";
 import { siteEndpoints } from "./site.js";
 export * from "./site.js";
 import { accessEndpoints } from "./access.js";
@@ -53,6 +61,10 @@ export function openApiDocument() {
       ...authPaths(),
       ...accessPaths(),
       ...sitePaths(),
+      ...modulePaths(invitationEndpoints),
+      ...modulePaths(fileEndpoints),
+      ...modulePaths(submissionEndpoints),
+      ...modulePaths(registrationEndpoints),
       [routes.instance]: {
         get: {
           operationId: "getInstance",
@@ -319,4 +331,13 @@ function sitePaths() {
     paths[spec.path] = { ...paths[spec.path], [spec.method]: operation };
   }
   return paths;
+}
+
+function modulePaths(endpoints:Record<string,{method:string;path:string;input?:z.ZodType;output:z.ZodType}>) {
+ const paths:Record<string,Record<string,unknown>>={};
+ for(const [operationId,spec] of Object.entries(endpoints)) {
+  const path=spec.path.replace(/:([a-zA-Z]+)/g,'{$1}');
+  paths[path]={...paths[path],[spec.method]:{operationId,parameters:[...(spec.path.includes(':id')?[{in:'path',name:'id',required:true,schema:{type:'string',format:'uuid'}}]:[]),...(spec.method==='post'?[{in:'header',name:'Origin',required:true,schema:{type:'string'}},{in:'header',name:'x-csrf-token',required:true,schema:{type:'string'}}]:spec.input?[{in:'query',name:'query',style:'form',explode:true,schema:z.toJSONSchema(spec.input)}]:[])],...(spec.method==='post'&&spec.input?{requestBody:{required:true,content:{'application/json':{schema:z.toJSONSchema(spec.input)}}}}:{}),responses:Object.fromEntries([200,400,401,403,404,409,413,415,500,503].map(code=>[code,{description:code===200?'Authorized projection':'Safe error',content:{'application/json':{schema:z.toJSONSchema(code===200?spec.output:errorSchema)}}}]))}};
+ }
+ return paths;
 }
