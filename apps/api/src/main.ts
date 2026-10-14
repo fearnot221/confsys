@@ -1,3 +1,6 @@
+import {createSubmissionService} from "./submissions/service.js";
+import {registerSubmissionRoutes} from "./submissions/routes.js";
+import {submissionDependencies} from "./submissions/dependencies.js";
 import { createFilesService } from "./files/service.js";
 import { registerFilesRoutes } from "./files/routes.js";
 import { registerInvitationRoutes } from "./invitations/routes.js";
@@ -55,6 +58,7 @@ registerSiteRoutes(app, config, site);
 registerInvitationRoutes(app, config, createInvitationService(pool,config));
 registerRegistrationRoutes(app, config, createRegistrationService(pool,config));
 registerFilesRoutes(app,config,createFilesService(pool,config,{root:config.PRIVATE_STORAGE_ROOT,scannerHost:config.CLAMAV_HOST,scannerPort:config.CLAMAV_PORT}));
+registerSubmissionRoutes(app,config,createSubmissionService(pool,config,submissionDependencies));
 await registerPublicRoutes(app, config, site);
 app.addHook("onClose", async () => {
   redis.disconnect();

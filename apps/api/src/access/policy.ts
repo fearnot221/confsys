@@ -2,6 +2,9 @@ import type { Role, Permission, AccessMutation } from "@confsys/contracts";
 import { AuthError } from "../auth/errors.js";
 // Explicit grants: adding a future permission never implicitly grants it to admins.
 export const rolePermissions: Readonly<Record<Role, readonly Permission[]>> = {
+  finance: ["finance.read", "finance.reconcile", "finance.refund", "finance.receipt"],
+  chair: ["reviews.manage", "reviews.decide"],
+  reviewer: ["reviews.assigned"],
   conference_staff: ["accounts.directory.read"],
   conference_admin: [
     "accounts.directory.read",
@@ -17,6 +20,7 @@ export const rolePermissions: Readonly<Record<Role, readonly Permission[]>> = {
     "registration.manage",
     "submissions.manage",
     "submissions.read_all",
+    "reviews.manage",
   ],
 };
 export function permissionsFor(roles: readonly string[]): Permission[] {

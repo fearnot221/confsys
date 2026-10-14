@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { z } from "zod";
 const url = (protocols: string[]) =>
   z
@@ -42,7 +43,7 @@ const apiSchema = z.object({
   ...instance,
   ...base,
   ...mailKey,
-  PRIVATE_STORAGE_ROOT: z.string().min(1).refine(v => v.startsWith("/")).default("/tmp/confsys-private-unconfigured"),
+  PRIVATE_STORAGE_ROOT: z.string().min(1).refine(v => v.startsWith("/")).default(() => resolve(".private-storage")),
   CLAMAV_HOST: z.enum(["127.0.0.1", "localhost", "clamav"]).default("127.0.0.1"),
   CLAMAV_PORT: port.default(3310),
   DATABASE_URL: database,

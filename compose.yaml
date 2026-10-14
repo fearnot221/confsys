@@ -57,7 +57,7 @@ services:
     image: clamav/clamav@sha256:9a96980b265cb2b51a20bdcca921dc80aa55ed0e56cdfb076198ee27a9171927
     ports: ["127.0.0.1:${CLAMAV_PORT:-3310}:3310"]
     volumes: ["clamav-data:/var/lib/clamav"]
-    mem_limit: 1536m
+    mem_limit: 3g
   migrate:
     profiles: ["app"]
     image: ${APP_IMAGE:?Select a versioned application image}
