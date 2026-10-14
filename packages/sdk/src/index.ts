@@ -55,3 +55,5 @@ export { createReviewClient } from "./reviews.js";
 export { createProgramClient } from "./program.js";
 
 export {createActivitiesClient} from './activities.js';
+
+export {createOnsiteClient} from "./onsite.js";
