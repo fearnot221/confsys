@@ -1,3 +1,8 @@
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createFilesService} from '../../apps/api/src/files/service.js';
+import {createPaymentEvidenceDownload} from '../../apps/api/src/finance/evidence.js';
 import {beforeAll,afterAll,it,expect} from 'vitest';
 import {randomUUID} from 'node:crypto';
 import {authFixture,password} from '../helpers/auth.js';
@@ -8,6 +13,7 @@ import {withIdentityTransaction} from '@confsys/db';
 const f=authFixture(),auth=createAuthService(f.app,f.config),registration=createRegistrationService(f.app,f.config),finance=createFinanceService(f.app,f.config),rid=()=>randomUUID();
 async function account(role?:string){const email=f.email();await auth.requestMail('register',email,rid());await auth.consume('verify',(await f.link(email)).token,password,rid());const login=await auth.login(email,password,rid());if(role)await f.admin.query('INSERT INTO confsys.user_roles(user_id,role) VALUES($1,$2)',[login.account.user.id,role]);return {id:login.account.user.id,raw:login.raw,email};}
 let admin:Awaited<ReturnType<typeof account>>,fin:Awaited<ReturnType<typeof account>>,a:Awaited<ReturnType<typeof account>>,b:Awaited<ReturnType<typeof account>>,c:Awaited<ReturnType<typeof account>>;
+let evidenceRoot:string|undefined;
 let oldVersion:number|null,version=0;const ticket=rid();let registrationA:string,orderA:string,paymentId:string,allocationId:string;
 const doc=()=>({opensAt:new Date(Date.now()-3600000).toISOString(),closesAt:new Date(Date.now()+3600000).toISOString(),currency:'TWD',timezone:'Asia/Taipei',consent:'Synthetic conference agreement',fields:[{key:'food',label:'Preference',type:'select',required:true,options:['standard','vegetarian']}],tickets:[{id:ticket,name:'Synthetic ticket',capacity:1,waitlist:true,rates:[{startsAt:new Date(Date.now()-3600000).toISOString(),endsAt:new Date(Date.now()+3600000).toISOString(),amount:'1000'}]}]});
 const input=(key=rid())=>({idempotencyKey:key,configVersion:version,ticketId:ticket,badgeName:'合成參與者',affiliation:'Synthetic university',consent:true,answers:{food:'vegetarian'}});
@@ -22,7 +28,7 @@ afterAll(async()=>{
  await f.admin.query('DELETE FROM confsys.orders WHERE user_id=ANY($1::uuid[])',[users]);
  await f.admin.query('DELETE FROM confsys.registrations WHERE user_id=ANY($1::uuid[])',[users]);
  await f.admin.query('UPDATE confsys.registration_state SET version=$1',[oldVersion]);
- await f.admin.query('DELETE FROM confsys.registration_config_versions WHERE created_by=ANY($1::uuid[])',[users]);await f.cleanup();
+ await f.admin.query('DELETE FROM confsys.registration_config_versions WHERE created_by=ANY($1::uuid[])',[users]);await f.admin.query('DELETE FROM confsys.file_references WHERE file_id IN(SELECT id FROM confsys.file_assets WHERE owner_id=ANY($1::uuid[]))',[users]);await f.admin.query('DELETE FROM confsys.file_assets WHERE owner_id=ANY($1::uuid[])',[users]);await f.cleanup();if(evidenceRoot)await rm(evidenceRoot,{recursive:true,force:true});
 });
 it('role separation, no registration inference and validated configured form',async()=>{
  expect((await registration.mine(a.raw,0)).items).toEqual([]);
@@ -82,4 +88,31 @@ it('audit/outbox failure rolls back registration and order, actual worker has no
  try{await expect(registration.create(c.raw,input(),trigger)).rejects.toThrow();expect((await registration.mine(c.raw,0)).items).toEqual([]);}finally{await f.admin.query('DROP TRIGGER registration_test_failure ON confsys.notifications');await f.admin.query('DROP FUNCTION confsys.registration_test_failure()');}
  await expect(f.worker.query('SELECT * FROM confsys.payments')).rejects.toMatchObject({code:'42501'});
  await expect(withIdentityTransaction(f.app,async db=>{await db.query("SELECT set_config('app.actor_id',$1,true)",[c.id]);await db.query('INSERT INTO confsys.payment_allocations(id,payment_id,order_id,amount,created_by,idempotency_key,request_hash) VALUES($1,$2,$3,1,$4,$5,\'bad\')',[rid(),paymentId,orderA,c.id,rid()]);})).rejects.toThrow();
+});
+it('edits bind the original form, retain immutable history, and FIFO promotion keeps the original fee',async()=>{
+ const waiting=(await registration.mine(b.raw,0)).items[0]!;
+ const edited=await registration.edit(b.raw,{id:waiting.id,expectedVersion:waiting.version,badgeName:'更新合成姓名',affiliation:'New synthetic institute',answers:{food:'standard'},reason:'Participant correction'},rid());
+ expect(edited.version).toBe(waiting.version+1);expect(edited.order).toBeNull();
+ await expect(registration.edit(c.raw,{id:waiting.id,expectedVersion:edited.version,badgeName:'Foreign',affiliation:'',answers:{food:'standard'},reason:'Unauthorized edit'},rid())).rejects.toMatchObject({code:'NOT_FOUND'});
+ await expect(registration.edit(b.raw,{id:waiting.id,expectedVersion:waiting.version,badgeName:'Stale',affiliation:'',answers:{food:'standard'},reason:'Stale version edit'},rid())).rejects.toMatchObject({code:'CONFLICT'});
+ const history=await registration.history(b.raw,waiting.id);expect(history.items[0]).toMatchObject({version:edited.version,before:{badgeName:'合成參與者'},after:{badgeName:'更新合成姓名'}});
+ await expect(registration.history(c.raw,waiting.id)).rejects.toMatchObject({code:'NOT_FOUND'});
+ const newDoc=doc();newDoc.tickets[0]!.rates[0]!.amount='9900';await registration.configure(admin.raw,{expectedVersion:version,document:newDoc},rid());
+ const input={id:waiting.id,expectedVersion:edited.version,reason:'Promote first waiting participant'};
+ await expect(registration.promote(b.raw,input,rid())).rejects.toMatchObject({code:'FORBIDDEN'});
+ const outcomes=await Promise.allSettled([registration.promote(admin.raw,input,rid()),registration.promote(admin.raw,input,rid())]);expect(outcomes.filter(x=>x.status==='fulfilled')).toHaveLength(1);
+ const promoted=(await registration.mine(b.raw,0)).items[0]!;expect(promoted.state).toBe('confirmed');expect(promoted.order!.amount).toBe('1000');expect(promoted.configVersion).toBe(version);
+ await expect(f.app.query('UPDATE confsys.registration_price_snapshots SET amount=1')).rejects.toMatchObject({code:'42501'});
+ await expect(f.app.query("UPDATE confsys.registration_changes SET reason='tamper'")).rejects.toMatchObject({code:'42501'});
+ expect((await f.admin.query('SELECT count(*) FROM confsys.notifications WHERE event_key=$1',[`registration-promoted:${waiting.id}`])).rows[0].count).toBe('1');
+});
+
+it('finance can download only linked ready evidence; admin and revoked finance cannot read it',async()=>{
+ evidenceRoot=await mkdtemp(join(tmpdir(),'confsys-finance-evidence-'));const storage={root:evidenceRoot,scannerHost:'127.0.0.1',scannerPort:Number(process.env.CLAMAV_PORT)},files=createFilesService(f.app,f.config,storage),download=createPaymentEvidenceDownload(f.app,f.config,storage);
+ const proof=await files.upload(c.raw,{purpose:'payment_evidence',name:'synthetic-proof.png',content:'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADklEQVQImWP4DwYMEAoAU7oL9W/sIDEAAAAASUVORK5CYII='},rid());expect(proof.status).toBe('ready');
+ const payment=await finance.submit(c.raw,{idempotencyKey:rid(),amount:'50',currency:'TWD',reference:rid(),evidenceFileId:proof.id},rid());expect(payment.evidenceFileId).toBe(proof.id);
+ const result=await download(fin.raw,payment.id,rid());expect(result.mediaType).toBe('image/png');expect(result.bytes.length).toBeGreaterThan(0);expect(result.name).not.toContain('synthetic-proof');
+ for(const raw of [admin.raw,a.raw,c.raw])await expect(download(raw,payment.id,rid())).rejects.toMatchObject({code:'FORBIDDEN'});
+ await expect(download(fin.raw,rid(),rid())).rejects.toMatchObject({code:'NOT_FOUND'});
+ await f.admin.query("DELETE FROM confsys.user_roles WHERE user_id=$1 AND role='finance'",[fin.id]);await expect(download(fin.raw,payment.id,rid())).rejects.toMatchObject({code:'FORBIDDEN'});
 });

@@ -1,3 +1,13 @@
+import {createNotificationBatchService} from './notification-batches/service.js';
+import {registerNotificationBatchRoutes} from './notification-batches/routes.js';
+import {createOnsiteService} from './onsite/service.js';
+import {registerOnsiteRoutes} from './onsite/routes.js';
+import {createDocumentJobsService} from './document-jobs/service.js';
+import {registerDocumentJobRoutes} from './document-jobs/routes.js';
+import {createReportingService} from './reporting/service.js';
+import {registerReportingRoutes} from './reporting/routes.js';
+import {createCompetitionService} from './competitions/service.js';
+import {registerCompetitionRoutes} from './competitions/routes.js';
 import {createPaymentEvidenceDownload} from './finance/evidence.js';
 import {createActivitiesService} from './activities/service.js';
 import {registerActivityRoutes} from './activities/routes.js';
@@ -76,6 +86,11 @@ registerActivityRoutes(app,config,createActivitiesService(pool,config));
 registerReceiptRoutes(app,config,createReceiptsService(pool,config));
 registerReviewRoutes(app,config,createReviewService(pool,config),createReviewFileDownload(pool,config,{root:config.PRIVATE_STORAGE_ROOT,scannerHost:config.CLAMAV_HOST,scannerPort:config.CLAMAV_PORT},authorizeReviewFile));
 registerProgramRoutes(app,config,createProgramService(pool,config));
+registerOnsiteRoutes(app,config,createOnsiteService(pool,config));
+registerDocumentJobRoutes(app,config,createDocumentJobsService(pool,config));
+registerReportingRoutes(app,config,createReportingService(pool,config));
+registerCompetitionRoutes(app,config,createCompetitionService(pool,config));
+registerNotificationBatchRoutes(app,config,createNotificationBatchService(pool,config));
 await registerPublicRoutes(app, config, site);
 app.addHook("onClose", async () => {
   redis.disconnect();

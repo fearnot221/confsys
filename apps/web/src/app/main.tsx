@@ -1,3 +1,13 @@
+import {useNotificationBatches} from '../features/notification-batches/hooks/use-notification-batches.js';
+import {NotificationBatchesScreen} from '../features/notification-batches/components/notification-batches-screen.js';
+import {useOnsite} from '../features/onsite/hooks/use-onsite.js';
+import {OnsiteScreen} from '../features/onsite/components/onsite-screen.js';
+import {useDocumentJobs} from '../features/documents/hooks/use-document-jobs.js';
+import {DocumentJobsScreen} from '../features/documents/components/document-jobs-screen.js';
+import {useReporting} from '../features/reporting/hooks/use-reporting.js';
+import {ReportingScreen} from '../features/reporting/components/reporting-screen.js';
+import {useCompetitions,usePublicCompetitionAwards} from '../features/competitions/hooks/use-competitions.js';
+import {CompetitionsScreen,PublicCompetitionAwardsScreen} from '../features/competitions/components/competitions-screen.js';
 import {useActivities} from '../features/activities/hooks/use-activities.js';
 import {ActivitiesScreen} from '../features/activities/components/activities-screen.js';
 import {useReceipts} from '../features/documents/hooks/use-receipts.js';
@@ -134,12 +144,18 @@ function ReviewsApp() {return <ReviewsScreen {...useReviews()}/>;}
 function ProgramApp() {return <ProgramScreen {...useProgram()}/>;}
 function PublicProgramApp() {return <PublicProgramScreen {...usePublicProgram()}/>;}
 function ActivitiesApp({admin=false}:{admin?:boolean}) {return <ActivitiesScreen {...useActivities(admin)}/>;}
+function OnsiteApp({admin=false}:{admin?:boolean}) {return <OnsiteScreen {...useOnsite(admin)}/>;}
+function DocumentJobsApp() {return <DocumentJobsScreen {...useDocumentJobs()}/>;}
+function ReportingApp() {return <ReportingScreen {...useReporting()}/>;}
+function CompetitionsApp({mode='author'}:{mode?:'author'|'admin'|'judge'}) {return <CompetitionsScreen {...useCompetitions(mode)}/>;}
+function AwardsApp() {return <PublicCompetitionAwardsScreen {...usePublicCompetitionAwards()}/>;}
+function NotificationBatchesApp() {return <NotificationBatchesScreen {...useNotificationBatches()}/>;}
 const queryClient = new QueryClient();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        {window.location.pathname === '/activities' ? <ActivitiesApp/> : window.location.pathname === '/admin/activities' ? <ActivitiesApp admin/> : window.location.pathname === '/reviews' ? <ReviewsApp/> : window.location.pathname === '/receipts' ? <ReceiptsApp/> : window.location.pathname === '/admin/receipts' ? <ReceiptsApp admin/> : window.location.pathname === '/admin/program' ? <ProgramApp/> : window.location.pathname === '/program' ? <PublicProgramApp/> : window.location.pathname === "/finance" ? <FinanceApp /> : window.location.pathname === "/admin/finance" ? <FinanceApp admin /> : window.location.pathname === "/submissions" ? <SubmissionsApp /> : window.location.pathname === "/admin/submissions" ? <SubmissionsApp admin /> : window.location.pathname === "/account/files" ? <FilesApp /> : window.location.pathname === "/registration" ? <RegistrationApp /> : window.location.pathname === "/admin/registration" ? <RegistrationApp admin /> : window.location.pathname === "/admin/invitations" ? <InvitationsApp /> : window.location.pathname === "/auth/invitation" ? <InvitationAcceptApp /> : window.location.pathname === "/admin/site" ? (
+        {window.location.pathname === '/admin/notifications' ? <NotificationBatchesApp/> : window.location.pathname === '/onsite/pass' ? <OnsiteApp/> : window.location.pathname === '/admin/onsite' ? <OnsiteApp admin/> : window.location.pathname === '/admin/documents' ? <DocumentJobsApp/> : window.location.pathname === '/notifications' ? <ReportingApp/> : window.location.pathname === '/competitions' ? <CompetitionsApp/> : window.location.pathname === '/admin/competitions' ? <CompetitionsApp mode='admin'/> : window.location.pathname === '/judging' ? <CompetitionsApp mode='judge'/> : window.location.pathname === '/competition-awards' ? <AwardsApp/> : window.location.pathname === '/activities' ? <ActivitiesApp/> : window.location.pathname === '/admin/activities' ? <ActivitiesApp admin/> : window.location.pathname === '/reviews' ? <ReviewsApp/> : window.location.pathname === '/receipts' ? <ReceiptsApp/> : window.location.pathname === '/admin/receipts' ? <ReceiptsApp admin/> : window.location.pathname === '/admin/program' ? <ProgramApp/> : window.location.pathname === '/program' ? <PublicProgramApp/> : window.location.pathname === "/finance" ? <FinanceApp /> : window.location.pathname === "/admin/finance" ? <FinanceApp admin /> : window.location.pathname === "/submissions" ? <SubmissionsApp /> : window.location.pathname === "/admin/submissions" ? <SubmissionsApp admin /> : window.location.pathname === "/account/files" ? <FilesApp /> : window.location.pathname === "/registration" ? <RegistrationApp /> : window.location.pathname === "/admin/registration" ? <RegistrationApp admin /> : window.location.pathname === "/admin/invitations" ? <InvitationsApp /> : window.location.pathname === "/auth/invitation" ? <InvitationAcceptApp /> : window.location.pathname === "/admin/site" ? (
           <SiteApp />
         ) : window.location.pathname.startsWith("/access/") ? (
           <AccessApp />

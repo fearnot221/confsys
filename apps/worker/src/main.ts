@@ -1,3 +1,4 @@
+import {startDocumentWorker} from '@confsys/documents/worker';
 import { startMailWorker } from "@confsys/notifications/worker";
 import Fastify, { LogController } from "fastify";
 import { Redis } from "ioredis";
@@ -16,6 +17,7 @@ redis.on("error", () => diagnostic("worker", "redis_unavailable"));
 redis.on("ready", () => diagnostic("worker", "redis_ready"));
 await databaseReady(pool, "confsys_worker");
 const mail = startMailWorker(pool, config);
+const documents = startDocumentWorker(pool,config);
 const worker = createSyntheticWorker(config.REDIS_URL);
 let queueReady = false;
 void worker
@@ -39,6 +41,7 @@ app.get("/health/ready", async (_request, reply) => {
       !queueReady ||
       !worker.isRunning() ||
       !mail.worker.isRunning() ||
+      !documents.worker.isRunning() ||
       worker.isPaused()
     )
       throw new Error("Not ready");
@@ -48,6 +51,7 @@ app.get("/health/ready", async (_request, reply) => {
   }
 });
 app.addHook("onClose", async () => {
+  await documents.close();
   await mail.close();
   await worker.close();
   redis.disconnect();
