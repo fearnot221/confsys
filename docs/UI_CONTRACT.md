@@ -82,3 +82,15 @@ enter a subject/body, and explicitly queue the batch. Recent-password proof is
 available in the workspace. The hook preserves request identity across ambiguous
 retries of the same form. The page lists bounded batch pages, real worker status
 counts, refresh and cancellation, with explicit non-recall/uncertain-delivery labels.
+
+
+### Complete-data export workspace and statistics
+
+Mount `ExportJobsScreen` with `useExportJobs()` at `/admin/exports`. The page explains
+snapshot timing, the explicit 64 MiB failure limit, 24-hour expiry and five-job bound.
+It preserves retry identity, offers an explicit new-snapshot action, current status
+refresh, recent-password verification, and an authorized blob download whose URL
+is revoked on replacement/unmount. Presentation never fetches or constructs API URLs.
+The notification/reporting workspace links to full exports and labels its preview
+CSV pages separately. Statistics display the common snapshot time, UTC date grouping
+and separate currency totals without an invented net-income calculation.

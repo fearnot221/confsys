@@ -161,7 +161,7 @@ Review verified checkpoint (2026-10-15 06:32 Asia/Taipei): `PATH=/tmp/confsys-to
   real app-role notification RLS/ownership, read idempotency, session/permission/proof,
   safe export/preview projections, audited principal preservation, pagination and HTTP CSRF.
 - Reporting exports are bounded live pages, not an asynchronous snapshot export job.
-  Large snapshot exports and richer aggregation remain distinct follow-up scope.
+  Full snapshot exports are now a distinct durable worker flow described below.
 
 ### Bounded bulk mail
 
@@ -171,3 +171,23 @@ proof, recipient eligibility, concurrent idempotency, immutable body/key binding
 accepted status, explicit cancellation, issuer-role/credential revocation and disabled
 recipient cancellation. `tests/e2e/notification-batches.spec.ts` exercises the browser
 queue command, actual worker-to-Mailpit capture and the recipient's notification center.
+
+
+### Durable CSV export and aggregate statistics
+
+`node --env-file=/path/to/synthetic.env node_modules/vitest/vitest.mjs run tests/integration/export-jobs.test.ts tests/integration/reporting.test.ts`
+passed 10/10 on 2026-10-15 07:07 Asia/Taipei against the isolated real PostgreSQL,
+Redis and non-privileged runtime roles. Export tests cover over 1,000 source rows,
+keyset batching, a coherent historical read despite a subsequent source edit,
+formula-safe CSV, SHA-256 verification, owner isolation, fresh-password checks,
+revocation between snapshot and publication, credential epochs, expiry, concurrent
+request bounds, lease recovery and actual BullMQ processing. Reporting checks one
+statement timestamp and exact currency aggregates without private detail leakage.
+
+`pnpm exec vitest run tests/unit/export-csv.test.ts tests/unit/reporting.test.ts`
+passed 2/2: CSV escaping/formula neutralization and actual UTF-8 byte accounting;
+exceeding the configured 64 MiB ceiling cannot yield partial successful output.
+The integration test is over 1,000 rows; no throughput benchmark or maximum-size
+performance claim is made. `tests/e2e/export-jobs.spec.ts` exercises request, real
+worker completion and the downloaded browser file (browser verification tracked
+in the integration run report).

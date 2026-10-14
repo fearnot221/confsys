@@ -124,9 +124,58 @@ export function ReportingScreen(p: Props) {
               <p>以查詢當下資料為準；訂單金額為最小貨幣單位，並非收款總額。</p>
               {p.stats && (
                 <>
+                  <p>
+                    同一快照時間：{new Date(p.stats.asOf).toLocaleString()}
+                    ；每日報名依 UTC 日期分組。
+                  </p>
                   <Counts title="報名" rows={p.stats.registrations} />
+                  <h3>每日報名（UTC）</h3>
+                  <ul>
+                    {p.stats.registrationDates.map((r) => (
+                      <li key={r.date}>
+                        {r.date}：{r.count}
+                      </li>
+                    ))}
+                  </ul>
+                  <h3>票種與狀態</h3>
+                  <ul>
+                    {p.stats.tickets.map((r) => (
+                      <li key={r.ticketId + r.ticketName + r.state}>
+                        {r.ticketName} · {r.state}：{r.count}
+                      </li>
+                    ))}
+                  </ul>
                   <Counts title="投稿" rows={p.stats.submissions} />
                   <Counts title="審查指派" rows={p.stats.reviews} />
+                  <Counts title="報到／撤銷" rows={p.stats.checkins} />
+                  <Counts title="競賽資格" rows={p.stats.competitionEntries} />
+                  <Counts
+                    title="競賽評分指派"
+                    rows={p.stats.competitionAssignments}
+                  />
+                  <Counts
+                    title="業務通知寄送狀態"
+                    rows={p.stats.notifications}
+                  />
+                  <h3>餐飲／活動與核銷</h3>
+                  <ul>
+                    {p.stats.activities.map((r) => (
+                      <li key={r.activityId + r.state}>
+                        {r.activityId} · {r.state}：{r.bookings}筆預訂、
+                        {r.quantity}份、已核銷{r.redeemedQuantity}份
+                      </li>
+                    ))}
+                  </ul>
+                  <Money
+                    title="付款紀錄（依核帳狀態）"
+                    rows={p.stats.payments}
+                  />
+                  <Money title="付款分配" rows={p.stats.allocations} />
+                  <Money title="退款紀錄" rows={p.stats.refunds} />
+                  <p>
+                    付款、分配、退款分別呈現，不相加為營收；分配代表既有付款的用途。
+                  </p>
+
                   <h3>訂單</h3>
                   <table>
                     <thead>
@@ -155,6 +204,9 @@ export function ReportingScreen(p: Props) {
           {p.canExport && (
             <section aria-labelledby="export-heading">
               <h2 id="export-heading">資料與 Email 清單匯出</h2>
+              <p>
+                <a href="/admin/exports">需要全部資料？建立完整背景匯出快照</a>
+              </p>
               <p>
                 每頁最多100筆。各頁獨立讀取；匯出期間異動可能影響分頁，請在活動較少時完整匯出。下載需近期密碼驗證，並留下稽核紀錄。
               </p>
@@ -296,6 +348,40 @@ function Counts({
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+function Money({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: { currency: string; count: number; amount: string; state?: string }[];
+}) {
+  return (
+    <>
+      <h3>{title}</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>幣別</th>
+            <th>狀態</th>
+            <th>筆數</th>
+            <th>金額（最小貨幣單位）</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.currency + (r.state ?? "")}>
+              <td>{r.currency}</td>
+              <td>{r.state ?? "已記錄"}</td>
+              <td>{r.count}</td>
+              <td>{r.amount}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </>
   );
 }

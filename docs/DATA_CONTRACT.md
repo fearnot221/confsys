@@ -207,3 +207,34 @@ Submission configuration now includes `mode: abstract | full_paper` and `present
 `POST /api/competitions/remind` accepts an assignment ID, idempotency key and reason. It requires competition administration, a still-qualified approved entry, an active judge role, an unsubmitted assignment and an open judging deadline. Generic notices are deduplicated by assignment/request key; they contain no manuscript or score details. Final scoring takes the exclusive access fence so eligibility cannot race an author withdrawal or registration cancellation; read-only judging and conflict declarations retain shared access fences. This intentionally favors a single-instance correctness boundary over unmeasured parallel scoring throughput.
 
 Follow-up verification checkpoint (06:53 Asia/Taipei): typecheck and scoped eslint passed; submission/competition policy+SDK unit tests passed 10/10. New presenter/PDF integration, reminder and queued withdrawal-versus-publication/scoring regression tests are authored but have not yet run while the main integration worker holds the shared PostgreSQL test slot. Treat these additions as pending the next real-PG regression gate, not verified completion.
+
+### Durable complete-data CSV exports
+
+`export-jobs` is separate from bounded synchronous preview pages. A fresh authorized
+request inserts a small durable job and audit event atomically. Each requester has
+at most five pending/processing jobs; idempotency keys bind the export kind.
+`@confsys/exports` owns one shared CSV encoding/formula boundary and the worker.
+No additional external dependency is introduced beyond existing BullMQ/DB/policy
+packages. The worker reads only explicit owner-evaluated source views guarded by a
+real claimed job and transaction-local job/claim IDs. It has no raw user-table grant.
+
+All source rows are read by UUID keyset in a repeatable-read transaction, preserving
+one worker-start database snapshot. The output fails explicitly above 64 MiB; it is
+never silently truncated. Source reading finishes before a NEW read-committed,
+access-fenced transaction checks current requester roles, credential epoch, state
+and expiry before publishing bytes. The original snapshot cannot authorize its own
+publication after revocation. Pure local jobs recover abandoned leases up to three
+attempts. Exceptions persist bounded safe codes rather than data-bearing errors.
+
+CSV bytes, count, snapshot time and SHA-256 live in PostgreSQL for up to 24 hours from
+request creation; expiry removes bytes. Download is requester-scoped and rechecks
+current session, permission, recent proof, credential epoch, expiry and checksum,
+then writes an audit event. No public or bearer download URLs are created. The
+64 MiB limit bounds the current in-memory renderer; streaming object storage for
+larger exports is an explicit future extension, not an existing capability.
+
+Statistics now use one SQL statement/MVCC snapshot with a reported `asOf` timestamp.
+Registration dates use UTC; ticket/state, payment state/currency, allocations,
+refunds, activity reservations/redemptions, checkins, review/competition state and
+business-notification delivery state are explicit aggregates. Monetary categories
+are separate exact minor-unit strings and must not be added as if all were revenue.

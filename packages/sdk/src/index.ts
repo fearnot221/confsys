@@ -62,3 +62,4 @@ export {createDocumentJobsClient} from "./document-jobs.js";
 export { createReportingClient } from './reporting.js';
 export { createCompetitionClient } from "./competitions.js";
 export { createNotificationBatchClient } from './notification-batches.js';
+export { createExportJobsClient } from './export-jobs.js';

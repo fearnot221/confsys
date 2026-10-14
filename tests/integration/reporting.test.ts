@@ -51,6 +51,10 @@ afterAll(async () => {
     "DELETE FROM confsys.submissions WHERE owner_id=ANY($1::uuid[])",
     [ids],
   );
+  await f.admin.query(
+    "DELETE FROM confsys.payments WHERE payer_id=ANY($1::uuid[])",
+    [ids],
+  );
   await f.cleanup();
 });
 it("shows only own business messages, never identity links, and marks read idempotently with real RLS", async () => {
@@ -297,4 +301,42 @@ it("validates HTTP inputs and CSRF before exports and preview", async () => {
     redis.disconnect();
     await server.close();
   }
+});
+
+it("reports one timestamped cross-domain snapshot with exact currency values and only aggregate notification states", async () => {
+  const before = await service.stats(admin.raw),
+    prior = before.payments.find(
+      (r) => r.currency === "TWD" && r.state === "submitted",
+    );
+  await f.admin.query(
+    "INSERT INTO confsys.payments(id,payer_id,state,amount,currency,reference,idempotency_key,request_hash) VALUES($1,$2,'submitted',125,'TWD',$3,$4,'synthetic-statistics')",
+    [rid(), owner.id, rid(), rid()],
+  );
+  const start = Date.now(),
+    result = await service.stats(admin.raw),
+    payment = result.payments.find(
+      (r) => r.currency === "TWD" && r.state === "submitted",
+    );
+  expect(result.timezone).toBe("UTC");
+  expect(Date.parse(result.asOf)).toBeGreaterThanOrEqual(start - 100);
+  expect(Date.parse(result.asOf)).toBeLessThanOrEqual(Date.now() + 100);
+  expect(payment?.amount).toBe(String(BigInt(prior?.amount ?? "0") + 125n));
+  expect(payment?.count).toBe((prior?.count ?? 0) + 1);
+  expect(
+    result.notifications.reduce((sum, r) => sum + r.count, 0),
+  ).toBeGreaterThanOrEqual(22);
+  for (const list of [
+    result.registrationDates,
+    result.tickets,
+    result.allocations,
+    result.refunds,
+    result.activities,
+    result.checkins,
+    result.competitionEntries,
+    result.competitionAssignments,
+  ])
+    expect(Array.isArray(list)).toBe(true);
+  expect(JSON.stringify(result)).not.toMatch(
+    /password_hash|credential|reference|authorComment|privateComment/,
+  );
 });

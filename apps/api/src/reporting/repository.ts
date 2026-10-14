@@ -8,7 +8,7 @@ import { csvDocument } from "./policy.js";
 const pageSize = 100;
 export async function context(db: PoolClient, actorId: string, admin: boolean) {
   await db.query(
-    "SELECT set_config('app.actor_id',$1,true),set_config('app.registration_admin',$2,true),set_config('app.submissions_admin',$2,true),set_config('app.reviews_manage',$2,true)",
+    "SELECT set_config('app.actor_id',$1,true),set_config('app.registration_admin',$2,true),set_config('app.submissions_admin',$2,true),set_config('app.reviews_manage',$2,true),set_config('app.reporting_admin',$2,true)",
     [actorId, String(admin)],
   );
 }
@@ -20,16 +20,14 @@ export async function notifications(db: PoolClient, offset: number) {
     )
   ).rows;
   return notificationPage.parse({
-    items: rows
-      .slice(0, 20)
-      .map((r) => ({
-        id: r.id,
-        subject: r.subject,
-        text: r.text,
-        status: r.status,
-        createdAt: r.created_at.toISOString(),
-        readAt: r.read_at?.toISOString() ?? null,
-      })),
+    items: rows.slice(0, 20).map((r) => ({
+      id: r.id,
+      subject: r.subject,
+      text: r.text,
+      status: r.status,
+      createdAt: r.created_at.toISOString(),
+      readAt: r.read_at?.toISOString() ?? null,
+    })),
     nextOffset: rows.length > 20 ? offset + 20 : null,
   });
 }
@@ -46,27 +44,35 @@ export async function markRead(db: PoolClient, actorId: string, id: string) {
   return true;
 }
 export async function stats(db: PoolClient) {
-  const registrations = (
-    await db.query(
-      "SELECT state,count(*)::integer AS count FROM confsys.registrations GROUP BY state ORDER BY state",
-    )
-  ).rows;
-  const submissions = (
-    await db.query(
-      "SELECT state,count(*)::integer AS count FROM confsys.submissions GROUP BY state ORDER BY state",
-    )
-  ).rows;
-  const reviews = (
-    await db.query(
-      "SELECT state,count(*)::integer AS count FROM confsys.review_assignments GROUP BY state ORDER BY state",
-    )
-  ).rows;
-  const orders = (
-    await db.query(
-      "SELECT state,currency,count(*)::integer AS count,sum(amount)::text AS amount FROM confsys.orders GROUP BY state,currency ORDER BY currency,state",
-    )
-  ).rows;
-  return reportingStats.parse({ registrations, submissions, reviews, orders });
+  await db.query(
+    "SELECT set_config('app.finance_admin','true',true),set_config('app.onsite_admin','true',true),set_config('app.competitions_manage','true',true)",
+  );
+  // One statement has one MVCC snapshot across domains; no totals assembled from
+  // unrelated timestamps. Currency totals remain exact text minor units.
+  const row = (
+    await db.query(`SELECT statement_timestamp() AS as_of,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT state,count(*)::integer AS count FROM confsys.registrations GROUP BY state ORDER BY state)x) AS registrations,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT state,count(*)::integer AS count FROM confsys.submissions GROUP BY state ORDER BY state)x) AS submissions,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT state,count(*)::integer AS count FROM confsys.review_assignments GROUP BY state ORDER BY state)x) AS reviews,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT state,currency,count(*)::integer AS count,sum(amount)::text AS amount FROM confsys.orders GROUP BY state,currency ORDER BY currency,state)x) AS orders,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD') AS date,count(*)::integer AS count FROM confsys.registrations GROUP BY date ORDER BY date)x) AS "registrationDates",
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT ticket_id AS "ticketId",ticket_name AS "ticketName",state,count(*)::integer AS count FROM confsys.registrations GROUP BY ticket_id,ticket_name,state ORDER BY ticket_id,ticket_name,state)x) AS tickets,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT state,currency,count(*)::integer AS count,sum(amount)::text AS amount FROM confsys.payments GROUP BY state,currency ORDER BY currency,state)x) AS payments,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT p.currency,count(*)::integer AS count,sum(a.amount)::text AS amount FROM confsys.payment_allocations a JOIN confsys.payments p ON p.id=a.payment_id GROUP BY p.currency ORDER BY p.currency)x) AS allocations,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT p.currency,count(*)::integer AS count,sum(r.amount)::text AS amount FROM confsys.refunds r JOIN confsys.payment_allocations a ON a.id=r.allocation_id JOIN confsys.payments p ON p.id=a.payment_id GROUP BY p.currency ORDER BY p.currency)x) AS refunds,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT b.activity_id AS "activityId",b.state,count(*)::integer AS bookings,sum(b.quantity)::integer AS quantity,sum(coalesce((SELECT sum(r.quantity) FROM confsys.onsite_redemptions r WHERE r.booking_id=b.id AND r.active),0))::integer AS "redeemedQuantity" FROM confsys.activity_bookings b GROUP BY b.activity_id,b.state ORDER BY b.activity_id,b.state)x) AS activities,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT CASE WHEN active THEN 'active' ELSE 'reversed' END AS state,count(*)::integer AS count FROM confsys.onsite_checkins GROUP BY active ORDER BY active)x) AS checkins,
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT state,count(*)::integer AS count FROM confsys.competition_entries GROUP BY state ORDER BY state)x) AS "competitionEntries",
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT state,count(*)::integer AS count FROM confsys.competition_assignments GROUP BY state ORDER BY state)x) AS "competitionAssignments",
+  (SELECT coalesce(jsonb_agg(x),'[]'::jsonb) FROM (SELECT status AS state,count FROM confsys.reporting_notification_totals ORDER BY status)x) AS notifications
+ `)
+  ).rows[0];
+  const { as_of, ...totals } = row;
+  return reportingStats.parse({
+    ...totals,
+    asOf: as_of.toISOString(),
+    timezone: "UTC",
+  });
 }
 export async function exportRows(
   db: PoolClient,
@@ -170,12 +176,10 @@ export async function preview(db: PoolClient, userId: string, email: string) {
     readOnly: true,
     registrations: registrations.slice(0, 100),
     submissions: submissions.slice(0, 100),
-    results: results
-      .slice(0, 100)
-      .map(({ published_at, ...r }) => ({
-        ...r,
-        publishedAt: published_at.toISOString(),
-      })),
+    results: results.slice(0, 100).map(({ published_at, ...r }) => ({
+      ...r,
+      publishedAt: published_at.toISOString(),
+    })),
     truncated:
       Math.max(registrations.length, submissions.length, results.length) > 100,
   });
