@@ -1,0 +1,5 @@
+authOperations additions:
+emailChangeRequest:{path:'/api/auth/email-change/request',input:emailInput,output:acceptedSchema,status:202}
+emailChangeConfirm:{path:'/api/auth/email-change/confirm',input:z.strictObject({token:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}),output:doneSchema,status:200}
+Export token-only input as emailChangeConfirmInput; existing SDK mutate automatically handles entries.
+Request and confirm both require same verified account session + recent password proof. Auth UI calls reauthenticate immediately before either operation. Confirm clears session cookie and caches after revoking all sessions.

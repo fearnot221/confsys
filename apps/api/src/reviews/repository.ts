@@ -357,8 +357,8 @@ export async function candidates(
       title: string;
       trackId: string;
     }>(
-      `SELECT s.id AS "submissionId",r.id AS "revisionId",r.document->>'title' AS title,r.document->>'trackId' AS "trackId" FROM confsys.submissions s JOIN confsys.submission_revisions r ON r.id=s.current_revision_id WHERE s.state='submitted' AND s.owner_id<>$2 AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(r.document->'authors') a WHERE lower(btrim(a->>'email'))=$3) AND NOT EXISTS(SELECT 1 FROM confsys.review_conflicts c WHERE c.submission_id=s.id AND c.user_id=$2) AND ($4::uuid IS NULL OR EXISTS(SELECT 1 FROM confsys.review_chair_scopes c WHERE c.user_id=$4 AND c.track_id=r.document->>'trackId')) ORDER BY s.updated_at DESC,s.id LIMIT 21 OFFSET $1`,
-      [offset, actor.id, actor.email, chairId],
+      `SELECT s.id AS "submissionId",r.id AS "revisionId",r.document->>'title' AS title,r.document->>'trackId' AS "trackId" FROM confsys.submissions s JOIN confsys.submission_revisions r ON r.id=s.current_revision_id WHERE s.state='submitted' AND s.owner_id<>$2 AND NOT EXISTS(SELECT 1 FROM confsys.submission_author_conflicts conflict WHERE conflict.revision_id=r.id AND conflict.user_id=$2) AND NOT EXISTS(SELECT 1 FROM confsys.review_conflicts c WHERE c.submission_id=s.id AND c.user_id=$2) AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM confsys.review_chair_scopes c WHERE c.user_id=$3 AND c.track_id=r.document->>'trackId')) ORDER BY s.updated_at DESC,s.id LIMIT 21 OFFSET $1`,
+      [offset, actor.id, chairId],
     )
   ).rows;
 }
@@ -463,8 +463,8 @@ export async function workload(
       submitted: number;
       overdue: number;
     }>(
-      `SELECT a.reviewer_id AS "reviewerId",count(*) FILTER(WHERE a.state='invited')::int AS invited,count(*) FILTER(WHERE a.state='accepted')::int AS accepted,count(*) FILTER(WHERE a.state='submitted')::int AS submitted,count(*) FILTER(WHERE a.state IN('invited','accepted') AND (f.document->>'closesAt')::timestamptz<=now())::int AS overdue FROM confsys.review_assignments a JOIN confsys.submission_revisions r ON r.id=a.revision_id JOIN confsys.submissions s ON s.id=a.submission_id JOIN confsys.review_forms f ON f.id=a.form_id WHERE a.reviewer_id=ANY($1::uuid[]) AND s.state<>'withdrawn' AND s.owner_id<>$2 AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(r.document->'authors') author WHERE lower(btrim(author->>'email'))=$3) AND NOT EXISTS(SELECT 1 FROM confsys.review_conflicts c WHERE c.submission_id=s.id AND c.user_id=$2) AND ($4::uuid IS NULL OR EXISTS(SELECT 1 FROM confsys.review_chair_scopes scope WHERE scope.user_id=$4 AND scope.track_id=r.document->>'trackId')) GROUP BY a.reviewer_id`,
-      [reviewerIds, actor.id, actor.email, chairId],
+      `SELECT a.reviewer_id AS "reviewerId",count(*) FILTER(WHERE a.state='invited')::int AS invited,count(*) FILTER(WHERE a.state='accepted')::int AS accepted,count(*) FILTER(WHERE a.state='submitted')::int AS submitted,count(*) FILTER(WHERE a.state IN('invited','accepted') AND (f.document->>'closesAt')::timestamptz<=now())::int AS overdue FROM confsys.review_assignments a JOIN confsys.submission_revisions r ON r.id=a.revision_id JOIN confsys.submissions s ON s.id=a.submission_id JOIN confsys.review_forms f ON f.id=a.form_id WHERE a.reviewer_id=ANY($1::uuid[]) AND s.state<>'withdrawn' AND s.owner_id<>$2 AND NOT EXISTS(SELECT 1 FROM confsys.submission_author_conflicts conflict WHERE conflict.revision_id=r.id AND conflict.user_id=$2) AND NOT EXISTS(SELECT 1 FROM confsys.review_conflicts c WHERE c.submission_id=s.id AND c.user_id=$2) AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM confsys.review_chair_scopes scope WHERE scope.user_id=$3 AND scope.track_id=r.document->>'trackId')) GROUP BY a.reviewer_id`,
+      [reviewerIds, actor.id, chairId],
     )
   ).rows;
 }

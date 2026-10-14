@@ -140,3 +140,11 @@ The allocation query checks the requested own/admin scope independently of the
 Changing the order/payment page resets the allocation offset; SDK and data-hook
 cache keys include all filters. Presentation renders the pager and historical IDs
 without performing network calls or reconstructing business permissions.
+
+### Verified account email changes
+
+`auth/email-change.ts` requires a current verified local session and recent password proof both when requesting and confirming a new address. The confirmation token binds the stable user ID, original email, credential epoch and target email; it lasts at most 30 minutes and travels only in an encrypted outbox payload and URL fragment. A successful transaction changes the email, increments the epoch, consumes the token, revokes all prior sessions and outstanding identity tokens, and writes audit records. A duplicate/occupied address never merges accounts. Existing orders, submissions, roles and immutable author snapshots remain keyed to their original IDs.
+
+`verified_email_history` is append-only for the application's current verified address. Its owner-scoped RLS and boolean-only `submission_author_conflicts` projection retain prior verified aliases solely to deny review/judging conflicts. They never link coauthors to an account or authorize manuscript access. Reviews use the shared conflict query for actions and candidates; competition assignment and the persisted judging eligibility view use the same projection. Source email/epoch checks suppress obsolete email-change notifications. Mailpit remains the development transport; provider acceptance is not proof of delivery.
+
+The `/auth/email-change` presentation receives hook state/callbacks; the hook uses the shared auth SDK, reauthenticates explicitly and removes the fragment from browser history. Confirmation requires the original account to remain logged in; after success every old session is invalid and the user signs in with the new email. Migration 0040 backfills already verified addresses and preserves existing token fields; no dependency or environment variable is added.

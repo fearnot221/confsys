@@ -1,3 +1,4 @@
+import { isRevisionAuthorAccount } from "../auth/conflicts.js";
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import type { ApiConfig } from "@confsys/config";
@@ -32,12 +33,9 @@ import * as repo from "./repository.js";
 import { validateReviewScores } from "./policy.js";
 type Actor = { id: string; email: string };
 async function noConflict(db: PoolClient, paper: repo.PaperRow, actor: Actor) {
-  const document = repo.paperDocument(paper);
   if (
     paper.owner_id === actor.id ||
-    document.authors.some(
-      (a) => a.email.trim().toLowerCase() === actor.email,
-    ) ||
+    (await isRevisionAuthorAccount(db,paper.id,actor.id)) ||
     (await repo.hasConflict(db, paper.submission_id, actor.id))
   )
     throw new AuthError("FORBIDDEN");

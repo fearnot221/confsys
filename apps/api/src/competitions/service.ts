@@ -1,3 +1,4 @@
+import { isRevisionAuthorAccount } from "../auth/conflicts.js";
 import type { Pool, PoolClient } from "pg";
 import type { ApiConfig } from "@confsys/config";
 import { withIdentityTransaction } from "@confsys/db";
@@ -212,14 +213,12 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
         const e = await repo.entry(db, d.entryId, true),
           c = await repo.competition(db, e.competitionId, true);
         if (e.state !== "approved") throw new AuthError("CONFLICT");
-        const r = await eligible(db, e.revisionId, c.value.config),
-          email = await repo.actorEmail(db, d.judgeId);
+        const r = await eligible(db, e.revisionId, c.value.config);
+        await repo.actorEmail(db,d.judgeId);
         requirePermission(await rolesFor(db, d.judgeId), "competitions.score");
         if (
           r.ownerId === d.judgeId ||
-          r.document.authors.some(
-            (a) => a.email.trim().toLowerCase() === email,
-          ) ||
+          (await isRevisionAuthorAccount(db,e.revisionId,d.judgeId)) ||
           (await repo.hasConflict(db, e.id, d.judgeId))
         )
           throw new AuthError("FORBIDDEN");

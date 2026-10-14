@@ -993,4 +993,12 @@ it('auxiliary review metadata is denied without actor context and manager reads 
   await context(db,admin.id,true);
   expect((await db.query('SELECT id FROM confsys.review_forms WHERE id=$1',[form.id])).rowCount).toBe(1);
  });
+it('changing a verified coauthor email cannot evade reviewer assignment or manager candidate conflicts',async()=>{
+ const alias=await account(['reviewer','conference_admin']);
+ const paper=await submitted({authors:[...document().authors,{name:'Historical coauthor',email:alias.email,affiliation:'Synthetic'}]});
+ const target=f.email();await auth.requestEmailChange(alias.raw,target,rid());
+ await auth.confirmEmailChange(alias.raw,{token:(await f.link(alias.email,'email_change')).token},rid());
+ const fresh=await auth.login(target,password,rid());
+ await expect(assigned(paper,{id:alias.id,email:target,raw:fresh.raw})).rejects.toMatchObject({code:'FORBIDDEN'});
+ expect((await reviews.board(fresh.raw,{})).papers.some(row=>row.submissionId===paper.id)).toBe(false);
 });

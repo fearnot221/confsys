@@ -160,6 +160,8 @@ export async function processNotification(
           : `[${row.conference_name ?? config.CONFERENCE_NAME}] ` +
             (row.kind === "verify"
               ? "確認信箱 / Verify email"
+              : row.kind === "email_change"
+                ? "確認新信箱 / Confirm new email"
               : row.kind === "reset"
                 ? "重設密碼 / Reset password"
                 : row.kind === "role_invitation"
