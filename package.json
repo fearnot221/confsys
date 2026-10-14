@@ -30,7 +30,9 @@
     "db:migrate:test": "node --env-file=${CONFSYS_ENV_FILE:-.env} --conditions=development --import tsx scripts/migrate-test.ts",
     "smoke:auth": "node --conditions=development --env-file=${CONFSYS_ENV_FILE:-.env} --import tsx scripts/smoke-auth.ts",
     "compose": "node --conditions=development --import tsx scripts/compose.mjs",
-    "test:instances": "node --conditions=development --import tsx scripts/test-instances.ts"
+    "test:instances": "node --conditions=development --import tsx scripts/test-instances.ts",
+    "admin:bootstrap": "node --conditions=development --env-file=${CONFSYS_ENV_FILE:-.env} --import tsx scripts/bootstrap-admin.ts",
+    "test:access": "node --env-file=${CONFSYS_ENV_FILE:-.env} node_modules/vitest/vitest.mjs run tests/integration/access.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
