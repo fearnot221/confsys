@@ -101,3 +101,5 @@ export async function renderBadges(badges: readonly BadgeSnapshot[]) {
   }
   return Buffer.from(await document.save());
 }
+
+export {passToken,passHash} from "./token.js";

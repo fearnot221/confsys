@@ -57,3 +57,5 @@ export { createProgramClient } from "./program.js";
 export {createActivitiesClient} from './activities.js';
 
 export {createOnsiteClient} from "./onsite.js";
+
+export {createDocumentJobsClient} from "./document-jobs.js";
