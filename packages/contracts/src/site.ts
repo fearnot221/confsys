@@ -2,7 +2,17 @@ import { z } from "zod";
 export const siteLocales = ["zh-Hant", "en"] as const;
 export const sitePages = ["home", "about", "participation", "contact"] as const;
 export type SiteLocale = (typeof siteLocales)[number];
-export type SitePage = (typeof sitePages)[number];
+export const siteExtraPages = [
+  "committee",
+  "dates",
+  "news",
+  "speakers",
+  "travel",
+  "sponsors",
+  "faq",
+] as const;
+export const siteContentPages = [...sitePages, ...siteExtraPages] as const;
+export type SitePage = (typeof siteContentPages)[number];
 const text = (max: number) =>
   z
     .string()
@@ -21,7 +31,23 @@ export const siteLinkSchema = z.strictObject({
   url: z.string().max(1000),
 });
 export function safeSiteLink(value: string) {
-  if (/^\/(zh-Hant|en)\/(home|about|participation|contact)$/.test(value))
+  if (
+    /^\/(zh-Hant|en)\/(home|about|participation|contact|committee|dates|news|speakers|travel|sponsors|faq)$/.test(
+      value,
+    )
+  )
+    return true;
+  if (
+    [
+      "/registration",
+      "/submissions",
+      "/activities",
+      "/program",
+      "/competition-awards",
+      "/auth/login",
+      "/auth/register",
+    ].includes(value)
+  )
     return true;
   try {
     const u = new URL(value);
@@ -56,12 +82,21 @@ const translation = z.strictObject({
     about: page,
     participation: page,
     contact: page,
+    committee: page.optional(),
+    dates: page.optional(),
+    news: page.optional(),
+    speakers: page.optional(),
+    travel: page.optional(),
+    sponsors: page.optional(),
+    faq: page.optional(),
   }),
 });
 // Structural schemas remain JSON-schema representable; semantic validation is shared below.
 export const siteDocumentSchema = z.strictObject({
   schemaVersion: z.literal(1),
-  media: z.strictObject({logoId: z.uuid().nullable(), heroId: z.uuid().nullable()}).optional(),
+  media: z
+    .strictObject({ logoId: z.uuid().nullable(), heroId: z.uuid().nullable() })
+    .optional(),
   defaultLocale: z.enum(siteLocales),
   enabledLocales: z.array(z.enum(siteLocales)).min(1).max(2),
   startDate: z.string().max(10),
@@ -107,8 +142,9 @@ export function siteIssues(d: SiteDocument, publishing: boolean): string[] {
     const t = d.translations[locale];
     if (publishing && d.enabledLocales.includes(locale) && !t.name.trim())
       errors.push(`${locale}.name: 必填`);
-    for (const key of sitePages) {
+    for (const key of siteContentPages) {
       const p = t.pages[key];
+      if (!p) continue;
       if (
         publishing &&
         d.enabledLocales.includes(locale) &&
@@ -249,5 +285,16 @@ export function siteChangedFields(
 ) {
   return (Object.keys(after) as (keyof SiteDocument)[]).filter(
     (key) => JSON.stringify(before?.[key]) !== JSON.stringify(after[key]),
+  );
+}
+
+export function availableSitePages(
+  document: SiteDocument,
+  locale: SiteLocale,
+): SitePage[] {
+  return siteContentPages.filter(
+    (page) =>
+      document.translations[locale].pages[page] ||
+      document.translations[document.defaultLocale].pages[page],
   );
 }

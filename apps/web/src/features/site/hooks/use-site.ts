@@ -124,7 +124,7 @@ export function useSite() {
   useEffect(() => {
     const change = () => {
       const m =
-        /^#preview-(zh-Hant|en)-(home|about|participation|contact)$/.exec(
+        /^#preview-(zh-Hant|en)-(home|about|participation|contact|committee|dates|news|speakers|travel|sponsors|faq)$/.exec(
           window.location.hash,
         );
       if (m) {

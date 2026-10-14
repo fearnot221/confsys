@@ -1,3 +1,4 @@
+import { availableSitePages } from "@confsys/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { PublicSite, SiteLocale, SitePage } from "@confsys/contracts";
 import { PublicSiteContent } from "./features/site/components/public-site.js";
@@ -9,7 +10,9 @@ export function renderSite(
   origin: string,
 ) {
   const d = site.document,
-    p = d?.translations[locale].pages[page];
+    p =
+      d?.translations[locale].pages[page] ??
+      d?.translations[d.defaultLocale].pages[page];
   return (
     "<!doctype html>" +
     renderToStaticMarkup(
@@ -23,14 +26,16 @@ export function renderSite(
             content={p?.description || "網站準備中 / Website in preparation"}
           />
           <link rel="canonical" href={`${origin}/${locale}/${page}`} />
-          {d?.enabledLocales.map((lang) => (
-            <link
-              key={lang}
-              rel="alternate"
-              hrefLang={lang}
-              href={`${origin}/${lang}/${page}`}
-            />
-          ))}
+          {d?.enabledLocales
+            .filter((lang) => availableSitePages(d, lang).includes(page))
+            .map((lang) => (
+              <link
+                key={lang}
+                rel="alternate"
+                hrefLang={lang}
+                href={`${origin}/${lang}/${page}`}
+              />
+            ))}
           <link rel="stylesheet" href="/public-site.css" />
         </head>
         <body>

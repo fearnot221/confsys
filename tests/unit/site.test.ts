@@ -48,3 +48,34 @@ it("rejects script/data/protocol-relative/userinfo/backslash links without fetch
   expect(safeSiteLink("https://example.invalid/path?q=1&x=2")).toBe(true);
   expect(safeSiteLink("/en/about")).toBe(true);
 });
+it("supports optional conference pages without changing historical documents or allowing arbitrary paths", () => {
+  const d = completeSite();
+  expect(siteDocumentSchema.parse(d)).toEqual(d);
+  d.translations["zh-Hant"].pages.news = {
+    title: "消息",
+    description: "會議消息",
+    body: "<script>plain text</script>",
+    bullets: [],
+    links: [{ label: "報名", url: "/registration" }],
+  };
+  expect(siteIssues(d, true)).toEqual([]);
+  expect(safeSiteLink("/en/news")).toBe(true);
+  expect(safeSiteLink("/admin/site")).toBe(false);
+  expect(safeSiteLink("/registration?redirect=//evil.invalid")).toBe(false);
+  d.translations["zh-Hant"].pages.news.title = "";
+  expect(siteIssues(d, true)).toContain(
+    "zh-Hant.news: title 與 description 必填",
+  );
+  expect(
+    siteDocumentSchema.safeParse({
+      ...d,
+      translations: {
+        ...d.translations,
+        en: {
+          ...d.translations.en,
+          pages: { ...d.translations.en.pages, arbitrary: {} },
+        },
+      },
+    }).success,
+  ).toBe(false);
+});

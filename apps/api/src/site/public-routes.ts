@@ -3,6 +3,8 @@ import type { ApiConfig } from "@confsys/config";
 import {
   siteLocales,
   sitePages,
+  siteContentPages,
+  availableSitePages,
   type PublicSite,
   type SiteLocale,
   type SitePage,
@@ -53,10 +55,16 @@ export async function registerPublicRoutes(
   app.get("/:locale/:page", async (req, reply) => {
     const { locale, page } = req.params as { locale: string; page: string };
     const lang = siteLocales.find((v) => v === locale),
-      key = sitePages.find((v) => v === page);
+      key = siteContentPages.find((v) => v === page);
     if (!lang || !key) throw new AuthError("NOT_FOUND");
     const s = await site.public();
     if (s.document && !s.document.enabledLocales.includes(lang))
+      throw new AuthError("NOT_FOUND");
+    if (
+      s.document
+        ? !availableSitePages(s.document, lang).includes(key)
+        : !sitePages.some((page) => page === key)
+    )
       throw new AuthError("NOT_FOUND");
     return reply
       .type("text/html; charset=utf-8")
@@ -66,7 +74,7 @@ export async function registerPublicRoutes(
     const s = await site.public();
     const urls = s.document
       ? s.document.enabledLocales.flatMap((lang) =>
-          sitePages.map(
+          availableSitePages(s.document!, lang).map(
             (page) => `${config.PUBLIC_APP_ORIGIN}/${lang}/${page}`,
           ),
         )

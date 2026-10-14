@@ -549,3 +549,28 @@ it("disabled translations stay private; enabled missing optional text falls back
   expect(html).toContain('lang="zh-Hant">公開導言');
   expect(html).toContain('hrefLang="zh-Hant"');
 });
+it("optional pages publish atomically, disappear only after next publication, and follow default-language fallback", async () => {
+ const current=await site.draft(leader.raw);
+ const doc=structuredClone(current.document);
+ doc.translations['zh-Hant'].pages.news={title:'大會公告',description:'合成公告測試',body:'<script>alert(1)</script>',bullets:[],links:[{label:'報名入口',url:'/registration'}]};
+ await site.save(leader.raw,{expectedVersion:current.draftVersion,document:doc},rid());
+ const up=async()=>{};
+ const server=buildApp({postgres:up,redis:up,worker:up});
+ const {renderSite}=await import('../../apps/web/src/entry-server.js');
+ await registerPublicRoutes(server,f.config,site,renderSite);
+ const headers={host:new URL(f.config.PUBLIC_APP_ORIGIN).host};
+ try {
+  expect((await server.inject({url:'/zh-Hant/news',headers})).statusCode).toBe(404);
+  await site.publish(leader.raw,{expectedVersion:current.draftVersion+1},rid());
+  const result=await server.inject({url:'/en/news',headers});
+  expect(result.statusCode).toBe(200);
+  expect(result.body).toContain('&lt;script&gt;');
+  expect(result.body).not.toContain('<script>alert');
+  expect((await server.inject({url:'/sitemap.xml',headers})).body).toContain('/en/news');
+  delete doc.translations['zh-Hant'].pages.news;
+  await site.save(leader.raw,{expectedVersion:current.draftVersion+1,document:doc},rid());
+  expect((await server.inject({url:'/zh-Hant/news',headers})).statusCode).toBe(200);
+  await site.publish(leader.raw,{expectedVersion:current.draftVersion+2},rid());
+  expect((await server.inject({url:'/zh-Hant/news',headers})).statusCode).toBe(404);
+ } finally {await server.close();}
+});
