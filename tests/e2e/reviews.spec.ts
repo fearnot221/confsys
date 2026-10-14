@@ -226,10 +226,10 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
     const chairPage = await chairContext.newPage();
     await login(chairPage, chairEmail);
     await chairPage.goto("/reviews");
-    await chairPage
-      .getByText(paper.document.title, { exact: false })
-      .first()
-      .waitFor();
+    // The title also exists in a hidden <option>; assert the visible review summary.
+    await expect(
+      chairPage.locator("summary").filter({ hasText: paper.document.title }),
+    ).toBeVisible();
     await chairPage
       .getByRole("combobox", { name: "正式投稿", exact: true })
       .selectOption(paper.id);
