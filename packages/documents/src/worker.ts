@@ -19,7 +19,7 @@ async function authorized(db:PoolClient,id:string) {
 export async function recoverDocumentJobs(pool:Pool) {
  await pool.query("UPDATE confsys.document_jobs SET status=CASE WHEN attempts>=3 THEN 'failed' ELSE 'pending' END,result_code='LEASE_EXPIRED',claim_id=NULL,lease_until=NULL WHERE status='processing' AND lease_until<now()");
 }
-export async function processDocumentJob(pool:Pool,config:Pick<WorkerConfig,"QR_SIGNING_KEY">,id:string) {
+export async function processDocumentJob(pool:Pool,config:Pick<WorkerConfig,"QR_SIGNING_KEY">,id:string,render:typeof renderBadges=renderBadges) {
  const claim=await withIdentityTransaction(pool,async db=>{
   if(!await authorized(db,id)){await db.query("UPDATE confsys.document_jobs SET status='cancelled',result_code='INELIGIBLE',completed_at=now() WHERE id=$1 AND status='pending'",[id]);return null;}
   return(await db.query<Claim>("UPDATE confsys.document_jobs SET status='processing',claim_id=$2,lease_until=now()+interval '120 seconds',attempts=attempts+1,result_code=NULL WHERE id=$1 AND status='pending' AND attempts<3 RETURNING id,snapshot,claim_id,attempts",[id,randomUUID()])).rows[0]??null;
@@ -28,7 +28,7 @@ export async function processDocumentJob(pool:Pool,config:Pick<WorkerConfig,"QR_
  try {
   const snapshot=badgeJobSnapshot.parse(claim.snapshot),badges=[];
   for(const badge of snapshot.badges){const token=passToken(badge.tokenId,config.QR_SIGNING_KEY);if(passHash(token)!==badge.tokenHash)throw new Error("KEY_ROTATED");badges.push({conferenceName:snapshot.conferenceName,name:badge.name,affiliation:badge.affiliation,registrationNumber:badge.registrationNumber,qrPng:await QRCode.toBuffer(token,{type:"png",width:320,margin:4,errorCorrectionLevel:"M"})});}
-  const pdf=await renderBadges(badges);if(pdf.byteLength>16_777_216)throw new Error("OUTPUT_TOO_LARGE");
+  const pdf=await render(badges);if(pdf.byteLength>16_777_216)throw new Error("OUTPUT_TOO_LARGE");
   await withIdentityTransaction(pool,async db=>{
    const allowed=await authorized(db,id);
    const changed=await db.query("UPDATE confsys.document_jobs SET status=$3,result_code=$4,pdf=$5,sha256=$6,completed_at=now(),lease_until=NULL WHERE id=$1 AND claim_id=$2 AND status='processing'",[id,claim.claim_id,allowed?"ready":"cancelled",allowed?null:"INELIGIBLE",allowed?pdf:null,allowed?createHash("sha256").update(pdf).digest("hex"):null]);

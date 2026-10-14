@@ -1,3 +1,4 @@
+import {renderBadges} from "../../packages/documents/src/index.js";
 import {createDocumentJobsService} from "../../apps/api/src/document-jobs/service.js";
 import {startDocumentWorker,processDocumentJob,recoverDocumentJobs} from "../../packages/documents/src/worker.js";
 import {writeFile,mkdir} from "node:fs/promises";
@@ -68,6 +69,11 @@ it("real Redis worker builds private CJK/QR batch; idempotency and token rotatio
  const rotated=await service.pass(owner.raw,{registrationId,rotate:true},rid());token=rotated.token;await expect(jobs.download(staff.raw,job.id,rid())).rejects.toMatchObject({code:"CONFLICT"});
  const retry=await jobs.create(staff.raw,{registrationIds:[registrationId],idempotencyKey:rid()},rid());
  await f.admin.query("UPDATE confsys.document_jobs SET status='processing',attempts=1,claim_id=$2,lease_until=now()-interval '1 second' WHERE id=$1",[retry.id,rid()]);await recoverDocumentJobs(f.worker);expect((await jobs.list(staff.raw,0)).items.find(j=>j.id===retry.id)?.status).toBe("pending");await processDocumentJob(f.worker,f.workerConfig,retry.id);expect((await jobs.list(staff.raw,0)).items.find(j=>j.id===retry.id)?.status).toBe("ready");
+ const midRender=(await jobs.create(staff.raw,{registrationIds:[registrationId],idempotencyKey:rid()},rid())).id;
+ await processDocumentJob(f.worker,f.workerConfig,midRender,async badges=>{await access.mutate(admin.raw,staff.id,{action:"revoke",role:"onsite",reason:"Synthetic mid-render revoke"},rid());return renderBadges(badges);});
+ expect((await f.admin.query("SELECT status,pdf FROM confsys.document_jobs WHERE id=$1",[midRender])).rows[0]).toEqual({status:"cancelled",pdf:null});
+ await access.mutate(admin.raw,staff.id,{action:"grant",role:"onsite",reason:"Synthetic restore onsite"},rid());staff.raw=(await auth.login(staff.email,password,rid())).raw;
+ await expect(jobs.download(staff.raw,retry.id,rid())).rejects.toMatchObject({code:"CONFLICT"});
  pendingBadgeJob=(await jobs.create(staff.raw,{registrationIds:[registrationId],idempotencyKey:rid()},rid())).id;
  expect((await f.app.query("SELECT * FROM confsys.document_jobs")).rowCount).toBe(0);
 });
