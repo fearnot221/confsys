@@ -5,7 +5,7 @@ import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { mkdtemp, copyFile, rm, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPool, assertRuntimeRole } from "@confsys/db";
+import { createPool, assertRuntimeRole, databaseReady } from "@confsys/db";
 import { runMigrations } from "../../packages/db/src/migrations.js";
 import { hashPassword } from "../../apps/api/src/auth/password.js";
 import {
@@ -209,6 +209,7 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
         const runtime = createPool(runtimeUrl.href);
         try {
           await assertRuntimeRole(runtime, "confsys_app");
+          await databaseReady(runtime, "confsys_app");
           expect(
             (await runtime.query("SELECT count(*) FROM confsys.users")).rows[0]
               .count,

@@ -1,3 +1,5 @@
+import { createPresenterChangesService } from "./presenter-changes/service.js";
+import { registerPresenterChangesRoutes } from "./presenter-changes/routes.js";
 import {assertPrivateStorage} from "./files/storage.js";
 import { createBadgeTemplateService } from "./badge-template/service.js";
 import { registerBadgeTemplateRoutes } from "./badge-template/routes.js";
@@ -103,6 +105,7 @@ registerSubmissionRoutes(
   config,
   createSubmissionService(pool, config, submissionDependencies),
 );
+registerPresenterChangesRoutes(app, config, createPresenterChangesService(pool, config, submissionDependencies));
 registerFinanceRoutes(
   app,
   config,

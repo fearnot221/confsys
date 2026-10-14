@@ -1,3 +1,4 @@
+import { presenterChangeEndpoints } from "./presenter-change.js";
 import {downloadPaths} from "./download-paths.js";
 import {badgeTemplateEndpoints} from "./badge-template.js";
 export * from "./badge-template.js";
@@ -89,6 +90,7 @@ export function openApiDocument() {
       ...modulePaths(invitationEndpoints),
       ...modulePaths(fileEndpoints),
       ...modulePaths(submissionEndpoints),
+      ...modulePaths(presenterChangeEndpoints),
       ...modulePaths(registrationEndpoints),
       ...modulePaths(reviewEndpoints),
       ...modulePaths(financeEndpoints),

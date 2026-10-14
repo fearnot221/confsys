@@ -6,7 +6,7 @@ Baseline: 9642a62, verified descendant of d4c0788. Branch: codex/phase-1-4-to-6-
 ## Plan and ownership
 Main: private files/media then registration/finance and dependent workflow; owns migrations/contracts/permissions/lockfile. Separate invitation agent owns invitation-specific source/tests, proposing central changes for main review. Existing stack and access fences retained. No provider credentials required: local storage and Mailpit only.
 
-## Current scope status — 07:44 Taipei
+## Current scope status — 07:54 Taipei
 
 All rows describe implemented source plus actual verification; none imply production readiness or completion of every SPEC requirement.
 
@@ -93,3 +93,11 @@ The entries below are chronological evidence; the current state is summarized ab
 - Latest browser run23 cases:22 passed, badge size label failed; fixed explicit label/id and pending rerun. No assertion weakened. Main full integration142/142 passed07:31 before mailbox/release changes. New scoped run43 pass, review suite parse failure from cherry-pick conflict repair fixed; focused review rerun underway.
 - Mailbox agent27 scoped PG tests passed (email6,HTTP1,competitions11,reviews9), recent proof/session revocation/alias conflicts/race covered. Main wiring+contract+40 migration integrated; main typecheck passed after fixing test merge syntax. Notification agent12 PG+2 unit passed with45; worker permission fence and released_at prevents scheduled inbox disclosure before authorized preflight.
 - Next: current-source lint/contract/build/browser; presenter approval44 and competition successor46 with immutable history; Phase6 reporting gaps; complete regression after integration.
+
+## 07:54 checkpoint
+- New mailbox browser flow passed after handling same-document hash navigation; no token persisted to browser storage. Badge template and retry flows passed, notification audience/template/schedule flow passed after explicit textarea labels. Main `pnpm build && pnpm test:e2e tests/e2e/email-change.spec.ts tests/e2e/notification-batches.spec.ts`:2/2 passed07:48.
+- `node --env-file=.env node_modules/vitest/vitest.mjs run tests/integration/business-mail.test.ts tests/integration/notification-batches.test.ts`:15/15 passed07:47, including real mailbox-confirmation race before worker preflight and Mailpit delivery only to the new address.
+- Main latest unit63/63 and contract16/16 passed; lint/typecheck passed before latest central readiness change. Presenter44 agent5/5, competition successor46 agent11/11, purpose47/reporting12/12 +new48stats1/1 passed. Raw competition private table49 scoped12/12 passed in agent; source integration pending. New browser presenter/export changes await main full regression.
+- Main central44/46/47/48 schemas, presenterAPI/UI/routes/contracts and purpose/stats source integrated. Readiness now tracks latest required migration, with a guard test preventing new schema additions from silently leaving startup checks behind.
+- Completed synthetic30cec03e A/B anded58cf47restore containers stopped after detected Docker memory pressure (B API/workerOOM07:48); volumes/artifacts retained. Original containers unchanged. Native scanner and main synthetic PG/Redis/Mailpit remain available.
+- Next actual work:49source integration thenfullcheck; single participant service lifecycle test across business modules; enrich next two-instance rehearsal with real PDF/CSV/QR/pending encrypted mail before restore. No Phase6-complete claim.

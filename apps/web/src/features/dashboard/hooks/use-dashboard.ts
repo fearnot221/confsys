@@ -100,6 +100,7 @@ const managementLinks: readonly {
     title: "批次名牌文件",
     href: "/admin/documents",
   },
+  {permission: "submissions.manage", title: "報告者變更審批", href: "/admin/presenter-changes"},
   {permission: "documents.template.manage", title: "名牌模板", href: "/admin/badge-template"},
   {
     permission: "reporting.read",
@@ -273,6 +274,7 @@ export function useDashboard(): DashboardView {
     { title: "報名與名牌 QR", href: "/registration" },
     { title: "付款與團體授權", href: "/finance" },
     { title: "投稿與修訂", href: "/submissions" },
+    { title: "報告者變更與邀請", href: "/presenter-changes" },
     { title: "餐飲活動預訂", href: "/activities" },
     { title: "我的私有檔案", href: "/account/files" },
     { title: "參加競賽", href: "/competitions" },

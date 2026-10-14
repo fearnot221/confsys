@@ -54,7 +54,9 @@ Each deployment fixes its own database/Redis connections at startup. Host/header
 
 The unused Phase 0 `withTenant` helper and tenant fixture were retired in 1.1b. `withIdentityTransaction` still owns one pooled connection and commit/rollback; failed rollback destroys it. Actual-role grant, rollback, pool-reuse and constraint tests remain. Resource authorization and suitable resource-level RLS belong to future local business modules; no production RLS policy was disabled.
 
-## Later business modules; not implemented
+## Historical Phase 1.1 baseline for later business modules
+
+The following three paragraphs describe the earlier baseline only. Current business implementations and private storage are described in ADR0006 and CONTINUOUS_RUN.
 
 Phase 1.1 implements identity/session and its minimal audit/outbox. Phase 1.2 adds local account access control below. Later units introduce resource permissions, settings versions and private file metadata. Domain services/policies will be shared with worker; controllers only validate/map requests. No empty domain package was created because there are no business state machines yet.
 

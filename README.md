@@ -49,11 +49,11 @@ pnpm infra:down
 
 | 流程 | 入口 |
 |---|---|
-| 官網、帳號 | `/`、`/auth/account`；管理 `/admin/site`、`/access/accounts`、`/admin/invitations` |
+| 官網、帳號 | `/`、`/auth/account`、`/auth/email-change`；管理 `/admin/site`、`/access/accounts`、`/admin/invitations` |
 | 報名、表單、候補、異動 | `/registration`、`/admin/registration` |
 | 人工付款、團體分配、退款紀錄 | `/finance`、`/admin/finance`（財務角色） |
 | 餐飲與活動 | `/activities`、`/admin/activities` |
-| 投稿與版本、私有附件 | `/submissions`、`/admin/submissions`、`/account/files` |
+| 投稿與版本、私有附件 | `/submissions`、`/admin/submissions`、`/account/files`、`/presenter-changes`、`/admin/presenter-changes` |
 | 初檢、審查、決議與已發布結果 | `/reviews`（依角色／分組／指派顯示） |
 | 議程與競賽 | `/program`、`/admin/program`、`/competitions`、`/admin/competitions`、`/judging`、`/competition-awards` |
 | 報到、核銷、名牌 | 報名紀錄內的 QR 入口、`/admin/onsite`、`/admin/documents`、`/admin/badge-template` |
@@ -87,7 +87,7 @@ CONFSYS_ENV_FILE=/absolute/path/instance.env pnpm admin:bootstrap --user-id <loc
 
 使用實際 env 路徑、UUID 與該實例 origin。成功後重新登入 → 帳號管理 → 搜尋已驗證的本地帳號 → 確認角色／狀態、理由與 Session 失效效果 → 執行。只有 conference_admin 可寫與讀稽核；conference_staff 只能查目錄。高風險操作要求五分鐘內密碼驗證；不可改自己的角色／停用自己，不能失去最後管理員。bootstrap 永不自動重開。完整矩陣見 PERMISSIONS，鎖與升級限制見 ADR 0004，維運步驟見 OPERATIONS。
 
-`pnpm test:access` 是可重跑的真 PostgreSQL／Redis／CLI 存取控制驗證入口，限定此輪合成 `confsys_test`。`pnpm check` 包含它所用的整合案例與完整 UI E2E。沒有新增依賴／環境變數；Phase 1.2 使用 migration 0004，現行啟動亦需 0005。MFA 尚未實作，本地測試不代表高權限 production ready。
+`pnpm test:access` 是可重跑的真 PostgreSQL／Redis／CLI 存取控制驗證入口，限定此輪合成 `confsys_test`。`pnpm check` 包含它所用的整合案例與完整 UI E2E。Phase 1.2 使用 migration 0004；目前啟動必須先套用本版本全部 migrations，readiness 會檢查目前必要版本。後續依賴與環境變數見 ADR0006、`.env.example` 及 DATA_CONTRACT。MFA 尚未實作，本地測試不代表高權限 production ready。
 
 ## 會議設定與基本官網
 

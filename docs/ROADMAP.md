@@ -114,3 +114,11 @@ Core domain/service/repository, SDK/hook/presentation boundaries remain. Initial
 | Native form accessibility fixes cover labels, status/required guidance and expanded sections only | No complete WCAG or cross-browser assurance | Maintain semantic E2E assertions and reserve a full assistive-technology/browser audit for presentation hardening. |
 
 Post-acceptance registration follow-up (07:25): the previously listed missing dated policy now has an implementation pinned to immutable submission revisions, plus explicit author/admin status, reversible eligibility gates and manual deduplicated notices. Static checks pass; real PostgreSQL/browser regressions remain pending at this checkpoint. Automatic scheduled deadline notices, a permanent registration-cutoff exception process and a separate presenter-change approval workflow remain unfinished; none is implied by the manual gate.
+
+## Continuous follow-up — 2026-10-15 07:53
+
+The dated07:12/07:25 gaps above remain historical evidence, not current absence claims. Pinned post-acceptance registration policy/status passed real PG and author browser tests. Presenter consent/approval44 and explicit competition successor46 now have real PG coverage; browser integration remains pending. Notification templates/audience/scheduling with authorized worker inbox release passed PG12 and browser flow. Reminders remain explicit administrative actions; automatic due-date detection and immutable deadline extension workflows are still unimplemented.
+
+Evidenced safety fixes this run include program private draft RLS42, auxiliary review/conflict RLS43, terminal receipt guard39, verified email alias conflict fences40 and scheduled inbox release45. Competition base tables still expose award drafts to direct app-role SELECT despite service checks: focused49 safe-projection/RLS work is in progress and must be verified before closing that blocker.
+
+Docker Desktop resource pressure killed this run's B API/worker at07:48 after the successful07:41 two-instance rehearsal. Completed synthetic A/B and restore containers were stopped, volumes retained; original containers were not changed. Continuous availability under host pressure is unverified. Acceptance before deployment: isolate resource budgets and validate representative concurrency/recovery; do not infer load capacity from functional checks.
