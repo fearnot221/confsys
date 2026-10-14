@@ -108,3 +108,17 @@ No arbitrary PATCH, deployment setting assignment or history deletion. `CONFLICT
 Invitations bind recipient UUID/email and both issuer/recipient credential epochs. Tokens are random 256-bit values, hashed in `role_invitations`, encrypted only while pending delivery, and carried in a browser fragment. They expire after 72 hours. Acceptance requires the matching authenticated local account and fresh password proof. The same access-control lock serializes invitation acceptance against role changes; issuer authority and both epochs are rechecked. Acceptance, role grant, audit and session invalidation commit atomically. Password reset, role/session revocation or disable/restore makes earlier invitations unusable; the administrative list renders these as revoked. A successfully accepted invitation cannot be replayed.
 
 The additive migration grants runtime updates only for acceptance/revocation timestamps. The worker cannot read invitations directly. Its eligibility view exposes only unfinished eligible recipient deliveries. Mailpit SMTP acceptance is recorded as accepted, never claimed as human receipt. Provider uncertainty remains unknown and is not blindly retried. No environment variables or dependencies are added.
+## 投稿與不可變修訂（Phase 3）
+
+`apps/api/src/submissions/routes.ts` 僅處理 HTTP/CSRF/contract validation；`service.ts` 驗證真實 session、permission、owner 與交易；`policy.ts` 管理投稿窗口及提交完整性；`repository.ts` 管理參數化 SQL、RLS context 與版本。`dependencies.ts` 在同一交易查本地報名與 ready/owned manuscript files；不接受前端傳入 owner、registration id 或角色。
+
+- 作者入口 `/submissions`；行政唯讀稿件與投稿設定入口 `/admin/submissions`。SDK `createSubmissionClient` 與 `useSubmissions` 負責網路／server state；呈現元件只接 props/callbacks。
+- `GET /api/submissions/config` 回傳已登入者可見的投稿窗口、track/topic 與必要條件；`POST` 僅 `submissions.manage`。UTC ISO 時刻為權威，開放起點含、截止點不含；未設定窗口即關閉。
+- `GET /api/submissions?scope=own|admin&offset=0` 每頁 20；admin 要求 `submissions.read_all`，不因此取得編輯他人稿件權。
+- `GET /api/submissions/detail?id=...&scope=own|admin&revisionOffset=0` 回傳稿件與每頁 20 筆歷史，`nextRevisionOffset` 提供下一頁。作者只能存取自己的 primary ownership，表單內共同作者的 Email 不會自動綁定帳號。
+- `POST /api/submissions/save` 使用客戶端 UUID 與 `expectedVersion`；空草稿為 0。競爭保存回傳 conflict。已提交稿件可在窗口內保存新草稿，但 `currentRevisionId`／`submittedVersion` 仍指向上次正式提交。
+- `POST /api/submissions/transition` 明確 `submit|withdraw`。提交保存不可變文件及投稿設定快照、附件引用、稽核與 business outbox；同一版本重送不重複建 revision／通知。撤稿與審查結果分離，草稿不表示拒稿。
+- 私有附件使用真檔案 SDK；未通過檢查不得加入或正式提交。附件與簡報都是 manuscript purpose，原檔名、storage key 不進公開 API。此工作台不提供公開稿件端點。
+- RLS 使用 transaction-local `app.actor_id`／`app.submissions_admin`；missing context 無資料。Runtime 無 UPDATE/DELETE revision 權限。權限 shared fence → actor → config → manuscript 鎖順序；外部檔案掃描不在投稿交易內執行。
+
+`tests/unit/submissions.test.ts` 覆蓋窗口邊界與完整性；`tests/integration/submissions.test.ts` 使用實際非特權 PostgreSQL role 驗證 owner/admin、並發保存、重送、immutable history、outbox 回滾、RLS context 與附件引用。附件 fixture 測試 ready 狀態與所有權，並不宣稱掃描器已驗證；掃描由 files suite 負責。

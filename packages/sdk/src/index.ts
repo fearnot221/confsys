@@ -46,3 +46,5 @@ export { createAuthClient } from "./auth.js";
 export { createInvitationClient } from "./invitations.js";
 export { createRegistrationClient } from './registration.js';
 export { createFilesClient } from "./files.js";
+
+export { createSubmissionClient } from "./submissions.js";

@@ -1,0 +1,383 @@
+import { beforeAll, beforeEach, afterAll, it, expect } from "vitest";
+import { randomUUID } from "node:crypto";
+import { authFixture, password } from "../helpers/auth.js";
+import { createAuthService } from "../../apps/api/src/auth/service.js";
+import { createAccessService } from "../../apps/api/src/access/service.js";
+import { bootstrapAdministrator } from "../../apps/api/src/access/bootstrap.js";
+import { createSubmissionService } from "../../apps/api/src/submissions/service.js";
+import { submissionDependencies } from "../../apps/api/src/submissions/dependencies.js";
+import { withIdentityTransaction } from "@confsys/db";
+import { type SubmissionDocument } from "@confsys/contracts";
+const f = authFixture(),
+  auth = createAuthService(f.app, f.config),
+  access = createAccessService(f.app, f.config),
+  service = createSubmissionService(f.app, f.config, submissionDependencies),
+  rid = () => randomUUID();
+async function account() {
+  const email = f.email();
+  await auth.requestMail("register", email, rid());
+  await auth.consume("verify", (await f.link(email)).token, password, rid());
+  const login = await auth.login(email, password, rid());
+  return { id: login.account.user.id, email, raw: login.raw };
+}
+let leader: Awaited<ReturnType<typeof account>>,
+  author: Awaited<ReturnType<typeof account>>,
+  stranger: Awaited<ReturnType<typeof account>>,
+  staff: Awaited<ReturnType<typeof account>>,
+  baseline: Record<string, unknown>;
+const doc = (): SubmissionDocument => ({
+  title: "Synthetic title",
+  abstract: "Synthetic abstract",
+  trackId: "science",
+  topicIds: ["physics"],
+  authors: [
+    {
+      name: "Synthetic author",
+      email: "unregistered@example.invalid",
+      affiliation: "Synthetic institute",
+    },
+  ],
+  presenterIndex: 0,
+  presentationPreference: "either",
+  competition: true,
+  attachmentIds: [],
+  slidesFileId: null,
+  videoUrl: "https://example.invalid/video",
+});
+async function configure(patch: object = {}) {
+  const config = await service.config(leader.raw);
+  return service.configure(leader.raw, { ...config, ...patch }, rid());
+}
+async function draft(document = doc()) {
+  return service.save(
+    author.raw,
+    { id: rid(), expectedVersion: 0, document },
+    rid(),
+  );
+}
+beforeAll(async () => {
+  f.migrate();
+  baseline = (await f.admin.query("SELECT * FROM confsys.submission_config"))
+    .rows[0];
+  leader = await account();
+  await bootstrapAdministrator(
+    f.admin,
+    {
+      conferenceName: f.config.CONFERENCE_NAME,
+      origin: f.config.PUBLIC_APP_ORIGIN,
+    },
+    {
+      targetId: leader.id,
+      apply: true,
+      reason: "Synthetic submissions",
+      confirmOrigin: f.config.PUBLIC_APP_ORIGIN,
+    },
+    rid(),
+  );
+  leader.raw = (await auth.login(leader.email, password, rid())).raw;
+  author = await account();
+  stranger = await account();
+  staff = await account();
+  await access.mutate(
+    leader.raw,
+    staff.id,
+    { action: "grant", role: "conference_staff", reason: "Synthetic staff" },
+    rid(),
+  );
+  staff.raw = (await auth.login(staff.email, password, rid())).raw;
+  await configure({
+    opensAt: new Date(Date.now() - 60000).toISOString(),
+    closesAt: new Date(Date.now() + 3600000).toISOString(),
+    tracks: [
+      {
+        id: "science",
+        name: "Science",
+        topics: [{ id: "physics", name: "Physics" }],
+      },
+    ],
+  });
+});
+beforeEach(async () => {
+  await configure({
+    requireRegistration: false,
+    requireAttachment: false,
+    opensAt: new Date(Date.now() - 60000).toISOString(),
+    closesAt: new Date(Date.now() + 3600000).toISOString(),
+  });
+});
+afterAll(async () => {
+  if (baseline)
+    await f.admin.query(
+      "UPDATE confsys.submission_config SET version=$1,document=$2",
+      [baseline.version, baseline.document],
+    );
+  const ids = [leader?.id, author?.id, stranger?.id, staff?.id].filter(Boolean);
+  await f.admin.query(
+    "DELETE FROM confsys.file_references WHERE file_id IN(SELECT id FROM confsys.file_assets WHERE owner_id=ANY($1::uuid[]))",
+    [ids],
+  );
+  await f.admin.query(
+    "UPDATE confsys.submissions SET current_revision_id=null,submitted_version=null,state='draft' WHERE owner_id=ANY($1::uuid[])",
+    [ids],
+  );
+  await f.admin.query(
+    "DELETE FROM confsys.submission_revisions WHERE owner_id=ANY($1::uuid[])",
+    [ids],
+  );
+  await f.admin.query(
+    "DELETE FROM confsys.submissions WHERE owner_id=ANY($1::uuid[])",
+    [ids],
+  );
+  await f.admin.query(
+    "DELETE FROM confsys.file_assets WHERE owner_id=ANY($1::uuid[])",
+    [ids],
+  );
+  await f.cleanup();
+});
+it("owner-only drafts, ordered unregistered coauthors and explicit admin read permission", async () => {
+  const paper = await draft();
+  expect(paper.state).toBe("draft");
+  expect(paper.currentRevisionId).toBeNull();
+  expect(
+    (await service.detail(author.raw, paper.id, "own")).submission.document
+      .authors[0]!.email,
+  ).toBe("unregistered@example.invalid");
+  for (const raw of [stranger.raw, staff.raw]) {
+    await expect(service.detail(raw, paper.id, "own")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    await expect(service.detail(raw, paper.id, "admin")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await expect(
+      service.save(
+        raw,
+        { id: paper.id, expectedVersion: paper.version, document: doc() },
+        rid(),
+      ),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  }
+  await expect(service.list(undefined, "own", 0)).rejects.toMatchObject({
+    code: "SESSION_EXPIRED",
+  });
+  expect(
+    (await service.detail(leader.raw, paper.id, "admin")).submission.id,
+  ).toBe(paper.id);
+  expect((await service.list(stranger.raw, "own", 0)).items).toHaveLength(0);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT id FROM confsys.users WHERE email='unregistered@example.invalid'",
+      )
+    ).rowCount,
+  ).toBe(0);
+});
+it("concurrent saves conflict; submit retries produce one immutable revision and business notification", async () => {
+  const paper = await draft();
+  const races = await Promise.allSettled([
+    service.save(
+      author.raw,
+      { id: paper.id, expectedVersion: 1, document: { ...doc(), title: "A" } },
+      rid(),
+    ),
+    service.save(
+      author.raw,
+      { id: paper.id, expectedVersion: 1, document: { ...doc(), title: "B" } },
+      rid(),
+    ),
+  ]);
+  expect(races.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  expect(races.find((r) => r.status === "rejected")).toMatchObject({
+    reason: { code: "CONFLICT" },
+  });
+  const results = await Promise.all([
+    service.transition(
+      author.raw,
+      { id: paper.id, expectedVersion: 2, action: "submit" },
+      rid(),
+    ),
+    service.transition(
+      author.raw,
+      { id: paper.id, expectedVersion: 2, action: "submit" },
+      rid(),
+    ),
+  ]);
+  expect(results[0]).toEqual(results[1]);
+  const historical = await service.detail(author.raw, paper.id, "own");
+  expect(historical.revisions).toHaveLength(1);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT count(*) FROM confsys.notifications WHERE event_key=$1",
+        [`submission:${paper.id}:submit:2`],
+      )
+    ).rows[0].count,
+  ).toBe("1");
+  const revision = historical.revisions[0]!;
+  const updated = await service.save(
+    author.raw,
+    {
+      id: paper.id,
+      expectedVersion: 2,
+      document: { ...doc(), title: "Revised title" },
+    },
+    rid(),
+  );
+  expect(updated.state).toBe("submitted");
+  expect(updated.submittedVersion).toBe(2);
+  expect(
+    (await service.detail(author.raw, paper.id, "own")).revisions[0],
+  ).toEqual(revision);
+  await service.transition(
+    author.raw,
+    { id: paper.id, expectedVersion: 3, action: "submit" },
+    rid(),
+  );
+  expect(
+    (await service.detail(author.raw, paper.id, "own")).revisions,
+  ).toHaveLength(2);
+  const snapshot = (
+    await f.admin.query(
+      "SELECT config_snapshot FROM confsys.submission_revisions WHERE id=$1",
+      [revision.id],
+    )
+  ).rows[0].config_snapshot;
+  expect(snapshot.tracks[0].name).toBe("Science");
+  for (const db of [f.app, f.worker])
+    for (const sql of [
+      "UPDATE confsys.submission_revisions SET document=document WHERE false",
+      "DELETE FROM confsys.submission_revisions WHERE false",
+    ])
+      await expect(db.query(sql)).rejects.toMatchObject({ code: "42501" });
+});
+it("registration gating, server deadlines and withdrawal are separate from review decisions", async () => {
+  const paper = await draft();
+  await configure({ requireRegistration: true });
+  await expect(
+    service.transition(
+      author.raw,
+      { id: paper.id, expectedVersion: 1, action: "submit" },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await configure({
+    requireRegistration: false,
+    closesAt: new Date(Date.now() - 1000).toISOString(),
+  });
+  await expect(
+    service.transition(
+      author.raw,
+      { id: paper.id, expectedVersion: 1, action: "submit" },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(draft()).rejects.toMatchObject({ code: "CONFLICT" });
+  const withdrawn = await service.transition(
+    author.raw,
+    { id: paper.id, expectedVersion: 1, action: "withdraw" },
+    rid(),
+  );
+  expect(withdrawn.state).toBe("withdrawn");
+  expect(withdrawn.currentRevisionId).toBeNull();
+  await configure({ closesAt: new Date(Date.now() + 3600000).toISOString() });
+  await expect(
+    service.save(
+      author.raw,
+      { id: paper.id, expectedVersion: withdrawn.version, document: doc() },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    service.transition(
+      author.raw,
+      { id: paper.id, expectedVersion: withdrawn.version, action: "submit" },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+});
+it("files must be ready, owned manuscript assets; submission snapshot references cannot be omitted", async () => {
+  const owned = rid(),
+    other = rid(),
+    quarantined = rid();
+  for (const [id, owner, state] of [
+    [owned, author.id, "ready"],
+    [other, stranger.id, "ready"],
+    [quarantined, author.id, "quarantined"],
+  ])
+    await f.admin.query(
+      "INSERT INTO confsys.file_assets(id,owner_id,purpose,original_name,media_type,size_bytes,sha256,storage_key,status) VALUES($1,$2,'manuscript','synthetic.pdf','application/pdf',100,$3,$4,$5)",
+      [id, owner, "a".repeat(64), rid(), state],
+    );
+  await expect(
+    draft({ ...doc(), attachmentIds: [other] }),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  await expect(
+    draft({ ...doc(), attachmentIds: [quarantined] }),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const paper = await draft({ ...doc(), attachmentIds: [owned] });
+  await service.transition(
+    author.raw,
+    { id: paper.id, expectedVersion: 1, action: "submit" },
+    rid(),
+  );
+  const refs = await f.admin.query(
+    "SELECT resource_id FROM confsys.file_references WHERE file_id=$1 AND resource_type='submission_revision'",
+    [owned],
+  );
+  expect(refs.rowCount).toBe(1);
+});
+it("missing/foreign RLS contexts deny and transaction-local context never leaks to pooled connections", async () => {
+  const paper = await draft();
+  expect(
+    (await f.app.query("SELECT id FROM confsys.submissions")).rowCount,
+  ).toBe(0);
+  expect(
+    (await f.app.query("SELECT id FROM confsys.submission_revisions")).rowCount,
+  ).toBe(0);
+  await withIdentityTransaction(f.app, async (db) => {
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [stranger.id]);
+    expect(
+      (
+        await db.query("SELECT id FROM confsys.submissions WHERE id=$1", [
+          paper.id,
+        ])
+      ).rowCount,
+    ).toBe(0);
+    await expect(
+      db.query(
+        "INSERT INTO confsys.submissions(id,owner_id,version,document) VALUES($1,$2,1,$3)",
+        [rid(), author.id, doc()],
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+  });
+  expect(
+    (await f.app.query("SELECT id FROM confsys.submissions")).rowCount,
+  ).toBe(0);
+});
+it("outbox failure rolls back revision and state instead of reporting successful submission", async () => {
+  const paper = await draft(),
+    failure = rid();
+  await f.admin.query(
+    `CREATE FUNCTION confsys.submissions_test_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.request_id='${failure}'::uuid THEN RAISE EXCEPTION 'synthetic'; END IF; RETURN NEW; END $$`,
+  );
+  await f.admin.query(
+    "CREATE TRIGGER submissions_test_failure BEFORE INSERT ON confsys.notifications FOR EACH ROW EXECUTE FUNCTION confsys.submissions_test_failure()",
+  );
+  try {
+    await expect(
+      service.transition(
+        author.raw,
+        { id: paper.id, expectedVersion: 1, action: "submit" },
+        failure,
+      ),
+    ).rejects.toThrow();
+    const after = await service.detail(author.raw, paper.id, "own");
+    expect(after.submission).toEqual(paper);
+    expect(after.revisions).toHaveLength(0);
+  } finally {
+    await f.admin.query(
+      "DROP TRIGGER submissions_test_failure ON confsys.notifications",
+    );
+    await f.admin.query("DROP FUNCTION confsys.submissions_test_failure()");
+  }
+});
