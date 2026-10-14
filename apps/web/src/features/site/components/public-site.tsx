@@ -1,4 +1,4 @@
-import { availableSitePages } from "@confsys/contracts";
+import { siteNavigation } from "./site-navigation.js";
 import type { PublicSite, SiteLocale, SitePage } from "@confsys/contracts";
 const labels = {
   "zh-Hant": {
@@ -113,7 +113,7 @@ export function PublicSiteContent({
       </header>
       {d && (
         <nav className="site-nav" aria-label="官網 / Website">
-          {availableSitePages(d, locale).map((key) => (
+          {siteNavigation(d, locale).map((key) => (
             <a
               key={key}
               href={href(key)}
@@ -124,7 +124,7 @@ export function PublicSiteContent({
           ))}
           <span className="site-languages">
             {d.enabledLocales
-              .filter((lang) => availableSitePages(d, lang).includes(page))
+              .filter((lang) => siteNavigation(d, lang).includes(page))
               .map((lang) => (
                 <a
                   key={lang}

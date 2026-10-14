@@ -57,6 +57,15 @@ services:
     image: clamav/clamav@sha256:9a96980b265cb2b51a20bdcca921dc80aa55ed0e56cdfb076198ee27a9171927
     ports: ["127.0.0.1:${CLAMAV_PORT:-3310}:3310"]
     volumes: ["clamav-data:/var/lib/clamav"]
+    environment:
+      CLAMD_CONF_AlertExceedsMax: "yes"
+      CLAMD_CONF_AlertEncrypted: "yes"
+      CLAMD_CONF_MaxThreads: "2"
+      CLAMD_CONF_MaxConnectionQueueLength: "10"
+      CLAMD_CONF_StreamMaxLength: "10M"
+      CLAMD_CONF_MaxScanSize: "40M"
+      CLAMD_CONF_MaxFileSize: "10M"
+      CLAMD_CONF_ConcurrentDatabaseReload: "no"
     mem_limit: 3g
   migrate:
     profiles: ["app"]

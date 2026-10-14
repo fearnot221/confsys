@@ -1,4 +1,4 @@
-import { availableSitePages } from "@confsys/contracts";
+import { siteNavigation } from "./features/site/components/site-navigation.js";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { PublicSite, SiteLocale, SitePage } from "@confsys/contracts";
 import { PublicSiteContent } from "./features/site/components/public-site.js";
@@ -27,7 +27,7 @@ export function renderSite(
           />
           <link rel="canonical" href={`${origin}/${locale}/${page}`} />
           {d?.enabledLocales
-            .filter((lang) => availableSitePages(d, lang).includes(page))
+            .filter((lang) => siteNavigation(d, lang).includes(page))
             .map((lang) => (
               <link
                 key={lang}

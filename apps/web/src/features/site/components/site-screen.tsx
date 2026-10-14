@@ -1,4 +1,3 @@
-import { siteContentPages, siteExtraPages } from "@confsys/contracts";
 import { useState, useId } from "react";
 import type {
   SiteDocument,
@@ -29,6 +28,8 @@ type Props = {
   canWrite: boolean;
   canPublish: boolean;
   canMedia: boolean;
+  pages: readonly SitePage[];
+  optionalPages: readonly SitePage[];
   onLocale: (v: SiteLocale) => void;
   onPage: (v: SitePage) => void;
   onHistoryPage: (v: number) => void;
@@ -41,7 +42,7 @@ type Props = {
   onExecute: () => void;
   onReauthenticate: (v: string) => void;
 };
-const pages = siteContentPages;
+
 const pageNames = {
   committee: "大會委員",
   dates: "重要日期",
@@ -264,13 +265,13 @@ export function SiteScreen(p: Props) {
                 value={p.page}
                 onChange={(e) => p.onPage(e.target.value as SitePage)}
               >
-                {pages.map((key) => (
+                {p.pages.map((key) => (
                   <option key={key} value={key}>
                     {pageNames[key]}
                   </option>
                 ))}
               </select>
-              {siteExtraPages.some((key) => key === p.page) && (
+              {p.optionalPages.some((key) => key === p.page) && (
                 <div>
                   <p>
                     {t.pages[p.page]
@@ -281,7 +282,7 @@ export function SiteScreen(p: Props) {
                     disabled={!p.canWrite || p.busy || !t.pages[p.page]}
                     onClick={() => {
                       const next = { ...t.pages };
-                      for (const key of siteExtraPages)
+                      for (const key of p.optionalPages)
                         if (key === p.page) delete next[key];
                       translation("pages", next);
                     }}

@@ -32,7 +32,7 @@ export async function databaseReady(
 ) {
   await assertRuntimeRole(pool, role);
   const result = await pool.query(
-    `SELECT version FROM confsys.schema_migrations WHERE version = '0026_notification_batches.sql'`,
+    `SELECT version FROM confsys.schema_migrations WHERE version = '0031_generated_artifact_constraints.sql'`,
   );
   if (result.rowCount !== 1) throw new Error("Database migrations required");
 }

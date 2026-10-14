@@ -1,3 +1,5 @@
+import {exportJobEndpoints} from "./export-jobs.js";
+export * from "./export-jobs.js";
 import {notificationBatchEndpoints} from './notification-batches.js';
 export * from './notification-batches.js';
 import {documentJobEndpoints} from './document-jobs.js';
@@ -95,6 +97,8 @@ export function openApiDocument() {
       ...modulePaths(reportingEndpoints),
       ...modulePaths(notificationBatchEndpoints),
       ...modulePaths(documentJobEndpoints),
+      ...modulePaths(exportJobEndpoints),
+      "/api/reporting/export-jobs/{id}/download": {get:{operationId:"exportJobDownload",parameters:[{in:"path",name:"id",required:true,schema:{type:"string",format:"uuid"}}],responses:{"200":{description:"Private CSV snapshot; requires current reporting.export and recent password proof",content:{"text/csv":{schema:{type:"string"}}}},"401":{description:"Authentication required"},"403":{description:"Permission or recent proof required"},"404":{description:"Owned export not found"},"409":{description:"Export unavailable or expired"}}}},
       [routes.instance]: {
         get: {
           operationId: "getInstance",

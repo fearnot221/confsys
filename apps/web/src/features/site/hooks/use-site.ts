@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAuthClient, ApiError } from "@confsys/sdk";
 import {
   siteDraftSchema,
+  siteContentPages,
+  siteExtraPages,
   siteHistorySchema,
   publicSiteSchema,
   siteIssues,
@@ -162,6 +164,8 @@ export function useSite() {
         (i) => `${i.path.join(".")}: ${i.message}`,
       ) ?? []);
   return {
+    pages: siteContentPages,
+    optionalPages: siteExtraPages,
     loading: !expired && (account.isPending || (canRead && draft.isPending)),
     expired,
     error:

@@ -90,6 +90,9 @@ importers:
       '@confsys/documents':
         specifier: workspace:*
         version: link:../../packages/documents
+      '@confsys/exports':
+        specifier: workspace:*
+        version: link:../../packages/exports
       '@confsys/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
@@ -166,6 +169,9 @@ importers:
       '@confsys/documents':
         specifier: workspace:*
         version: link:../../packages/documents
+      '@confsys/exports':
+        specifier: workspace:*
+        version: link:../../packages/exports
       '@confsys/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
@@ -238,6 +244,24 @@ importers:
       qrcode:
         specifier: 1.5.4
         version: 1.5.4
+
+  packages/exports:
+    dependencies:
+      '@confsys/config':
+        specifier: workspace:*
+        version: link:../config
+      '@confsys/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@confsys/db':
+        specifier: workspace:*
+        version: link:../db
+      '@confsys/policy':
+        specifier: workspace:*
+        version: link:../policy
+      bullmq:
+        specifier: 6.3.15
+        version: 6.3.15(ioredis@5.11.1)(pg@8.23.1)
 
   packages/notifications:
     dependencies:

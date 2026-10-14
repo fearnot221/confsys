@@ -2,7 +2,7 @@
 
 **一份程式碼，每場研討會獨立部署，每個實例只服務一場。** 帳號、Session、token、資料、佇列與郵件各自獨立；不是全域帳號跨研討會平台。主辦單位是介紹／聯絡資料，不是 tenant。產品決策見 [SPEC](docs/SPEC.md)／[ADR 0003](docs/adr/0003-single-conference.md)。
 
-目前有 Phase 0 工程底座、Phase 1.1 帳號生命週期、Phase 1.1b 單研討會校正，Phase 1.2 固定角色、權限與受控管理員初始化，以及 Phase 1.3 會議設定／基本官網草稿與發布。邀請、上傳、報名、付款、投稿尚未實作；後續單元需要另行授權。
+目前開發分支已接上私有檔案／邀請、報名與人工核帳、投稿、審查、議程／競賽及現場／行政作業。這些功能使用真實 PostgreSQL、Redis、worker 與 Mailpit；各項驗證與尚未完成範圍見 [連續開發紀錄](docs/CONTINUOUS_RUN.md)。2026-10-15 本輪明確授權連續推進至 Phase 6，截止台北時間 10:00；不代表已全數驗收或可正式上線。
 
 ## 本地啟動
 
@@ -41,7 +41,26 @@ pnpm infra:down
 
 `CONFSYS_ENV_FILE=... pnpm compose ...` 明確載入該檔的 project name；沒有隱藏的 `confsys-phase0` 預設。所有 pnpm migration／smoke／dev／測試命令亦支援此選擇。不同 project 的 volumes/networks 不共享；只讀 bootstrap SQL 共用原始碼。Web/API/worker 使用同一 image，不需為名稱或網域重建。資料庫與 runtime 憑證分離，migration 不在 API 啟動時執行。
 
-`down` 保留 volumes；不要對使用者資料執行 `down -v`，不要刪除設定後沿用失去密碼的 volume。尚無檔案 adapter 或私有下載；不宣稱檔案功能已驗證。此 Compose 是 HTTP／Mailpit 開發模板，production TLS、備份還原、外部 provider 等限制見 [OPERATIONS](docs/OPERATIONS.md)。
+`down` 保留 volumes；不要對使用者資料執行 `down -v`，不要刪除設定後沿用失去密碼的 volume。檔案需要實際 ClamAV 掃描；無法連線時保持隔離，不能下載或引用。標準容器 scanner 請以 `pnpm compose up -d clamav` 啟動；Docker Desktop 記憶體不足時可用已驗證的 [本地 scanner 流程](docs/LOCAL_SCANNER.md)，不改動其他服務。此 Compose 是 HTTP／Mailpit 開發模板，production TLS、備份還原、外部 provider 等限制見 [OPERATIONS](docs/OPERATIONS.md)。
+
+## 操作入口
+
+登入後從 `/dashboard` 開啟個人工作台；入口依伺服器回傳權限顯示，每個 API 仍重新驗權。
+
+| 流程 | 入口 |
+|---|---|
+| 官網、帳號 | `/`、`/auth/account`；管理 `/admin/site`、`/access/accounts`、`/admin/invitations` |
+| 報名、表單、候補、異動 | `/registration`、`/admin/registration` |
+| 人工付款、團體分配、退款紀錄 | `/finance`、`/admin/finance`（財務角色） |
+| 餐飲與活動 | `/activities`、`/admin/activities` |
+| 投稿與版本、私有附件 | `/submissions`、`/admin/submissions`、`/account/files` |
+| 初檢、審查、決議與已發布結果 | `/reviews`（依角色／分組／指派顯示） |
+| 議程與競賽 | `/program`、`/admin/program`、`/competitions`、`/admin/competitions`、`/judging`、`/competition-awards` |
+| 報到、核銷、名牌 | 報名紀錄內的 QR 入口、`/admin/onsite`、`/admin/documents` |
+| 收據 | `/receipts`、`/admin/receipts` |
+| 通知、統計、受控作者預覽、完整匯出 | `/notifications`、`/admin/notifications`、`/admin/exports` |
+
+建立帳號、上傳憑證、報名、人工核帳、正式投稿、結果發布各有獨立狀態。金額以最小貨幣單位字串傳輸；無信用卡實際扣款。郵件只送本地 Mailpit；SMTP accepted 不等於實際到達收件匣。批次 PDF／CSV 為真實佇列工作，失敗／到期／撤權會阻止下載。
 
 ## 驗證與協作
 

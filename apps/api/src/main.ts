@@ -1,28 +1,30 @@
-import {createNotificationBatchService} from './notification-batches/service.js';
-import {registerNotificationBatchRoutes} from './notification-batches/routes.js';
-import {createOnsiteService} from './onsite/service.js';
-import {registerOnsiteRoutes} from './onsite/routes.js';
-import {createDocumentJobsService} from './document-jobs/service.js';
-import {registerDocumentJobRoutes} from './document-jobs/routes.js';
-import {createReportingService} from './reporting/service.js';
-import {registerReportingRoutes} from './reporting/routes.js';
-import {createCompetitionService} from './competitions/service.js';
-import {registerCompetitionRoutes} from './competitions/routes.js';
-import {createPaymentEvidenceDownload} from './finance/evidence.js';
-import {createActivitiesService} from './activities/service.js';
-import {registerActivityRoutes} from './activities/routes.js';
-import {createReceiptsService} from './documents/service.js';
-import {registerReceiptRoutes} from './documents/routes.js';
-import {createReviewService,authorizeReviewFile} from './reviews/service.js';
-import {registerReviewRoutes} from './reviews/routes.js';
-import {createReviewFileDownload} from './files/review-download.js';
-import {createProgramService} from './program/service.js';
-import {registerProgramRoutes} from './program/routes.js';
-import {createFinanceService} from "./finance/service.js";
-import {registerFinanceRoutes} from "./finance/routes.js";
-import {createSubmissionService} from "./submissions/service.js";
-import {registerSubmissionRoutes} from "./submissions/routes.js";
-import {submissionDependencies} from "./submissions/dependencies.js";
+import { createExportJobsService } from "./export-jobs/service.js";
+import { registerExportJobRoutes } from "./export-jobs/routes.js";
+import { createNotificationBatchService } from "./notification-batches/service.js";
+import { registerNotificationBatchRoutes } from "./notification-batches/routes.js";
+import { createOnsiteService } from "./onsite/service.js";
+import { registerOnsiteRoutes } from "./onsite/routes.js";
+import { createDocumentJobsService } from "./document-jobs/service.js";
+import { registerDocumentJobRoutes } from "./document-jobs/routes.js";
+import { createReportingService } from "./reporting/service.js";
+import { registerReportingRoutes } from "./reporting/routes.js";
+import { createCompetitionService } from "./competitions/service.js";
+import { registerCompetitionRoutes } from "./competitions/routes.js";
+import { createPaymentEvidenceDownload } from "./finance/evidence.js";
+import { createActivitiesService } from "./activities/service.js";
+import { registerActivityRoutes } from "./activities/routes.js";
+import { createReceiptsService } from "./documents/service.js";
+import { registerReceiptRoutes } from "./documents/routes.js";
+import { createReviewService, authorizeReviewFile } from "./reviews/service.js";
+import { registerReviewRoutes } from "./reviews/routes.js";
+import { createReviewFileDownload } from "./files/review-download.js";
+import { createProgramService } from "./program/service.js";
+import { registerProgramRoutes } from "./program/routes.js";
+import { createFinanceService } from "./finance/service.js";
+import { registerFinanceRoutes } from "./finance/routes.js";
+import { createSubmissionService } from "./submissions/service.js";
+import { registerSubmissionRoutes } from "./submissions/routes.js";
+import { submissionDependencies } from "./submissions/dependencies.js";
 import { createFilesService } from "./files/service.js";
 import { registerFilesRoutes } from "./files/routes.js";
 import { registerInvitationRoutes } from "./invitations/routes.js";
@@ -77,20 +79,64 @@ await registerAuthRoutes(app, {
 });
 registerAccessRoutes(app, config, createAccessService(pool, config));
 registerSiteRoutes(app, config, site);
-registerInvitationRoutes(app, config, createInvitationService(pool,config));
-registerRegistrationRoutes(app, config, createRegistrationService(pool,config));
-registerFilesRoutes(app,config,createFilesService(pool,config,{root:config.PRIVATE_STORAGE_ROOT,scannerHost:config.CLAMAV_HOST,scannerPort:config.CLAMAV_PORT}));
-registerSubmissionRoutes(app,config,createSubmissionService(pool,config,submissionDependencies));
-registerFinanceRoutes(app,config,createFinanceService(pool,config),createPaymentEvidenceDownload(pool,config,{root:config.PRIVATE_STORAGE_ROOT,scannerHost:config.CLAMAV_HOST,scannerPort:config.CLAMAV_PORT}));
-registerActivityRoutes(app,config,createActivitiesService(pool,config));
-registerReceiptRoutes(app,config,createReceiptsService(pool,config));
-registerReviewRoutes(app,config,createReviewService(pool,config),createReviewFileDownload(pool,config,{root:config.PRIVATE_STORAGE_ROOT,scannerHost:config.CLAMAV_HOST,scannerPort:config.CLAMAV_PORT},authorizeReviewFile));
-registerProgramRoutes(app,config,createProgramService(pool,config));
-registerOnsiteRoutes(app,config,createOnsiteService(pool,config));
-registerDocumentJobRoutes(app,config,createDocumentJobsService(pool,config));
-registerReportingRoutes(app,config,createReportingService(pool,config));
-registerCompetitionRoutes(app,config,createCompetitionService(pool,config));
-registerNotificationBatchRoutes(app,config,createNotificationBatchService(pool,config));
+registerInvitationRoutes(app, config, createInvitationService(pool, config));
+registerRegistrationRoutes(
+  app,
+  config,
+  createRegistrationService(pool, config),
+);
+registerFilesRoutes(
+  app,
+  config,
+  createFilesService(pool, config, {
+    root: config.PRIVATE_STORAGE_ROOT,
+    scannerHost: config.CLAMAV_HOST,
+    scannerPort: config.CLAMAV_PORT,
+  }),
+);
+registerSubmissionRoutes(
+  app,
+  config,
+  createSubmissionService(pool, config, submissionDependencies),
+);
+registerFinanceRoutes(
+  app,
+  config,
+  createFinanceService(pool, config),
+  createPaymentEvidenceDownload(pool, config, {
+    root: config.PRIVATE_STORAGE_ROOT,
+    scannerHost: config.CLAMAV_HOST,
+    scannerPort: config.CLAMAV_PORT,
+  }),
+);
+registerActivityRoutes(app, config, createActivitiesService(pool, config));
+registerReceiptRoutes(app, config, createReceiptsService(pool, config));
+registerReviewRoutes(
+  app,
+  config,
+  createReviewService(pool, config),
+  createReviewFileDownload(
+    pool,
+    config,
+    {
+      root: config.PRIVATE_STORAGE_ROOT,
+      scannerHost: config.CLAMAV_HOST,
+      scannerPort: config.CLAMAV_PORT,
+    },
+    authorizeReviewFile,
+  ),
+);
+registerProgramRoutes(app, config, createProgramService(pool, config));
+registerOnsiteRoutes(app, config, createOnsiteService(pool, config));
+registerDocumentJobRoutes(app, config, createDocumentJobsService(pool, config));
+registerReportingRoutes(app, config, createReportingService(pool, config));
+registerCompetitionRoutes(app, config, createCompetitionService(pool, config));
+registerNotificationBatchRoutes(
+  app,
+  config,
+  createNotificationBatchService(pool, config),
+);
+registerExportJobRoutes(app, config, createExportJobsService(pool, config));
 await registerPublicRoutes(app, config, site);
 app.addHook("onClose", async () => {
   redis.disconnect();

@@ -68,6 +68,7 @@ export function AuthScreen(view: AuthView) {
                   </p>
                 )}
                 {view.canDirectory && <a href="/access/accounts">帳號管理</a>}
+                <p><a href="/dashboard">開啟我的研討會工作台</a></p>
                 <p>已驗證的信箱</p>
                 <p data-testid="account-email">{view.email}</p>
                 <p>本地帳號 ID：{view.userId}</p>

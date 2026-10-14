@@ -1,6 +1,6 @@
 # Roadmap
 
-Scope follows SPEC. This delivery is limited to authorized Phase 1.3; later units still require approval.
+Scope follows SPEC. **2026-10-15 timed override:** user explicitly authorized continuous implementation from Phase1.3 through Phase6 until10:00 Asia/Taipei. Historical stop rules below describe earlier deliveries and do not block this run. Current implementation/verification checkpoints are in CONTINUOUS_RUN; Phase7 and production remain unauthorized.
 
 | Phase | Status / scope |
 |---|---|
@@ -9,15 +9,15 @@ Scope follows SPEC. This delivery is limited to authorized Phase 1.3; later unit
 | 1.1b | Single-conference deployment correction; runtime display, isolated resource template and dual-instance regression |
 | 1.2 | Implemented fixed local roles/permissions, one-time operator CLI bootstrap, account management UI/API, reauthentication and audit; see PHASE1_2_DELIVERY |
 | 1.3 | Implemented bounded settings/site draft, protected preview, immutable publication/history, initial HTML and official mail branding; see PHASE1_3_DELIVERY |
-| Later Phase 1 | Not started: private files/media safety lifecycle, invitations and resource-specific permissions |
-| 2 | Not started: registration, pricing, capacity, manual reconciliation, group payments, meals, receipts |
-| 3 | Not started: submission, revisions, private content validation/quarantine |
-| 4 | Not started: assignments, conflicts, review and decision publication |
-| 5 | Not started: program, publication versions, oral/poster competitions |
-| 6 | Not started: check-in/redemption, documents, notifications, exports, selected provider sandboxes |
+| Later Phase 1 | Implemented private files/media, actual scanner, local invitations; full128-case integration and19-browser regression pass at07:15 before subsequent additions |
+| 2 | Implemented core; ongoing acceptance coverage: registration, pricing, capacity, manual reconciliation, group payments, meals, receipts |
+| 3 | Implemented core; ongoing acceptance coverage: submission, revisions, private content validation/quarantine |
+| 4 | Implemented core including screening/workload/reminders; ongoing acceptance coverage: assignments, conflicts, review and decision publication |
+| 5 | Implemented core; ongoing acceptance coverage: program, publication versions, oral/poster competitions |
+| 6 | Implemented core; templates/personal schedule/retry and operational checks ongoing: check-in/redemption, documents, notifications, exports, selected provider sandboxes |
 | 7 | Not started: Claude read-only UI audit then isolated presentation PRs; end-to-end launch verification |
 
-## Phase 1 increments (only 1.3 currently authorized)
+## Historical Phase 1 increments (prior delivery baseline)
 
 1. **1.1 retained:** local registration/verification/reset/session, CSRF/Origin, audit/outbox/worker/Mailpit, race and crash recovery.
 2. **1.1b retained:** correct single-conference model in contracts/config/Compose/UI/mail/docs/tests, same-build dual-instance isolation. No role/CMS/business modules.
@@ -25,7 +25,7 @@ Scope follows SPEC. This delivery is limited to authorized Phase 1.3; later unit
 4. **1.3 implemented:** bounded versioned conference/site configuration, dates/timezone/locales, protected saved-draft preview, immutable publications/history and public initial HTML/metadata. Currency/fees/deadlines belong to later business modules. Future reuse exports/imports whitelisted settings into a fresh instance; never clone account/business DBs.
 5. **Later reliability:** local invitations and resource-specific notification policy; private file framework with validation/quarantine/download authorization. Preserve all original registration/finance/submission/review/competition/program/on-site/mail/statistics phases above.
 
-Each unit needs real UI/API/errors/permissions/tests/docs. Stop after Phase 1.3 local commit; no implicit approval for files, invitations or later business work.
+Each unit needs real UI/API/errors/permissions/tests/docs. The earlier Phase1.3 stop is superseded only by the dated, time-bounded authorization above.
 
 Open questions that do not block Phase 0: hosting, volumes/traffic, external mail/payment provider, SSO, receipt requirements, data retention and anonymization policy. No provider/production-readiness claim is made.
 
