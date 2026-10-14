@@ -12,7 +12,11 @@ import {
   lockAccessShared,
   rolesFor,
 } from "../access/repository.js";
-import { requirePermission, assertRecentPassword } from "../access/policy.js";
+import {
+  requirePermission,
+  assertRecentPassword,
+  permissionsFor,
+} from "../access/policy.js";
 import { sessionActor } from "../auth/session.js";
 import { AuthError } from "../auth/errors.js";
 import { effectivePublicSite } from "../site/branding.js";
@@ -150,6 +154,73 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
         return repo.catalog(db, actor);
       });
     },
+    replaceEntry: (
+      raw: string | undefined,
+      input: unknown,
+      requestId: string,
+    ) => {
+      const d = competitionEndpoints.competitionReplaceEntry.input.parse(input);
+      return authorized(raw, undefined, true, async (db, actor) => {
+        const manager = permissionsFor(await rolesFor(db, actor)).includes(
+          "competitions.manage",
+        );
+        await repo.context(db, actor, manager);
+        const previous = await repo.entry(db, d.predecessorId, true);
+        if (!manager && previous.ownerId !== actor)
+          throw new AuthError("NOT_FOUND");
+        const existing = await repo.successor(db, previous.id);
+        if (existing) {
+          if (
+            existing.revisionId !== d.revisionId ||
+            existing.replacementReason !== d.reason
+          )
+            throw new AuthError("CONFLICT");
+          return existing;
+        }
+        verifyVersion(previous.version, d.expectedVersion);
+        const c = await repo.competition(db, previous.competitionId, true);
+        beforeDeadline(c.value.config.registrationClosesAt);
+        const accepted = await eligible(db, d.revisionId, c.value.config);
+        if (
+          accepted.submissionId !== previous.submissionId ||
+          accepted.ownerId !== previous.ownerId
+        )
+          throw new AuthError("CONFLICT");
+        if (
+          !(await repo.authorizedPresenterSuccessor(
+            db,
+            previous.revisionId,
+            d.revisionId,
+          ))
+        )
+          throw new AuthError("CONFLICT");
+        const result = await repo.replaceEntry(
+          db,
+          previous,
+          d.revisionId,
+          accepted.document.title,
+          accepted.presenter.name,
+          d.reason,
+        );
+        await repo.bump(db, previous.competitionId);
+        await repo.audit(
+          db,
+          actor,
+          "competition.entry_replaced",
+          result.id,
+          requestId,
+          d.reason,
+        );
+        await notify(
+          db,
+          previous.ownerId,
+          `competition-successor:${result.id}`,
+          "報告者更換後競賽資格重新申請",
+          requestId,
+        );
+        return result;
+      });
+    },
     entry: (raw: string | undefined, input: unknown, requestId: string) => {
       const d = competitionEndpoints.competitionEntry.input.parse(input);
       return authorized(
@@ -160,6 +231,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
           const e = await repo.entry(db, d.id, true);
           if (d.action === "withdraw" && e.ownerId !== actor)
             throw new AuthError("NOT_FOUND");
+          await repo.assertLatestEntry(db, e.id);
           verifyVersion(e.version, d.expectedVersion);
           if (!["requested", "approved"].includes(e.state))
             throw new AuthError("CONFLICT");
@@ -281,6 +353,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
       const d = competitionEndpoints.competitionCancel.input.parse(input);
       return authorized(raw, "competitions.manage", true, async (db, actor) => {
         const a = await repo.assignment(db, d.assignmentId, true);
+        await repo.assertLatestEntry(db, a.entryId);
         if (a.state !== "cancelled") {
           await repo.cancel(db, a.id);
           await repo.bump(db, a.competitionId);
@@ -300,6 +373,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
       const d = competitionEndpoints.competitionConflict.input.parse(input);
       return authorized(raw, "competitions.score", false, async (db, actor) => {
         const a = await ownAssignment(db, d.assignmentId, actor);
+        await repo.assertLatestEntry(db, a.entryId);
         if (a.state === "cancelled") throw new AuthError("CONFLICT");
         if (a.state !== "conflicted") {
           await repo.conflict(db, a.id, a.entryId, actor, d.reason);

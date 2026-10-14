@@ -108,7 +108,7 @@ export async function configure(
   );
 }
 const entryFields =
-  'e.id,e.competition_id AS "competitionId",e.submission_id AS "submissionId",e.revision_id AS "revisionId",e.owner_id AS "ownerId",e.version,e.state,e.title,e.presenter_name AS "presenterName",e.reason';
+  'e.id,e.competition_id AS "competitionId",e.submission_id AS "submissionId",e.revision_id AS "revisionId",e.owner_id AS "ownerId",e.version,e.state,e.title,e.presenter_name AS "presenterName",e.predecessor_id AS "predecessorId",e.replacement_reason AS "replacementReason",e.reason';
 export async function entry(db: PoolClient, id: string, lock = false) {
   const r = (
     await db.query(
@@ -139,10 +139,57 @@ export async function entries(
 export async function allEntries(db: PoolClient, competitionId: string) {
   return (
     await db.query(
-      `SELECT ${entryFields} FROM confsys.competition_entries e WHERE e.competition_id=$1 ORDER BY e.id`,
+      `SELECT ${entryFields} FROM confsys.competition_entries e WHERE e.competition_id=$1 AND NOT EXISTS(SELECT 1 FROM confsys.competition_entries child WHERE child.predecessor_id=e.id) ORDER BY e.id`,
       [competitionId],
     )
   ).rows.map((r) => competitionEntrySchema.parse(r));
+}
+async function assertEntryCapacity(db: PoolClient, competitionId: string) {
+  if (
+    Number(
+      (
+        await db.query(
+          "SELECT coalesce((SELECT total FROM confsys.competition_entry_counts WHERE competition_id=$1),0) AS count",
+          [competitionId],
+        )
+      ).rows[0].count,
+    ) >= 2000
+  )
+    throw new AuthError("CONFLICT");
+}
+export async function successor(db: PoolClient, predecessorId: string) {
+  const result = await db.query<{ id: string }>(
+    "SELECT id FROM confsys.competition_entries WHERE predecessor_id=$1",
+    [predecessorId],
+  );
+  return result.rows[0] ? entry(db, result.rows[0].id) : null;
+}
+export async function replaceEntry(
+  db: PoolClient,
+  previous: ReturnType<typeof competitionEntrySchema.parse>,
+  revisionId: string,
+  title: string,
+  presenter: string,
+  reason: string,
+) {
+  await assertEntryCapacity(db, previous.competitionId);
+  const id = randomUUID();
+  await db.query(
+    `INSERT INTO confsys.competition_entries(id,competition_id,submission_id,revision_id,owner_id,state,title,presenter_name,predecessor_id,replacement_reason)
+    VALUES($1,$2,$3,$4,$5,'requested',$6,$7,$8,$9)`,
+    [
+      id,
+      previous.competitionId,
+      previous.submissionId,
+      revisionId,
+      previous.ownerId,
+      title,
+      presenter,
+      previous.id,
+      reason,
+    ],
+  );
+  return entry(db, id);
 }
 export async function enroll(
   db: PoolClient,
@@ -155,22 +202,12 @@ export async function enroll(
 ) {
   const prior = (
     await db.query<{ id: string }>(
-      "SELECT id FROM confsys.competition_entries WHERE competition_id=$1 AND submission_id=$2",
+      "SELECT e.id FROM confsys.competition_entries e WHERE e.competition_id=$1 AND e.submission_id=$2 AND NOT EXISTS(SELECT 1 FROM confsys.competition_entries child WHERE child.predecessor_id=e.id)",
       [competitionId, submissionId],
     )
   ).rows[0];
   if (prior) return { value: await entry(db, prior.id), created: false };
-  if (
-    Number(
-      (
-        await db.query(
-          "SELECT coalesce((SELECT total FROM confsys.competition_entry_counts WHERE competition_id=$1),0) AS count",
-          [competitionId],
-        )
-      ).rows[0].count,
-    ) >= 2000
-  )
-    throw new AuthError("CONFLICT");
+  await assertEntryCapacity(db, competitionId);
   const id = randomUUID();
   await db.query(
     "INSERT INTO confsys.competition_entries(id,competition_id,submission_id,revision_id,owner_id,state,title,presenter_name) VALUES($1,$2,$3,$4,$5,'requested',$6,$7)",
@@ -484,4 +521,23 @@ export async function registered(db: PoolClient, userId: string) {
       [userId],
     )
   ).rowCount;
+}
+
+export async function authorizedPresenterSuccessor(
+  db: PoolClient,
+  prior: string,
+  next: string,
+) {
+  const r = await db.query(
+    "SELECT 1 FROM confsys.competition_presenter_successors WHERE prior_revision_id=$1 AND new_revision_id=$2",
+    [prior, next],
+  );
+  return !!r.rowCount;
+}
+export async function assertLatestEntry(db: PoolClient, entryId: string) {
+  const r = await db.query<{ current: boolean }>(
+    "SELECT current FROM confsys.competition_entry_current WHERE id=$1",
+    [entryId],
+  );
+  if (!r.rows[0]?.current) throw new AuthError("CONFLICT");
 }

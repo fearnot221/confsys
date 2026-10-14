@@ -54,6 +54,8 @@ export function registerCompetitionRoutes(
             return service.configure(raw, input, req.id);
           case "competitionEnroll":
             return service.enroll(raw, input, req.id);
+          case "competitionReplaceEntry":
+            return service.replaceEntry(raw, input, req.id);
           case "competitionEntry":
             return service.entry(raw, input, req.id);
           case "competitionAssign":

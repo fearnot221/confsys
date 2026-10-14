@@ -42,6 +42,7 @@ export function CompetitionsScreen(p: Props) {
     } | null>(null),
     [reason, setReason] = useState(""),
     [revisionId, setRevisionId] = useState(""),
+    [replacementRevisionId, setReplacementRevisionId] = useState(""),
     [competitionId, setCompetitionId] = useState(""),
     [judgeId, setJudgeId] = useState(""),
     [password, setPassword] = useState(""),
@@ -364,6 +365,17 @@ export function CompetitionsScreen(p: Props) {
               />
             </label>
           )}
+          <label htmlFor="competition-replacement-revision">
+            已重新接受並發布的報告者更換版本 ID
+          </label>
+          <input
+            id="competition-replacement-revision"
+            value={replacementRevisionId}
+            onChange={(e) => setReplacementRevisionId(e.target.value)}
+          />
+          <p>
+            更換申請會建立全新的待審資格；舊評分及公開名單保留，須重新確認資格、指派評審及評分。
+          </p>
           {entries.map((e) => (
             <article key={e.id}>
               <h3>{e.title}</h3>
@@ -371,8 +383,27 @@ export function CompetitionsScreen(p: Props) {
                 {e.presenterName} · {e.state} · 版本 {e.version}
               </p>
               <p>參賽 ID：{e.id}</p>
+              {e.predecessorId && (
+                <p>
+                  前一參賽紀錄：{e.predecessorId} · 更換原因：
+                  {e.replacementReason}
+                </p>
+              )}
               {e.reason && <p>{e.reason}</p>}
               <fieldset disabled={p.busy || reason.trim().length < 3}>
+                <button
+                  disabled={!replacementRevisionId}
+                  onClick={() =>
+                    p.onAction("competitionReplaceEntry", {
+                      predecessorId: e.id,
+                      expectedVersion: e.version,
+                      revisionId: replacementRevisionId,
+                      reason,
+                    })
+                  }
+                >
+                  以核准的新報告者版本重新申請
+                </button>
                 {p.admin && e.state === "requested" && (
                   <>
                     <button

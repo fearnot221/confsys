@@ -29,3 +29,59 @@ it("encodes bounded pages and preserves safe errors and cancellation", async () 
   ).rejects.toThrow();
   expect(calls).toHaveLength(1);
 });
+it("sends explicit successor identity and optimistic version with CSRF and validates lineage output", async () => {
+  const previous = randomUUID(),
+    revision = randomUUID();
+  const result = {
+    id: randomUUID(),
+    competitionId: randomUUID(),
+    submissionId: randomUUID(),
+    revisionId: revision,
+    ownerId: randomUUID(),
+    version: 1,
+    state: "requested",
+    title: "Replacement",
+    presenterName: "Presenter",
+    predecessorId: previous,
+    replacementReason: "Approved change",
+    reason: "",
+  };
+  const calls: { url: string; init: RequestInit | undefined }[] = [];
+  const client = createCompetitionClient("", async (input, init) => {
+    calls.push({ url: String(input), init });
+    return new Response(
+      JSON.stringify(
+        String(input).endsWith("/csrf") ? { csrfToken: "test-token" } : result,
+      ),
+    );
+  });
+  const request = {
+    predecessorId: previous,
+    expectedVersion: 3,
+    revisionId: revision,
+    reason: "Approved change",
+  };
+  expect(
+    await client(
+      "competitionReplaceEntry",
+      request,
+      new AbortController().signal,
+    ),
+  ).toEqual(result);
+  expect(calls[1]).toMatchObject({
+    url: "/api/competitions/replace-entry",
+    init: {
+      method: "POST",
+      headers: { "x-csrf-token": "test-token" },
+      body: JSON.stringify(request),
+    },
+  });
+  await expect(
+    client(
+      "competitionReplaceEntry",
+      { ...request, expectedVersion: -1 },
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow();
+  expect(calls).toHaveLength(2);
+});

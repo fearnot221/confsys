@@ -249,6 +249,10 @@ afterAll(async () => {
           [author.id],
         )
       ).rows.map((r) => r.id);
+      await f.admin.query(
+        "DELETE FROM confsys.presenter_change_requests WHERE submission_id=ANY($1::uuid[])",
+        [ids],
+      );
       for (const table of ["review_publications", "review_decisions"])
         await f.admin.query(
           `DELETE FROM confsys.${table} WHERE submission_id=ANY($1::uuid[])`,
@@ -902,4 +906,198 @@ it("historical verified coauthor aliases fence competition assignment and persis
       id(),
     ),
   ).rejects.toBeDefined();
+});
+it("creates an idempotent presenter successor with fresh qualification and scoring while retaining immutable history", async () => {
+  const target = await account();
+  const c = await competition();
+  const p = await paper({
+    authors: [
+      {
+        name: "Original presenter",
+        email: author.email,
+        affiliation: "Institute",
+      },
+      {
+        name: "Replacement presenter",
+        email: target.email,
+        affiliation: "Institute",
+      },
+    ],
+  });
+  const previous = await approve(await enroll(c, p));
+  const oldAssignment = await assignment(previous.id);
+  await submit(oldAssignment, 80);
+  const newRevisionId = id(),
+    decisionId = id(),
+    changeId = id();
+  const source = (
+    await f.admin.query(
+      "SELECT * FROM confsys.submission_revisions WHERE id=$1",
+      [p.currentRevisionId],
+    )
+  ).rows[0];
+  await f.admin.query(
+    "INSERT INTO confsys.submission_revisions(id,submission_id,owner_id,version,document,config_snapshot) VALUES($1,$2,$3,$4,$5,$6)",
+    [
+      newRevisionId,
+      p.id,
+      author.id,
+      source.version + 1,
+      { ...source.document, presenterIndex: 1 },
+      source.config_snapshot,
+    ],
+  );
+  await f.admin.query(
+    "UPDATE confsys.submissions SET current_revision_id=$2,submitted_version=$3,version=version+1,document=$4 WHERE id=$1",
+    [
+      p.id,
+      newRevisionId,
+      source.version + 1,
+      { ...source.document, presenterIndex: 1 },
+    ],
+  );
+  await f.admin.query(
+    "INSERT INTO confsys.review_decisions(id,submission_id,revision_id,version,outcome,author_message,internal_reason,decided_by) VALUES($1,$2,$3,2,'accept_oral','Accepted replacement','Synthetic successor fixture',$4)",
+    [decisionId, p.id, newRevisionId, leader.id],
+  );
+  await f.admin.query(
+    "UPDATE confsys.review_publications SET decision_id=$2 WHERE submission_id=$1",
+    [p.id, decisionId],
+  );
+  const request = {
+    predecessorId: previous.id,
+    expectedVersion: previous.version,
+    revisionId: newRevisionId,
+    reason: "Approved presenter replacement",
+  };
+  // Acceptance of an arbitrary new content revision is insufficient.
+  await expect(
+    svc.replaceEntry(author.raw, request, id()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await f.admin.query(
+    `INSERT INTO confsys.presenter_change_requests(id,submission_id,source_revision_id,expected_submission_version,config_version,requester_id,target_user_id,target_author_index,target_email,projection,reason,state,consent_credential_version,consented_at,decision_actor,decision_reason,decided_at,new_revision_id,expires_at)
+    VALUES($1,$2,$3,$4,0,$5,$6,1,$7,'{}','Synthetic consent fixture','approved',1,now(),$8,'Approved fixture',now(),$9,now()+interval '1 day')`,
+    [
+      changeId,
+      p.id,
+      p.currentRevisionId,
+      p.version,
+      author.id,
+      target.id,
+      target.email,
+      leader.id,
+      newRevisionId,
+    ],
+  );
+  await expect(
+    svc.replaceEntry(otherJudge.raw, request, id()),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  await expect(
+    svc.replaceEntry(author.raw, { ...request, expectedVersion: 999 }, id()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const outcomes = await Promise.all([
+    svc.replaceEntry(author.raw, request, id()),
+    svc.replaceEntry(leader.raw, request, id()),
+  ]);
+  expect(outcomes[0].id).toBe(outcomes[1].id);
+  const successor = outcomes[0];
+  expect(successor).toMatchObject({
+    predecessorId: previous.id,
+    revisionId: newRevisionId,
+    state: "requested",
+    presenterName: "Replacement presenter",
+  });
+  expect(
+    (
+      await f.admin.query(
+        "SELECT state,version,revision_id FROM confsys.competition_entries WHERE id=$1",
+        [previous.id],
+      )
+    ).rows[0],
+  ).toEqual({
+    state: previous.state,
+    version: previous.version,
+    revision_id: previous.revisionId,
+  });
+  expect(
+    (
+      await f.admin.query(
+        "SELECT id FROM confsys.competition_scores WHERE assignment_id=$1",
+        [oldAssignment.id],
+      )
+    ).rowCount,
+  ).toBe(1);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT id FROM confsys.competition_assignments WHERE entry_id=$1",
+        [successor.id],
+      )
+    ).rowCount,
+  ).toBe(0);
+  await expect(
+    svc.entry(
+      author.raw,
+      {
+        id: previous.id,
+        expectedVersion: previous.version,
+        action: "withdraw",
+        reason: "Historical entry",
+      },
+      id(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    svc.conflict(
+      judge.raw,
+      { assignmentId: oldAssignment.id, reason: "Historical assignment" },
+      id(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    svc.assign(leader.raw, { entryId: successor.id, judgeId: judge.id }, id()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const approved = await approve(successor),
+    freshAssignment = await assignment(approved.id);
+  await submit(freshAssignment, 90);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT count(*)::int AS total FROM confsys.competition_scores WHERE assignment_id=ANY($1::uuid[])",
+        [[oldAssignment.id, freshAssignment.id]],
+      )
+    ).rows[0].total,
+  ).toBe(2);
+  // Advance the synthetic registration clock after replacement; production rubric
+  // rows remain immutable once judging begins.
+  await f.admin.query(
+    "UPDATE confsys.competition_rubrics SET document=jsonb_set(document,'{registrationClosesAt}',to_jsonb($2::text)) WHERE competition_id=$1",
+    [c, new Date(Date.now() - 1000).toISOString()],
+  );
+  await svc.awards(
+    leader.raw,
+    {
+      competitionId: c,
+      expectedVersion: (await current(c)).version,
+      awards: [{ entryId: successor.id, label: "Replacement winner", rank: 1 }],
+      reason: "Fresh independent score",
+    },
+    id(),
+  );
+  const published = await svc.publish(
+    leader.raw,
+    { competitionId: c, expectedVersion: (await current(c)).version },
+    id(),
+  );
+  expect(JSON.stringify(published)).toContain("Replacement presenter");
+  expect(JSON.stringify(published)).not.toContain("Original presenter");
+  await withIdentityTransaction(f.app, async (db) => {
+    expect(
+      (await db.query("SELECT * FROM confsys.competition_presenter_successors"))
+        .rows,
+    ).toEqual([]);
+    expect(
+      (await db.query("SELECT * FROM confsys.competition_entry_current")).rows,
+    ).toEqual([]);
+  });
 });
