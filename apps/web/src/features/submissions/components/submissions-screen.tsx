@@ -361,22 +361,21 @@ export function SubmissionsScreen(p: Props) {
                 }
               />
             </label>
-            <label>
-              主題軌
-              <select
-                value={d.trackId}
-                onChange={(e) =>
-                  change({ trackId: e.target.value, topicIds: [] })
-                }
-              >
-                <option value="">請選擇</option>
-                {config?.tracks.map((t) => (
-                  <option value={t.id} key={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <label htmlFor="submission-track">主題軌</label>
+            <select
+              id="submission-track"
+              value={d.trackId}
+              onChange={(e) =>
+                change({ trackId: e.target.value, topicIds: [] })
+              }
+            >
+              <option value="">請選擇</option>
+              {config?.tracks.map((t) => (
+                <option value={t.id} key={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
             <fieldset>
               <legend>主題分類</legend>
               {config?.tracks
@@ -489,22 +488,21 @@ export function SubmissionsScreen(p: Props) {
                 新增共同作者
               </button>
             </fieldset>
-            <label>
-              發表意願
-              <select
-                value={d.presentationPreference}
-                onChange={(e) =>
-                  change({
-                    presentationPreference: e.target
-                      .value as SubmissionDocument["presentationPreference"],
-                  })
-                }
-              >
-                <option value="either">皆可</option>
-                <option value="oral">口頭</option>
-                <option value="poster">壁報</option>
-              </select>
-            </label>
+            <label htmlFor="submission-preference">發表意願</label>
+            <select
+              id="submission-preference"
+              value={d.presentationPreference}
+              onChange={(e) =>
+                change({
+                  presentationPreference: e.target
+                    .value as SubmissionDocument["presentationPreference"],
+                })
+              }
+            >
+              <option value="either">皆可</option>
+              <option value="oral">口頭</option>
+              <option value="poster">壁報</option>
+            </select>
             <label>
               <input
                 type="checkbox"
