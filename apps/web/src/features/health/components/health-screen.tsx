@@ -1,5 +1,6 @@
 import { Button, Layout, Status } from "@confsys/ui";
 export type HealthView = {
+  conferenceName: string;
   phase: "loading" | "error" | "ready" | "degraded";
   dependencies:
     | { postgres: "up" | "down"; redis: "up" | "down"; worker: "up" | "down" }
@@ -14,7 +15,7 @@ const copy = {
     brand: "研討會平台",
     label: "工程底座 · PHASE 0",
     title: "系統服務狀態",
-    intro: "支援多組織、多研討會與跨年度複用的平台，從可靠的基礎開始。",
+    intro: "本研討會使用獨立部署；帳號與資料僅屬於本場會議。",
     loading: "正在檢查服務…",
     error: "無法取得服務狀態，請確認 API 已啟動後重試。",
     ready: "所有基礎服務已就緒",
@@ -29,7 +30,7 @@ const copy = {
       "即時檢查 API、PostgreSQL、Redis 與背景 worker 的連線狀態。每 15 秒更新，也可手動重試。",
     next: "下一階段 · 等待確認",
     nextText:
-      "帳號生命週期可由登入入口使用。組織、會議、報名、付款與投稿仍待後續階段。",
+      "帳號生命週期可由登入入口使用。本研討會權限、內容、報名、付款與投稿仍待後續階段。",
     db: "權威資料儲存",
     redis: "背景佇列與開發快取",
     worker: "獨立背景處理程序",
@@ -39,8 +40,7 @@ const copy = {
     brand: "Conference Platform",
     label: "FOUNDATION · PHASE 0",
     title: "System status",
-    intro:
-      "A reusable platform for multiple organizations, conferences, and future editions starts with a reliable foundation.",
+    intro: "This conference runs independently with its own accounts and data.",
     loading: "Checking services…",
     error: "Unable to load status. Check that the API is running and retry.",
     ready: "All infrastructure services are ready",
@@ -55,7 +55,7 @@ const copy = {
       "Live connectivity checks for the API, PostgreSQL, Redis, and background worker. Refreshes every 15 seconds, with manual retry.",
     next: "Next phase · Awaiting approval",
     nextText:
-      "Account lifecycle is available from the sign-in link. Organizations, conferences, payments, and submissions await later phases.",
+      "Account lifecycle is available from the sign-in link. Conference permissions, content, payments, and submissions await later phases.",
     db: "Authoritative data storage",
     redis: "Job queue and development cache",
     worker: "Independent background process",
@@ -68,7 +68,7 @@ export function HealthScreen(props: HealthView) {
     <Layout>
       <header>
         <a href="#main-content" className="brand">
-          {t.brand}
+          {props.conferenceName}
         </a>
         <a href="/auth/login">{props.locale === "zh" ? "登入" : "Sign in"}</a>
         <Button

@@ -1,17 +1,19 @@
+import { localFetch } from "./local-http.js";
 import { randomUUID } from "node:crypto";
 import { Queue, QueueEvents } from "bullmq";
-import { redisOptions } from "@confsys/config";
+import { loadLocalConfig, redisOptions } from "@confsys/config";
 import { createClient } from "@confsys/sdk";
 import { SYNTHETIC_JOB, SYNTHETIC_QUEUE } from "@confsys/contracts";
-const base = "http://127.0.0.1:25173";
-const ready = await createClient(base).getReadiness();
+loadLocalConfig();
+const base = process.env.PUBLIC_APP_ORIGIN!;
+const ready = await createClient(base, localFetch).getReadiness();
 if (ready.status !== "ready") throw new Error("Stack not ready");
 for (const [url, status] of [
   [base, 200],
   [`${base}/api/login`, 404],
-  ["http://127.0.0.1:28025/readyz", 200],
+  [`${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/readyz`, 200],
 ] as const) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+  const response = await localFetch(url, { signal: AbortSignal.timeout(5000) });
   if (response.status !== status)
     throw new Error(`Unexpected status from local service: ${response.status}`);
 }

@@ -8,7 +8,7 @@ async function mailLink(email: string, kind: "verify" | "reset") {
     .poll(
       async () => {
         const result = await fetch(
-          `http://127.0.0.1:28025/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`,
+          `${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`,
         ).then((r) => r.json());
         const messages: { ID: string; Subject: string }[] = result.messages;
         id = messages.find((message) =>
@@ -22,10 +22,10 @@ async function mailLink(email: string, kind: "verify" | "reset") {
     )
     .toBe(true);
   const message = await fetch(
-    `http://127.0.0.1:28025/api/v1/message/${id}`,
+    `${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/api/v1/message/${id}`,
   ).then((r) => r.json());
   const match = String(message.Text).match(
-    /http:\/\/127\.0\.0\.1:25173\/auth\/(?:verify|reset)#token=[A-Za-z0-9_-]+/,
+    /http:\/\/[^\s]+\/auth\/(?:verify|reset)#token=[A-Za-z0-9_-]+/,
   );
   if (!match) throw new Error("Mailpit link missing");
   return match[0];
@@ -40,7 +40,7 @@ async function register(page: Page, email: string) {
     .poll(
       async () => {
         const result = await fetch(
-          `http://127.0.0.1:28025/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`,
+          `${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`,
         ).then((r) => r.json());
         return result.messages.length;
       },
@@ -74,7 +74,7 @@ test("real registration → Mailpit → verification → login → reload → lo
   expect(await page.evaluate(() => Object.keys(localStorage))).toEqual([]);
   const oldContext = await browser.newContext();
   const oldPage = await oldContext.newPage();
-  await oldPage.goto("http://127.0.0.1:25173/auth/login");
+  await oldPage.goto(`${process.env.PUBLIC_APP_ORIGIN}/auth/login`);
   await oldPage.getByLabel("電子郵件").fill(email);
   await oldPage.getByLabel("密碼", { exact: true }).fill(password);
   await oldPage.getByRole("button", { name: "登入", exact: true }).click();
@@ -181,4 +181,19 @@ test("invalid links, unavailable network, retry and anonymous resend have usable
   await page.unroute("**/api/auth/csrf");
   await page.getByRole("button", { name: "申請郵件" }).click();
   await expect(page.getByRole("status")).toContainText("寄送要求已受理");
+});
+
+test("runtime conference configuration failure hides auth form and retry loads real configuration", async ({
+  page,
+}) => {
+  await page.route("**/api/instance", (route) => route.abort());
+  await page.goto("/auth/register");
+  await expect(page.getByRole("alert")).toHaveText("無法取得研討會設定。");
+  await expect(page.getByLabel("電子郵件")).toHaveCount(0);
+  await page.unroute("**/api/instance");
+  await page.getByRole("button", { name: "重試", exact: true }).click();
+  await expect(page.getByLabel("電子郵件")).toBeVisible();
+  await expect(page.locator(".brand")).toHaveText(
+    process.env.CONFERENCE_NAME ?? "研討會",
+  );
 });

@@ -1,5 +1,6 @@
 import {
   readinessSchema,
+  publicInstanceSchema,
   errorSchema,
   routes,
   type Readiness,
@@ -8,6 +9,16 @@ import { ApiError } from "./errors.js";
 export { ApiError } from "./errors.js";
 export function createClient(baseUrl = "", transport: typeof fetch = fetch) {
   return {
+    async getInstance(signal?: AbortSignal) {
+      const response = await transport(`${baseUrl}${routes.instance}`, {
+        credentials: "same-origin",
+        signal: signal ?? AbortSignal.timeout(8000),
+        headers: { accept: "application/json" },
+      });
+      if (!response.ok)
+        throw new ApiError("SERVICE_UNAVAILABLE", response.status);
+      return publicInstanceSchema.parse(await response.json());
+    },
     async getReadiness(signal?: AbortSignal): Promise<Readiness> {
       const response = await transport(`${baseUrl}${routes.ready}`, {
         credentials: "same-origin",

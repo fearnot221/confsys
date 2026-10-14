@@ -1,8 +1,16 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
+import { loadIngressConfig } from "../packages/config/dist/index.js";
+const config = loadIngressConfig();
+const canonicalHost = new URL(config.PUBLIC_APP_ORIGIN).host;
 const root = resolve("apps/web/dist");
 const server = http.createServer(async (req, res) => {
+  if (req.headers.host !== canonicalHost) {
+    res.writeHead(403);
+    res.end("Unrecognized host");
+    return;
+  }
   if (req.url?.startsWith("/api/")) {
     const upstream = http.request(
       {
@@ -12,6 +20,7 @@ const server = http.createServer(async (req, res) => {
         method: req.method,
         headers: {
           accept: "application/json",
+          host: canonicalHost,
           ...Object.fromEntries(
             [
               "content-type",

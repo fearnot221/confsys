@@ -8,3 +8,7 @@ dist
 playwright-report
 test-results
 .DS_Store
+
+.instances
+**/*.env
+**/.env*

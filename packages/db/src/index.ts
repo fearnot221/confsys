@@ -1,12 +1,5 @@
 import { diagnostic } from "@confsys/config";
 import pg, { type PoolClient } from "pg";
-import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
-import { z } from "zod";
-export const tenantScopeSchema = z.strictObject({
-  organizationId: z.uuid(),
-  conferenceId: z.uuid(),
-});
-export type TenantScope = z.infer<typeof tenantScopeSchema>;
 export function createPool(connectionString: string, max = 10) {
   const pool = new pg.Pool({
     connectionString,
@@ -43,38 +36,7 @@ export async function databaseReady(
   );
   if (result.rowCount !== 1) throw new Error("Database migrations required");
 }
-// Internal infrastructure primitive, NOT authentication. A future service must
-// resolve scope from authenticated membership and resource ownership first.
-export async function withTenant<T>(
-  pool: pg.Pool,
-  scope: TenantScope,
-  work: (db: NodePgDatabase, client: PoolClient) => Promise<T>,
-): Promise<T> {
-  const parsed = tenantScopeSchema.parse(scope);
-  const client = await pool.connect();
-  let broken = false;
-  try {
-    await client.query("BEGIN");
-    await client.query(
-      `SELECT set_config('app.organization_id', $1, true), set_config('app.conference_id', $2, true)`,
-      [parsed.organizationId, parsed.conferenceId],
-    );
-    const result = await work(drizzle(client), client);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    try {
-      await client.query("ROLLBACK");
-    } catch {
-      broken = true;
-    }
-    throw error;
-  } finally {
-    client.release(broken);
-  }
-}
-
-// Explicitly for global identity/notification services; does not relax withTenant.
+// Local account/notification transaction; resource policies belong to their services.
 export async function withIdentityTransaction<T>(
   pool: pg.Pool,
   work: (client: PoolClient) => Promise<T>,

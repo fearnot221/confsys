@@ -11,7 +11,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
@@ -26,11 +26,12 @@ jobs:
       - run: pnpm db:migrate:test
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm check
-      - run: docker compose --profile app build
-      - run: docker compose --profile app run --rm migrate
-      - run: docker compose --profile app up -d --no-build --wait api worker web
+      - run: pnpm compose --profile app build
+      - run: pnpm compose --profile app run --rm migrate
+      - run: pnpm compose --profile app up -d --no-build --wait api worker web
       - run: pnpm smoke:stack
       - run: pnpm smoke:auth
+      - run: pnpm test:instances
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:
@@ -40,4 +41,9 @@ jobs:
             test-results/
           retention-days: 7
       - if: always()
-        run: docker compose --profile app down -v
+        run: |
+          pnpm compose --profile app down -v
+          for envfile in .instances/*/[ab].env; do
+            [ -f "$envfile" ] || continue
+            CONFSYS_ENV_FILE="$envfile" pnpm compose --profile app down -v
+          done

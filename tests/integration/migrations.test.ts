@@ -19,6 +19,10 @@ it("migrates a blank isolated database and upgrades an isolated Phase 0 database
       "docker",
       [
         "compose",
+        "--env-file",
+        process.env.CONFSYS_ENV_FILE ?? ".env",
+        "--project-name",
+        process.env.COMPOSE_PROJECT_NAME!,
         "exec",
         "-T",
         "postgres",

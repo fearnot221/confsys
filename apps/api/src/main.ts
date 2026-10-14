@@ -1,3 +1,4 @@
+import { registerInstanceRoute } from "./instance.js";
 import { registerAuthRoutes } from "./auth/routes.js";
 import { createAuthService } from "./auth/service.js";
 import { createRateLimiter } from "./auth/rate-limit.js";
@@ -30,6 +31,7 @@ const app = buildApp(
   },
   true,
 );
+registerInstanceRoute(app, config);
 await databaseReady(pool, "confsys_app");
 await registerAuthRoutes(app, {
   config,

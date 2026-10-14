@@ -1,7 +1,15 @@
 import { chromium, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-// Fixed loopback capture stack; never accepts a production URL/recipient.
-const origin = "http://127.0.0.1:25173";
+import { isLocalHostname, loadLocalConfig } from "@confsys/config";
+// Only selected local capture stacks; never production recipients or URLs.
+loadLocalConfig();
+const origin = process.env.PUBLIC_APP_ORIGIN!;
+if (
+  !origin ||
+  new URL(origin).protocol !== "http:" ||
+  !isLocalHostname(new URL(origin).hostname)
+)
+  throw new Error("Local HTTP origin required");
 const email = `container-smoke-${randomUUID()}@example.invalid`;
 const browser = await chromium.launch();
 try {
@@ -15,7 +23,7 @@ try {
     .poll(
       async () => {
         const response = await fetch(
-          `http://127.0.0.1:28025/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`,
+          `${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`,
         );
         const body: { messages: { ID: string }[] } = await response.json();
         messageId = body.messages[0]?.ID;
@@ -25,12 +33,13 @@ try {
     )
     .toBe(true);
   const detail: { Text: string } = await fetch(
-    `http://127.0.0.1:28025/api/v1/message/${messageId}`,
+    `${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/api/v1/message/${messageId}`,
   ).then((r) => r.json());
   const link = detail.Text.match(
-    /http:\/\/127\.0\.0\.1:25173\/auth\/verify#token=[A-Za-z0-9_-]+/,
+    /http:\/\/[^\s]+\/auth\/verify#token=[A-Za-z0-9_-]+/,
   )?.[0];
-  if (!link) throw new Error("Capture verification link missing");
+  if (!link || new URL(link).origin !== origin)
+    throw new Error("Canonical capture verification link missing");
   await page.goto(link);
   const password = `Synthetic smoke phrase ${randomUUID()}`;
   await page.getByLabel("新密碼", { exact: true }).fill(password);

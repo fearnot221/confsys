@@ -69,7 +69,10 @@ export async function recoverNotifications(pool: Pool) {
 }
 export async function processNotification(
   pool: Pool,
-  config: Pick<WorkerConfig, "MAIL_ENCRYPTION_KEY" | "MAIL_KEY_VERSION">,
+  config: Pick<
+    WorkerConfig,
+    "MAIL_ENCRYPTION_KEY" | "MAIL_KEY_VERSION" | "CONFERENCE_NAME"
+  >,
   id: string,
   send: SendMail,
 ) {
@@ -124,12 +127,13 @@ export async function processNotification(
     receipt = await send({
       to: entry.email,
       subject:
-        row.kind === "verify"
+        `[${config.CONFERENCE_NAME}] ` +
+        (row.kind === "verify"
           ? "確認信箱 / Verify email"
           : row.kind === "reset"
             ? "重設密碼 / Reset password"
-            : "密碼已變更 / Password changed",
-      text: `${row.kind === "password_changed" ? "Your password changed. Existing sessions were revoked." : "Open the link and explicitly submit the form. Opening it does not change your account."}\n\n${link}\n\nRequest: ${row.request_id}`,
+            : "密碼已變更 / Password changed"),
+      text: `${config.CONFERENCE_NAME} — 本研討會帳號 / Conference account\n\n${row.kind === "password_changed" ? "Your password changed. Existing sessions were revoked." : "Open the link and explicitly submit the form. Opening it does not change your account."}\n\n${link}\n\nRequest: ${row.request_id}`,
       messageId: `<${id}@confsys.invalid>`,
     });
   } catch (error) {
@@ -184,7 +188,7 @@ export function createMailSender(
   const send: SendMail = async (mail) => {
     const result = await transport.sendMail({
       ...mail,
-      from: "Conference Platform <noreply@confsys.invalid>",
+      from: "Conference <noreply@confsys.invalid>",
     });
     return { messageId: result.messageId };
   };

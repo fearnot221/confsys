@@ -4,7 +4,7 @@
 
 ## Contracts, schema and permissions
 
-- [ ] Tenant boundaries checked (cross-organization AND cross-conference)
+- [ ] Instance isolation and implemented local resource permissions checked
 - [ ] API / DTO changes reviewed by core owner
 - [ ] Migration and rollback/forward recovery documented
 - [ ] No secrets, real email, real charges or production fixtures

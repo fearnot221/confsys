@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Input, Layout } from "@confsys/ui";
 export type AuthView = {
+  conferenceName: string;
   mode: string;
   busy: boolean;
   loading: boolean;
@@ -15,7 +16,7 @@ export type AuthView = {
   onRetry: () => void;
 };
 const titles: Record<string, string> = {
-  register: "建立帳號",
+  register: "建立本研討會帳號",
   waiting: "等待信箱驗證",
   verify: "確認信箱並設定密碼",
   login: "登入",
@@ -35,14 +36,18 @@ export function AuthScreen(view: AuthView) {
     <Layout>
       <header>
         <a className="brand" href="/">
-          研討會平台
+          {view.conferenceName}
         </a>
         <a href="/auth/account">我的帳號</a>
       </header>
       <section className="auth-panel" aria-busy={view.busy || view.loading}>
         <p className="eyebrow">帳號與安全 / ACCOUNT</p>
-        <h1>{titles[view.mode] ?? titles.login}</h1>
-        <p>一個帳號參與不同研討會。會議權限由各組織另行授予。</p>
+        <h1>
+          {view.mode === "login"
+            ? `登入 ${view.conferenceName}`
+            : (titles[view.mode] ?? titles.login)}
+        </h1>
+        <p>本帳號僅用於本研討會；其他研討會需另外註冊。</p>
         {view.loading && <p role="status">正在確認登入狀態…</p>}
         {view.error && (
           <p id="auth-error" role="alert">

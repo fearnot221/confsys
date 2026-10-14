@@ -4,8 +4,13 @@ export default defineConfig({
   plugins: [react()],
   resolve: { conditions: ["development"] },
   server: {
-    port: 25173,
+    port: Number(process.env.WEB_PORT ?? 25173),
     strictPort: true,
-    proxy: { "/api": "http://127.0.0.1:23000" },
+    proxy: {
+      "/api": {
+        target: `http://127.0.0.1:${process.env.API_PORT ?? 23000}`,
+        changeOrigin: false,
+      },
+    },
   },
 });

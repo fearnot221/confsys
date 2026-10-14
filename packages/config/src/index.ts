@@ -19,7 +19,27 @@ const mailKey = {
   MAIL_KEY_VERSION: z.string().regex(/^[a-zA-Z0-9_-]{1,32}$/),
   MAIL_ENCRYPTION_KEY: z.string().regex(/^[a-f0-9]{64}$/),
 };
+const instance = {
+  CONFERENCE_NAME: z
+    .string()
+    .trim()
+    .min(1)
+    .max(160)
+    .refine((value) =>
+      [...value].every(
+        (char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127,
+      ),
+    )
+    .default("研討會"),
+};
+export function isLocalHostname(host: string) {
+  return (
+    ["localhost", "127.0.0.1", "[::1]"].includes(host) ||
+    /^[a-z0-9-]+\.localhost$/.test(host)
+  );
+}
 const apiSchema = z.object({
+  ...instance,
   ...base,
   ...mailKey,
   DATABASE_URL: database,
@@ -42,8 +62,8 @@ function parse<T>(schema: z.ZodType<T>, env: NodeJS.ProcessEnv): T {
     );
   return result.data;
 }
-export function loadApiConfig(env: NodeJS.ProcessEnv = process.env) {
-  const config = parse(apiSchema, env);
+export function loadIngressConfig(env: NodeJS.ProcessEnv = process.env) {
+  const config = parse(z.object({ ...base, PUBLIC_APP_ORIGIN: z.url() }), env);
   const origin = new URL(config.PUBLIC_APP_ORIGIN);
   if (
     origin.origin !== config.PUBLIC_APP_ORIGIN ||
@@ -53,10 +73,15 @@ export function loadApiConfig(env: NodeJS.ProcessEnv = process.env) {
       !(
         config.NODE_ENV !== "production" &&
         origin.protocol === "http:" &&
-        ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)
+        isLocalHostname(origin.hostname)
       ))
   )
     throw new Error("Invalid environment fields: PUBLIC_APP_ORIGIN");
+  return config;
+}
+export function loadApiConfig(env: NodeJS.ProcessEnv = process.env) {
+  const config = parse(apiSchema, env);
+  loadIngressConfig(env);
   if (config.SESSION_IDLE_SECONDS > config.SESSION_ABSOLUTE_SECONDS)
     throw new Error("Invalid environment fields: SESSION_IDLE_SECONDS");
   return config;
@@ -65,6 +90,7 @@ export function loadWorkerConfig(env: NodeJS.ProcessEnv = process.env) {
   return parse(
     z.object({
       ...base,
+      ...instance,
       ...mailKey,
       WORKER_DATABASE_URL: database,
       REDIS_URL: redis,
@@ -74,10 +100,7 @@ export function loadWorkerConfig(env: NodeJS.ProcessEnv = process.env) {
       SMTP_HOST: z
         .enum(["127.0.0.1", "localhost", "mailpit"])
         .default("127.0.0.1"),
-      SMTP_PORT: z.coerce
-        .number()
-        .refine((n) => n === 1025 || n === 21025)
-        .default(21025),
+      SMTP_PORT: port.default(21025),
     }),
     env,
   );
@@ -106,4 +129,32 @@ export function redisOptions(url: string) {
     db: Number(parsed.pathname.slice(1) || 0),
     ...(parsed.protocol === "rediss:" ? { tls: {} } : {}),
   };
+}
+
+// Local tooling only; never serialized by the API or passed wholesale to services.
+export function loadLocalConfig(env: NodeJS.ProcessEnv = process.env) {
+  return parse(
+    z.object({
+      COMPOSE_PROJECT_NAME: z.string().regex(/^[a-z0-9][a-z0-9_-]+$/),
+      APP_IMAGE: z
+        .string()
+        .regex(
+          /^[a-z0-9][a-z0-9/._-]*(?::[a-zA-Z0-9._-]+|@sha256:[a-f0-9]{64})$/,
+        ),
+      WEB_PORT: port.default(25173),
+      POSTGRES_PORT: port.default(25432),
+      REDIS_PORT: port.default(26379),
+      MAILPIT_PORT: port.default(28025),
+      SMTP_PORT: port.default(21025),
+      API_PORT: port.default(23000),
+      WORKER_PORT: port.default(23001),
+      MAILPIT_URL: url(["http:"])
+        .refine(
+          (value) =>
+            URL.canParse(value) && isLocalHostname(new URL(value).hostname),
+        )
+        .optional(),
+    }),
+    env,
+  );
 }

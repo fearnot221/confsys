@@ -1,3 +1,4 @@
+import { useInstance } from "../features/instance/hooks/use-instance.js";
 import { useAuth } from "../features/auth/hooks/use-auth.js";
 import { AuthScreen } from "../features/auth/components/auth-screen.js";
 import React, { Component, useEffect, useState, type ReactNode } from "react";
@@ -30,17 +31,19 @@ class ErrorBoundary extends Component<
 }
 function App() {
   const state = useHealth();
+  const instance = useInstance();
   const [locale, setLocale] = useState<"zh" | "en">("zh");
   useEffect(() => {
     document.documentElement.lang = locale === "zh" ? "zh-Hant" : "en";
     document.title =
       locale === "zh"
-        ? "研討會平台 · 系統狀態"
-        : "Conference Platform · System status";
-  }, [locale]);
+        ? `${instance.data?.conferenceName ?? "研討會"} · 系統狀態`
+        : `${instance.data?.conferenceName ?? "Conference"} · System status`;
+  }, [locale, instance.data]);
   return (
     <HealthScreen
       {...state}
+      conferenceName={instance.data?.conferenceName ?? "研討會"}
       onRefresh={state.refresh}
       locale={locale}
       onLocaleChange={() => setLocale(locale === "zh" ? "en" : "zh")}
@@ -50,7 +53,27 @@ function App() {
 function AuthApp() {
   const mode = window.location.pathname.split("/")[2] ?? "login";
   const state = useAuth(mode);
-  return <AuthScreen {...state} />;
+  const instance = useInstance();
+  useEffect(() => {
+    document.documentElement.lang = "zh-Hant";
+    document.title = instance.data
+      ? `${instance.data.conferenceName} · 帳號與安全`
+      : "載入研討會";
+  }, [instance.data]);
+  if (!instance.data)
+    return (
+      <main className="layout">
+        <p role={instance.error ? "alert" : "status"}>
+          {instance.error ? "無法取得研討會設定。" : "載入研討會…"}
+        </p>
+        {instance.error && (
+          <button onClick={() => void instance.refetch()}>重試</button>
+        )}
+      </main>
+    );
+  return (
+    <AuthScreen {...state} conferenceName={instance.data.conferenceName} />
+  );
 }
 const queryClient = new QueryClient();
 createRoot(document.getElementById("root")!).render(

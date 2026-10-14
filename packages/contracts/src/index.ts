@@ -6,6 +6,10 @@ import {
 } from "./auth.js";
 export * from "./auth.js";
 import { z } from "zod";
+export const publicInstanceSchema = z.strictObject({
+  conferenceName: z.string().min(1).max(160),
+});
+export type PublicInstance = z.infer<typeof publicInstanceSchema>;
 export const dependencyStatus = z.enum(["up", "down"]);
 export const readinessSchema = z.strictObject({
   status: z.enum(["ready", "not_ready"]),
@@ -28,6 +32,7 @@ export const syntheticJobSchema = z.strictObject({ nonce: z.uuid() });
 export const SYNTHETIC_QUEUE = "phase0-synthetic";
 export const SYNTHETIC_JOB = "synthetic.ping";
 export const routes = {
+  instance: "/api/instance",
   live: "/api/health/live",
   ready: "/api/health/ready",
 } as const;
@@ -42,6 +47,21 @@ export function openApiDocument() {
     info: { title: "Conference Platform Infrastructure API", version: "0.0.0" },
     paths: {
       ...authPaths(),
+      [routes.instance]: {
+        get: {
+          operationId: "getInstance",
+          responses: {
+            200: {
+              description: "Public conference display configuration",
+              content: {
+                "application/json": {
+                  schema: z.toJSONSchema(publicInstanceSchema),
+                },
+              },
+            },
+          },
+        },
+      },
       [routes.live]: {
         get: {
           operationId: "getLiveness",

@@ -1,6 +1,5 @@
 import { it, expect } from "vitest";
 import { loadConfig } from "@confsys/config";
-import { tenantScopeSchema } from "@confsys/db";
 it("fails closed on missing configuration without exposing secret values", () => {
   expect(() => loadConfig({ DATABASE_URL: "sensitive-not-a-url" })).toThrow(
     "Invalid environment fields",
@@ -10,13 +9,4 @@ it("fails closed on missing configuration without exposing secret values", () =>
   } catch (error) {
     expect(String(error)).not.toContain("sensitive-not-a-url");
   }
-});
-it("rejects missing or invalid tenant context", () => {
-  expect(tenantScopeSchema.safeParse({}).success).toBe(false);
-  expect(
-    tenantScopeSchema.safeParse({
-      organizationId: "untrusted",
-      conferenceId: "untrusted",
-    }).success,
-  ).toBe(false);
 });

@@ -1,4 +1,4 @@
-name: confsys-phase0
+name: ${COMPOSE_PROJECT_NAME:?Select an instance env file}
 services:
   postgres:
     image: postgres:17.11-alpine
@@ -8,7 +8,7 @@ services:
       MIGRATOR_PASSWORD: ${MIGRATOR_PASSWORD:?Run pnpm env:setup}
       APP_PASSWORD: ${APP_PASSWORD:?Run pnpm env:setup}
       WORKER_PASSWORD: ${WORKER_PASSWORD:?Run pnpm env:setup}
-    ports: ["127.0.0.1:25432:5432"]
+    ports: ["127.0.0.1:${POSTGRES_PORT:-25432}:5432"]
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/init-db.sh:/docker-entrypoint-initdb.d/01-roles.sh:ro
@@ -20,8 +20,15 @@ services:
     mem_limit: 512m
   redis:
     image: redis:7.4.7-alpine
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
-    ports: ["127.0.0.1:26379:6379"]
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
+    ports: ["127.0.0.1:${REDIS_PORT:-26379}:6379"]
     volumes: ["redis-data:/data"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -31,7 +38,11 @@ services:
     mem_limit: 256m
   mailpit:
     image: axllent/mailpit:v1.29.4
-    ports: ["127.0.0.1:28025:8025", "127.0.0.1:21025:1025"]
+    ports:
+      [
+        "127.0.0.1:${MAILPIT_PORT:-28025}:8025",
+        "127.0.0.1:${SMTP_PORT:-21025}:1025",
+      ]
     environment:
       MP_DATABASE: /data/mailpit.db
       MP_MAX_MESSAGES: 200
@@ -44,6 +55,7 @@ services:
     mem_limit: 256m
   migrate:
     profiles: ["app"]
+    image: ${APP_IMAGE:?Select a versioned application image}
     build: .
     command: ["node", "packages/db/dist/migrate.js"]
     environment:
@@ -53,13 +65,15 @@ services:
     mem_limit: 256m
   api:
     profiles: ["app"]
+    image: ${APP_IMAGE:?Select a versioned application image}
     build: .
     environment:
       DATABASE_URL: postgresql://confsys_app:${APP_PASSWORD}@postgres:5432/confsys
       REDIS_URL: redis://redis:6379/0
       WORKER_HEALTH_URL: http://worker:23001
-      NODE_ENV: development
-      PUBLIC_APP_ORIGIN: http://127.0.0.1:25173
+      NODE_ENV: ${NODE_ENV:-development}
+      CONFERENCE_NAME: ${CONFERENCE_NAME:?Set conference display name}
+      PUBLIC_APP_ORIGIN: ${PUBLIC_APP_ORIGIN:?Set canonical origin}
       MAIL_KEY_VERSION: ${MAIL_KEY_VERSION}
       MAIL_ENCRYPTION_KEY: ${MAIL_ENCRYPTION_KEY}
       CSRF_SIGNING_KEY: ${CSRF_SIGNING_KEY}
@@ -69,7 +83,13 @@ services:
       redis: { condition: service_healthy }
       worker: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:23000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:23000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -78,10 +98,12 @@ services:
     init: true
   worker:
     profiles: ["app"]
+    image: ${APP_IMAGE:?Select a versioned application image}
     build: .
     command: ["node", "apps/worker/dist/main.js"]
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV:-development}
+      CONFERENCE_NAME: ${CONFERENCE_NAME:?Set conference display name}
       WORKER_DATABASE_URL: postgresql://confsys_worker:${WORKER_PASSWORD}@postgres:5432/confsys
       REDIS_URL: redis://redis:6379/0
       WORKER_HOST: 0.0.0.0
@@ -93,7 +115,13 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:23001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:23001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -102,13 +130,23 @@ services:
     init: true
   web:
     profiles: ["app"]
+    image: ${APP_IMAGE:?Select a versioned application image}
     build: .
     command: ["node", "infra/web-server.mjs"]
-    ports: ["127.0.0.1:25173:25173"]
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PUBLIC_APP_ORIGIN: ${PUBLIC_APP_ORIGIN:?Set canonical origin}
+    ports: ["127.0.0.1:${WEB_PORT:-25173}:25173"]
     depends_on:
       api: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:25173/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('node:http').get('http://127.0.0.1:25173/',{headers:{host:new URL(process.env.PUBLIC_APP_ORIGIN).host}},r=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))",
+        ]
       interval: 5s
       timeout: 5s
       retries: 20

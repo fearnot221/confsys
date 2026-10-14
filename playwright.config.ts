@@ -26,13 +26,13 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],
-  use: { baseURL: "http://127.0.0.1:25173", trace: "retain-on-failure" },
+  use: { baseURL: process.env.PUBLIC_APP_ORIGIN!, trace: "retain-on-failure" },
   webServer: [
     {
       env: testEnvironment,
       command:
         "node --conditions=development --import tsx scripts/run-process.ts worker built",
-      url: "http://127.0.0.1:23001/health/ready",
+      url: `${process.env.WORKER_HEALTH_URL}/health/ready`,
       reuseExistingServer: false,
       timeout: 30000,
     },
@@ -40,13 +40,13 @@ export default defineConfig({
       env: testEnvironment,
       command:
         "node --conditions=development --import tsx scripts/run-process.ts api built",
-      url: "http://127.0.0.1:23000/api/health/ready",
+      url: `http://127.0.0.1:${process.env.API_PORT ?? 23000}/api/health/ready`,
       reuseExistingServer: false,
       timeout: 30000,
     },
     {
       command: "pnpm dev:web",
-      url: "http://127.0.0.1:25173",
+      url: process.env.PUBLIC_APP_ORIGIN!,
       reuseExistingServer: false,
       timeout: 30000,
     },

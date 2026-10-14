@@ -58,11 +58,11 @@ it("durable pending survives queue delay and real independent BullMQ consumer se
       .poll(async () => (await status(notification.id)).status)
       .toBe("accepted");
     const result = await fetch(
-      `http://127.0.0.1:28025/api/v1/search?query=${encodeURIComponent(`to:${notification.email}`)}`,
+      `${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/api/v1/search?query=${encodeURIComponent(`to:${notification.email}`)}`,
     ).then((r) => r.json());
     expect(result.messages.length).toBe(1);
     const detail = await fetch(
-      `http://127.0.0.1:28025/api/v1/message/${result.messages[0].ID}`,
+      `${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/api/v1/message/${result.messages[0].ID}`,
     ).then((r) => r.json());
     expect(detail.Text).toContain(notification.link);
     expect(
@@ -214,7 +214,7 @@ it("real worker process crash after Mailpit acceptance becomes unknown and is ne
     );
     expect(called).toBe(false);
     const mail = await fetch(
-      `http://127.0.0.1:28025/api/v1/search?query=${encodeURIComponent(`to:${notification.email}`)}`,
+      `${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/api/v1/search?query=${encodeURIComponent(`to:${notification.email}`)}`,
     ).then((r) => r.json());
     expect(mail.messages).toHaveLength(1);
   } finally {

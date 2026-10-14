@@ -2919,6 +2919,35 @@
         }
       }
     },
+    "/api/instance": {
+      "get": {
+        "operationId": "getInstance",
+        "responses": {
+          "200": {
+            "description": "Public conference display configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "conferenceName": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    }
+                  },
+                  "required": [
+                    "conferenceName"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health/live": {
       "get": {
         "operationId": "getLiveness",
