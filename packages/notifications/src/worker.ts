@@ -74,7 +74,7 @@ export async function recoverNotifications(pool: Pool) {
 }
 // Batches retain their issuing authority. Pending sends fail closed if the
 // issuer is disabled, credentials change, permission is removed, or cancelled.
-async function batchEligible(pool: Pool, row: Notification) {
+async function batchEligible(pool: Pool | PoolClient, row: Notification) {
   if (!row.batch_id) return true;
   const result = await pool.query<{ active: boolean; roles: string[] }>(
     "SELECT active,roles FROM confsys.notification_batch_authority WHERE id=$1",
@@ -137,16 +137,24 @@ export async function processNotification(
     await finish(pool, row, "failed", "SECRET_UNAVAILABLE");
     return;
   }
-  if (!(await batchEligible(pool, row))) {
-    await finish(pool, row, "cancelled", "BATCH_AUTHORITY_REVOKED");
-    return;
-  }
-  const sending = await pool.query(
-    `UPDATE confsys.notifications n SET stage='sending' FROM confsys.notification_eligibility e
-    WHERE n.id=$1 AND n.claim_id=$2 AND n.status='processing' AND n.lease_until>now() AND n.id=e.id AND e.eligible RETURNING n.id`,
-    [id, row.claim_id],
-  );
-  if (!sending.rowCount) {
+  // This transaction is the authorization linearization point for both inbox
+  // release and SMTP. Access revocation before it wins; SMTP outcomes cannot
+  // retract a notification that was already authorized for the recipient.
+  const sending = await withIdentityTransaction(pool, async (db) => {
+    await db.query("SELECT singleton FROM confsys.access_control FOR SHARE");
+    if (!(await batchEligible(db, row))) return false;
+    const changed = await db.query(
+      `UPDATE confsys.notifications n SET stage='sending',released_at=coalesce(n.released_at,clock_timestamp())
+       FROM confsys.notification_eligibility e
+       WHERE n.id=$1 AND n.claim_id=$2 AND n.status='processing' AND n.lease_until>now()
+       AND n.id=e.id AND e.eligible AND n.available_at<=clock_timestamp()
+       AND (n.batch_id IS NULL OR EXISTS(SELECT 1 FROM confsys.notification_batch_authority a WHERE a.id=n.id AND a.active))
+       RETURNING n.id`,
+      [id, row.claim_id],
+    );
+    return !!changed.rowCount;
+  });
+  if (!sending) {
     await finish(pool, row, "cancelled", "INELIGIBLE");
     return;
   }

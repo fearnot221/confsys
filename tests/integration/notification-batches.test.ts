@@ -707,6 +707,7 @@ it("keeps scheduled content hidden until due and preserves provider identifiers 
     "UPDATE confsys.notification_batches SET scheduled_at=now()-interval '1 second' WHERE id=$1",
     [batch.id],
   );
+  expect(await visibleTo(recipient.id, notificationId)).toBe(0);
   await send(batch.id);
   expect(await visibleTo(recipient.id, notificationId)).toBe(1);
   const detail = await service.deliveries(admin.raw, { id: batch.id });
@@ -761,6 +762,10 @@ it("cancellation before scheduled availability permanently suppresses recipient 
   );
   await f.admin.query(
     "UPDATE confsys.notification_batches SET created_at=now()-interval '8 days',scheduled_at=now()-interval '1 day' WHERE id=$1",
+    [retryable.id],
+  );
+  await f.admin.query(
+    "UPDATE confsys.notifications SET available_at=now()-interval '1 day' WHERE batch_id=$1",
     [retryable.id],
   );
   await connectionFailure(retryable.id);
@@ -848,4 +853,64 @@ it("audience and template HTTP endpoints enforce session, CSRF and no-store admi
     await server.close();
     await redis.quit();
   }
+});
+
+it("releases scheduled inbox content only after current issuer authority passes worker preflight", async () => {
+  const issuer = await active(true);
+  const batch = await service.create(
+    issuer.raw,
+    {
+      ...input(),
+      scheduledAt: new Date(Date.now() + 3600000).toISOString(),
+    },
+    rid(),
+  );
+  const id = await mailId(batch.id);
+  await f.admin.query(
+    "UPDATE confsys.notifications SET available_at=now()-interval '1 second',next_attempt_at=now()-interval '1 second' WHERE id=$1",
+    [id],
+  );
+  expect(await visibleTo(recipient.id, id)).toBe(0);
+  await f.admin.query("DELETE FROM confsys.user_roles WHERE user_id=$1", [
+    issuer.id,
+  ]);
+  await send(batch.id);
+  expect(await visibleTo(recipient.id, id)).toBe(0);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT status,released_at FROM confsys.notifications WHERE id=$1",
+        [id],
+      )
+    ).rows[0],
+  ).toEqual({ status: "cancelled", released_at: null });
+  await expect(
+    f.app.query(
+      "UPDATE confsys.notifications SET released_at=now() WHERE false",
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+
+  const authorized = await service.create(
+    admin.raw,
+    {
+      ...input(),
+      scheduledAt: new Date(Date.now() + 3600000).toISOString(),
+    },
+    rid(),
+  );
+  const authorizedId = await mailId(authorized.id);
+  await f.admin.query(
+    "UPDATE confsys.notifications SET available_at=now()-interval '1 second' WHERE id=$1",
+    [authorizedId],
+  );
+  await connectionFailure(authorized.id);
+  expect(await visibleTo(recipient.id, authorizedId)).toBe(1);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT released_at FROM confsys.notifications WHERE id=$1",
+        [authorizedId],
+      )
+    ).rows[0].released_at,
+  ).toBeInstanceOf(Date);
 });
