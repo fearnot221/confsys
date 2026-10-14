@@ -122,7 +122,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
     enroll: (raw: string | undefined, input: unknown, requestId: string) => {
       const d = competitionEndpoints.competitionEnroll.input.parse(input);
       return authorized(raw, undefined, true, async (db, actor) => {
-        const c = await repo.competition(db, d.competitionId, true);
+        const c = await repo.catalogCompetition(db, d.competitionId);
         beforeDeadline(c.value.config.registrationClosesAt);
         const r = await eligible(db, d.revisionId, c.value.config);
         if (r.ownerId !== actor) throw new AuthError("NOT_FOUND");
@@ -142,7 +142,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
         )
           throw new AuthError("CONFLICT");
         if (result.created) {
-          await repo.bump(db, d.competitionId);
+          await repo.bump(db, d.competitionId, result.value.id);
           await repo.audit(
             db,
             actor,
@@ -178,7 +178,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
           return existing;
         }
         verifyVersion(previous.version, d.expectedVersion);
-        const c = await repo.competition(db, previous.competitionId, true);
+        const c = await repo.catalogCompetition(db, previous.competitionId);
         beforeDeadline(c.value.config.registrationClosesAt);
         const accepted = await eligible(db, d.revisionId, c.value.config);
         if (
@@ -202,7 +202,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
           accepted.presenter.name,
           d.reason,
         );
-        await repo.bump(db, previous.competitionId);
+        await repo.bump(db, previous.competitionId, result.id);
         await repo.audit(
           db,
           actor,
@@ -259,7 +259,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
                   : "disqualified",
             d.reason,
           );
-          await repo.bump(db, e.competitionId);
+          await repo.bump(db, e.competitionId, e.id);
           await repo.audit(
             db,
             actor,
@@ -286,11 +286,11 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
           c = await repo.competition(db, e.competitionId, true);
         if (e.state !== "approved") throw new AuthError("CONFLICT");
         const r = await eligible(db, e.revisionId, c.value.config);
-        await repo.actorEmail(db,d.judgeId);
+        await repo.actorEmail(db, d.judgeId);
         requirePermission(await rolesFor(db, d.judgeId), "competitions.score");
         if (
           r.ownerId === d.judgeId ||
-          (await isRevisionAuthorAccount(db,e.revisionId,d.judgeId)) ||
+          (await isRevisionAuthorAccount(db, e.revisionId, d.judgeId)) ||
           (await repo.hasConflict(db, e.id, d.judgeId))
         )
           throw new AuthError("FORBIDDEN");
@@ -302,7 +302,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
           c.value.currentRubricId,
         );
         if (result.created) {
-          await repo.bump(db, e.competitionId);
+          await repo.bump(db, e.competitionId, e.id);
           await repo.audit(
             db,
             actor,
@@ -356,7 +356,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
         await repo.assertLatestEntry(db, a.entryId);
         if (a.state !== "cancelled") {
           await repo.cancel(db, a.id);
-          await repo.bump(db, a.competitionId);
+          await repo.bump(db, a.competitionId, a.entryId, a.id);
           await repo.audit(
             db,
             actor,
@@ -377,7 +377,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
         if (a.state === "cancelled") throw new AuthError("CONFLICT");
         if (a.state !== "conflicted") {
           await repo.conflict(db, a.id, a.entryId, actor, d.reason);
-          await repo.bump(db, a.competitionId);
+          await repo.bump(db, a.competitionId, a.entryId, a.id);
           await repo.audit(
             db,
             actor,
@@ -413,7 +413,8 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
           score.maximum,
           d.action === "submit",
         );
-        if (d.action === "submit") await repo.bump(db, a.competitionId);
+        if (d.action === "submit")
+          await repo.bump(db, a.competitionId, a.entryId, a.id);
         await repo.audit(
           db,
           actor,

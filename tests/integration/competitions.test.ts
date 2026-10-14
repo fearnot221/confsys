@@ -1101,3 +1101,119 @@ it("creates an idempotent presenter successor with fresh qualification and scori
     ).toEqual([]);
   });
 });
+
+it("isolates competition drafts and rubric/publication history while preserving scoped catalog and version advancement", async () => {
+  const c = await competition(),
+    p = await paper(),
+    e = await approve(await enroll(c, p));
+  const a = await assignment(e.id);
+  const hidden = id(),
+    activePublication = id();
+  await f.admin.query(
+    "UPDATE confsys.competitions SET award_reason='Private adjudication rationale' WHERE id=$1",
+    [c],
+  );
+  for (const [publicationId, version, name] of [
+    [hidden, 100, "Historical award"],
+    [activePublication, 101, "Active award"],
+  ] as const)
+    await f.admin.query(
+      "INSERT INTO confsys.competition_publications(id,competition_id,source_version,document,published_by) VALUES($1,$2,$3,$4,$5)",
+      [
+        publicationId,
+        c,
+        version,
+        { name, tiePolicy: "shared", awards: [] },
+        leader.id,
+      ],
+    );
+  await f.admin.query(
+    "UPDATE confsys.competitions SET active_publication_id=$2 WHERE id=$1",
+    [c, activePublication],
+  );
+  for (const actor of [null, author.id, judge.id, otherJudge.id])
+    await withIdentityTransaction(f.app, async (db) => {
+      if (actor)
+        await db.query("SELECT set_config('app.actor_id',$1,true)", [actor]);
+      for (const table of [
+        "competitions",
+        "competition_rubrics",
+        "competition_publications",
+      ])
+        expect(
+          (
+            await db.query(
+              `SELECT * FROM confsys.${table} WHERE ${table === "competitions" ? "id" : "competition_id"}=$1`,
+              [c],
+            )
+          ).rows,
+        ).toEqual([]);
+      const catalog = (
+        await db.query(
+          "SELECT * FROM confsys.competition_catalog WHERE id=$1",
+          [c],
+        )
+      ).rows;
+      expect(catalog).toHaveLength(actor ? 1 : 0);
+      expect(JSON.stringify(catalog)).not.toMatch(
+        /award_reason|Private adjudication|created_by/,
+      );
+      expect(
+        (
+          await db.query(
+            "SELECT * FROM confsys.competition_assignment_rubrics WHERE id=$1",
+            [a.rubricId],
+          )
+        ).rowCount,
+      ).toBe(actor === judge.id ? 1 : 0);
+      expect(
+        (
+          await db.query(
+            "SELECT publication_id FROM confsys.competition_active_awards WHERE id=$1",
+            [c],
+          )
+        ).rows,
+      ).toEqual([{ publication_id: activePublication }]);
+    });
+  expect((await svc.public()).competitions.find((v) => v.id === c)?.name).toBe(
+    "Active award",
+  );
+  expect(
+    (await svc.admin(leader.raw, c)).awardDrafts.find(
+      (v) => v.competitionId === c,
+    )?.reason,
+  ).toBe("Private adjudication rationale");
+  await expect(
+    f.app.query("SELECT confsys.advance_competition_version($1,$2,$3)", [
+      c,
+      e.id,
+      a.id,
+    ]),
+  ).rejects.toMatchObject({ code: "42501" });
+  for (const params of [
+    [c, e.id, a.id],
+    [c, id(), null],
+    [id(), e.id, null],
+  ])
+    await expect(
+      withIdentityTransaction(f.app, async (db) => {
+        await db.query("SELECT set_config('app.actor_id',$1,true)", [
+          author.id,
+        ]);
+        await db.query(
+          "SELECT confsys.advance_competition_version($1,$2,$3)",
+          params,
+        );
+      }),
+    ).rejects.toMatchObject({ code: "42501" });
+  const before = (await current(c)).version;
+  await withIdentityTransaction(f.app, async (db) => {
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [judge.id]);
+    await db.query("SELECT confsys.advance_competition_version($1,$2,$3)", [
+      c,
+      e.id,
+      a.id,
+    ]);
+  });
+  expect((await current(c)).version).toBe(before + 1);
+});

@@ -32,7 +32,7 @@ export async function competition(db: PoolClient, id: string, lock = false) {
       award_reason: string;
       active_publication_id: string | null;
     }>(
-      `SELECT c.*,r.document FROM confsys.competitions c JOIN confsys.competition_rubrics r ON r.id=c.current_rubric_id WHERE c.id=$1${lock ? " FOR UPDATE OF c" : ""}`,
+      `SELECT c.id,c.version,c.current_rubric_id,c.award_draft,c.award_reason,c.active_publication_id,r.document FROM confsys.competitions c JOIN confsys.competition_rubrics r ON r.id=c.current_rubric_id WHERE c.id=$1${lock ? " FOR UPDATE OF c" : ""}`,
       [id],
     )
   ).rows[0];
@@ -52,9 +52,17 @@ export async function competition(db: PoolClient, id: string, lock = false) {
 export async function competitions(db: PoolClient) {
   return (
     await db.query(
-      'SELECT c.id,c.version,c.current_rubric_id AS "currentRubricId",r.document AS config FROM confsys.competitions c JOIN confsys.competition_rubrics r ON r.id=c.current_rubric_id ORDER BY c.id LIMIT 51',
+      'SELECT id,version,current_rubric_id AS "currentRubricId",config FROM confsys.competition_catalog ORDER BY id LIMIT 51',
     )
   ).rows.map((r) => competitionSchema.parse(r));
+}
+export async function catalogCompetition(db: PoolClient, id: string) {
+  const r = await db.query(
+    'SELECT id,version,current_rubric_id AS "currentRubricId",config FROM confsys.competition_catalog WHERE id=$1',
+    [id],
+  );
+  if (!r.rows[0]) throw new AuthError("NOT_FOUND");
+  return { value: competitionSchema.parse(r.rows[0]) };
 }
 export async function configure(
   db: PoolClient,
@@ -231,7 +239,7 @@ const assignmentFields =
 export async function assignment(db: PoolClient, id: string, lock = false) {
   const r = (
     await db.query(
-      `SELECT ${assignmentFields} FROM confsys.competition_assignments a JOIN confsys.competition_rubrics r ON r.id=a.rubric_id JOIN confsys.competition_entries e ON e.id=a.entry_id WHERE a.id=$1${lock ? " FOR UPDATE OF a" : ""}`,
+      `SELECT ${assignmentFields} FROM confsys.competition_assignments a JOIN confsys.competition_assignment_rubrics r ON r.id=a.rubric_id JOIN confsys.competition_entries e ON e.id=a.entry_id WHERE a.id=$1${lock ? " FOR UPDATE OF a" : ""}`,
       [id],
     )
   ).rows[0];
@@ -246,7 +254,7 @@ export async function assignments(
 ) {
   const rows = (
     await db.query(
-      `SELECT ${assignmentFields} FROM confsys.competition_assignments a JOIN confsys.competition_rubrics r ON r.id=a.rubric_id JOIN confsys.competition_entries e ON e.id=a.entry_id WHERE ($1::uuid IS NULL OR (a.judge_id=$1 AND NOT EXISTS(SELECT 1 FROM confsys.submission_author_conflicts conflict WHERE conflict.revision_id=e.revision_id AND conflict.user_id=a.judge_id))) AND ($2::uuid[] IS NULL OR a.entry_id=ANY($2::uuid[])) ORDER BY a.id LIMIT $4 OFFSET $3`,
+      `SELECT ${assignmentFields} FROM confsys.competition_assignments a JOIN confsys.competition_assignment_rubrics r ON r.id=a.rubric_id JOIN confsys.competition_entries e ON e.id=a.entry_id WHERE ($1::uuid IS NULL OR (a.judge_id=$1 AND NOT EXISTS(SELECT 1 FROM confsys.submission_author_conflicts conflict WHERE conflict.revision_id=e.revision_id AND conflict.user_id=a.judge_id))) AND ($2::uuid[] IS NULL OR a.entry_id=ANY($2::uuid[])) ORDER BY a.id LIMIT $4 OFFSET $3`,
       [judgeId, entryIds, offset, judgeId ? 21 : 401],
     )
   ).rows;
@@ -410,11 +418,17 @@ export async function catalog(db: PoolClient, actorId: string, offset = 0) {
     ...(await entries(db, actorId, null, offset)),
   };
 }
-export async function bump(db: PoolClient, competitionId: string) {
-  await db.query(
-    "UPDATE confsys.competitions SET version=version+1 WHERE id=$1",
-    [competitionId],
-  );
+export async function bump(
+  db: PoolClient,
+  competitionId: string,
+  entryId: string,
+  assignmentId: string | null = null,
+) {
+  await db.query("SELECT confsys.advance_competition_version($1,$2,$3)", [
+    competitionId,
+    entryId,
+    assignmentId,
+  ]);
 }
 export async function awards(
   db: PoolClient,
@@ -435,7 +449,7 @@ export async function publicAwards(db: Pool | PoolClient) {
       document: Record<string, unknown>;
       published_at: Date;
     }>(
-      "SELECT c.id,p.id AS publication_id,p.document,p.published_at FROM confsys.competitions c JOIN confsys.competition_publications p ON p.id=c.active_publication_id ORDER BY c.id LIMIT 50",
+      "SELECT id,publication_id,document,published_at FROM confsys.competition_active_awards ORDER BY id LIMIT 50",
     )
   ).rows;
   return competitionPublicSchema.parse({
