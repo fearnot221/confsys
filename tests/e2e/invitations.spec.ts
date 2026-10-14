@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../helpers/browser-test.js";
 import { register, login } from "../helpers/browser-account.js";
 import { authFixture, password } from "../helpers/auth.js";
 const f = authFixture();

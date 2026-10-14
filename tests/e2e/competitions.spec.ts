@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../helpers/browser-test.js";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { authFixture, password } from "../helpers/auth.js";

@@ -1,5 +1,5 @@
 import { register, login } from "../helpers/browser-account.js";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../helpers/browser-test.js";
 import { execFileSync } from "node:child_process";
 import { authFixture, password } from "../helpers/auth.js";
 const f = authFixture();

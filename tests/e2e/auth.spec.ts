@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../helpers/browser-test.js";
 import { randomUUID } from "node:crypto";
 const password = "Browser conference phrase 918!";
 const replacement = "Updated browser phrase 173!";

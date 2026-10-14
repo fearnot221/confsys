@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../helpers/browser-test.js";
 import { randomUUID } from "node:crypto";
 import { withIdentityTransaction } from "@confsys/db";
 import { enqueueBusinessNotification } from "@confsys/notifications";
