@@ -19,3 +19,9 @@ ESLint forbids forbidden packages and network/browser credential globals in UI. 
 Accessibility baseline: semantic main/header/section, one h1, labeled language button, 44px controls, visible focus, text status in addition to color, polite live status, mobile wrapping. Playwright verifies language/document lang, status, manual retry and no horizontal overflow at 390px. Full WCAG 2.2 AA, assistive technology and all-browser testing are unverified.
 
 Phase 1 hooks must use keys including organization/conference/subject/permission version as applicable; switch/logout must clear sensitive query state and form selections. This health screen has only a global, public infrastructure key. Future states include empty, permission denied, expired session, closed deadline and unsaved changes; not fabricated in Phase 0.
+
+## Maintaining the boundary during feature work
+
+Mutations, server-state transitions, invalidation and error translation belong in feature hooks/data modules using the SDK. Components may manage local presentation state but must not duplicate business rules or decide backend access from hidden controls. DTOs remain explicit projections defined by the core owner; an ORM row or asserted cast is not an API contract.
+
+When a boundary genuinely needs to change, update the contract/view model, its tests and import rules together with core review. Do not relax lint merely to make a presentation import pass. Existing checks are an allowlist, not a complete dependency-graph proof; expansion work and its regression cases are tracked in [ROADMAP.md](ROADMAP.md#phase-0-maintainability-review--2026-10-15). Presentation-only improvements should not trigger unrelated renaming, file moves or format rewrites.

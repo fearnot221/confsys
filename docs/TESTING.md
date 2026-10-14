@@ -39,3 +39,28 @@ Redis integration uses a unique queue in local test DB 1; it executes a real wor
 No account/login, CSRF, session, payment, submission, upload, outbox, email-delivery or full business E2E exists. Network-error E2E deliberately aborts a browser request; healthy E2E uses real servers. Full browser matrix, WCAG certification, load/security penetration, production deployment and backup restore drills remain unverified. GitHub Actions YAML is configured for PR and main; cloud execution requires a remote repository and push.
 
 Exact local execution results, resolved failures and counts live in `PHASE0_DELIVERY.md`. Never mark checks passing solely because scripts or CI YAML exist.
+
+## Test and documentation maintenance
+
+Core business rules need independently runnable tests at the service/domain boundary. Use real PostgreSQL for RLS, constraints and transaction behavior, and real Redis for queue-dependent behavior. Injected transport/probe tests remain useful at their own boundary; they cannot replace those integration checks.
+
+For a bug fix, first capture the failing behavior in a regression test at the responsible layer, then verify the fix and relevant existing checks. Preserve negative authorization/error assertions. Never remove, skip or weaken a check merely to get a pass. New API, policy, schema, environment and operational behavior must update the corresponding contract, examples, runbook and tests in the same change.
+
+The existing required gates still apply to executable changes. Documentation-only changes need review for consistency, working relative links and diff cleanliness; do not invent behavioral tests or claim the full suite was rerun. Record actual commands, skipped/unverified areas and the four-part maintainability check in each delivery. Historical Phase 0 results in `PHASE0_DELIVERY.md` are not fresh evidence for later code changes.
+
+## Handoff and common failures
+
+Start with README setup, the [architecture entry-point map](ARCHITECTURE.md#entry-points-for-handoff) and the command table above. Inspect status/configuration without printing `.env`, credentials, request payloads or raw tokens.
+
+| Symptom | Inspect / next step |
+|---|---|
+| Engine mismatch or install refusal | Check `node --version`, `pnpm --version` against `.node-version` / `packageManager`; activate pinned tools, do not disable engine/peer checks |
+| Port conflict or Playwright refuses existing server | `docker compose ps`; choose host dev or app containers, stop only this project's conflicting process; never enable E2E reuse to test an unrelated server |
+| API ready returns 503 | Inspect dependency statuses; verify PostgreSQL/Redis/worker health and safe-role/migration setup; use `pnpm db:migrate`, never bypass the runtime-role check |
+| DB authentication fails after regenerating `.env` | Existing volume retains original passwords; follow OPERATIONS/README and a deliberate credential recovery plan, not automatic volume deletion |
+| Integration refuses URL | Verify local test DB is `confsys_test` and Redis DB is 1; do not remove production-protection guards |
+| OpenAPI drift | Review intended contract change, run `pnpm contract:generate`, then contract tests; never blindly bless unexpected private fields |
+| Presentation import fails | Trace component → feature hook → SDK; move data behavior to its owner rather than disabling the boundary rule |
+| Built behavior differs from source | Check package-local `dist` and staging `dist`; investigate stale artifacts before changing source or migrations; scheduled build-cleanup work is in ROADMAP |
+
+Log-format limitations currently make some worker/DB failures harder to distinguish; the roadmap schedules sanitized correlation and failure tests. That limitation does not justify exposing raw secrets for debugging.

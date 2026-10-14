@@ -87,3 +87,20 @@ Redis test executes actual jobs, stable-ID duplicate detection and two attempts 
 ## Next minimal work; stop condition
 
 Phase 1 is not started. Proposed reviewable slices: (1) real identity/session and audit/outbox base, (2) organization/conference memberships and trusted scope with switching, (3) versioned conference/series settings, (4) draft/published public pages with crawlable HTML, (5) invitation/outbox/private-file reliability completion. Details and gates in ROADMAP. Await explicit confirmation before beginning any slice.
+
+## Maintainability requirements follow-up — 2026-10-15
+
+Branch: `codex/maintainability-rules`, based on `c6f1d5f`. Earlier sections describe the original Phase 0 delivery; the results below are the fresh verification for this documentation-only follow-up. No Phase 1 implementation, external service operation, merge or production deployment is included.
+
+Added all-phase maintainability requirements to AGENTS, module/entry-point guidance to ARCHITECTURE, change/diagnostic discipline to DATA_CONTRACT, feature-layer guidance to UI_CONTRACT, and regression/handoff/troubleshooting guidance to TESTING. Updated the existing PR template with the required four-part delivery check. Existing document content was retained; no new document or framework was created. The focused source review and five evidence-based deferred items are in [ROADMAP.md](ROADMAP.md#phase-0-maintainability-review--2026-10-15).
+
+Actual commands (Node 24.21.0 / pnpm 10.34.7, using the same isolated tool PATH documented above): `pnpm lint` and `pnpm typecheck` passed; `pnpm test:unit` passed 5 tests, `pnpm test:integration` passed 17 tests against local PostgreSQL/Redis, and `pnpm test:contract` passed 3 tests. `git diff --check` passed. A Python inline check verified that original document lines remain in order and relative links/anchors resolve. No build, E2E, container rebuild or full `pnpm check` was rerun for this documentation-only change; their earlier results remain historical. No new behavioral test was warranted because runtime behavior was not changed.
+
+### Maintainability check / 可維護性檢查
+
+1. **Modules and boundaries:** changed only engineering instructions, architecture/UI/data/testing guidance, roadmap, delivery record and PR template. No runtime module, schema, API, environment variable or startup flow changed.
+2. **Duplication/coupling/dependencies:** no duplicated business rules, new cross-module runtime coupling or dependencies. AGENTS holds the enduring policy; existing specialized documents explain their own boundaries; the roadmap holds the single debt list.
+3. **Tests and documentation:** no test implementation changed; existing relevant gates reran as above, including both real nonprivileged DB logins and cross-organization/cross-conference isolation. Original documentation content and local links were checked.
+4. **Debt and practical risks:** the focused review found no demonstrated blocker for the current health/synthetic-job scope. M1–M5 track role-specific config, safe diagnostics, import-check coverage, stale build artifacts and future HTTP error semantics with treatment points and acceptance criteria. They are not claimed fixed. Reassess before the related authorized unit; Phase 1 still requires confirmation.
+
+No local environment blocker was encountered. Cloud CI, production behavior and the broader coverage limits above remain unverified. Current local services and existing startup instructions are unchanged.

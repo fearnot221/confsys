@@ -24,6 +24,24 @@ Presentation components receive props / view models and callbacks. They must not
 
 Every agent uses a separate branch/worktree. Do not modify another agent's worktree or overwrite its changes. Contract changes require coordinated review; presentation-only work cannot silently modify schemas or endpoints.
 
+## Maintainability — applies to every phase
+
+Maintainability, handoff, debugging and extension are ongoing acceptance criteria, not a final refactoring phase. Apply these rules within the currently authorized scope; they do not authorize the next phase, production operations or architectural rewrites.
+
+- Organize code by business domain with clear, one-way dependencies. HTTP handlers handle input, validation, invocation and response; application/domain services explicitly own authorization, business rules and transaction boundaries; repositories perform scoped persistence without HTTP or UI behavior.
+- API and worker reuse the same business rules. Generic helpers, generic CRUD and repository abstractions must never bypass trusted tenant context, authorization or database constraints. Introduce layers when a real responsibility exists, not to populate empty folders.
+- Use clear business names, small cohesive functions and readable control flow. Comments explain why and important constraints. Judge responsibility and complexity rather than arbitrary file-line limits.
+- Abstract existing duplication or stable boundaries. Do not speculate with large frameworks, generic engines or redundant wrappers. Avoid unrelated renaming, moves and formatting rewrites.
+- Do not conceal type, contract or runtime errors with excessive `any`, unchecked assertions, silent catches or false-success fallbacks. Deliberate error translation must preserve a truthful failure outcome and safe diagnostic information.
+- Browser network access belongs in the SDK; feature data layers own server state and mutations. Presentation receives only props/view models/callbacks, never implements business authorization. Maintain UI/data import boundaries and the existing Codex/Claude ownership split.
+- Schema changes use versioned migrations, never required ad hoc installation SQL or rewrites of applied migrations. Significant data changes document compatibility, backfill and failure/recovery strategy. Keep bootstrap provisioning scripted and repeatable.
+- Centrally validate new environment variables and update `.env.example` and relevant documentation. Use consistent error, log and job-state formats with necessary correlation information; never record passwords, session/invitation/reset tokens, provider secrets or unnecessary personal data.
+- Explain every added dependency's purpose; record the reasons and tradeoffs for important technical choices in an ADR. Do not add dependencies without a concrete need.
+- Keep core rules independently testable; verify PostgreSQL/RLS/transactions/Redis with real integration tests. Bug fixes include regression coverage; never delete or weaken existing checks to obtain a pass.
+- Update relevant documentation with API, permission, model, environment or operational changes. A new maintainer must be able to find feature entry points, start the environment, run tests and locate common failures. Details belong in the existing architecture/contracts/testing documents rather than duplicated manuals.
+
+Before the next authorized development unit, perform a focused Phase 0 review against these rules. Fix evidenced safety/correctness blockers first; record nonblocking debt with evidence, practical risk, acceptance criteria and an appropriate phase in `docs/ROADMAP.md`. The dated review is a baseline to recheck when the relevant code changes, not perpetual approval or permission to start Phase 1.
+
 ## Security and business invariants
 
 - Scope business resources by organization and conference. Resolve trusted context from authentication, memberships and resource ownership, not arbitrary request fields.
@@ -58,6 +76,13 @@ Use synthetic fixture data only. No production seeds with known passwords. Keep 
 Report: branch/commit; implemented scope; usable flow; schema/API/env changes; exact executed commands and results; tenant/permission test evidence; limitations and unverified areas; next minimal step.
 
 Distinguish implemented, mocked, unconfigured and unverified. No invented benchmark, external-provider verification, test result, PR URL or production-readiness claim.
+
+Every delivery must include a **Maintainability check / 可維護性檢查** covering:
+
+1. Changed modules and their responsibility boundaries.
+2. Any new duplicated rules, cross-module coupling or dependencies (explicitly say none when applicable).
+3. Tests and documentation updated together, with actual verification results.
+4. Known technical debt, practical risks and recommended treatment phase.
 
 ## Phase 0 executable commands
 
