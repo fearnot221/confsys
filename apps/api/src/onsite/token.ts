@@ -1,1 +1,1 @@
-export {passToken,passHash} from "@confsys/documents";
+export { passToken, passHash } from "@confsys/documents";

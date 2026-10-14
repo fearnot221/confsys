@@ -7,7 +7,8 @@ export async function validatePdf(bytes: Buffer): Promise<void> {
   const parser = require.resolve("pdf-lib");
   const valid = await new Promise<boolean>((resolve) => {
     let settled = false;
-    const worker = new Worker(`
+    const worker = new Worker(
+      `
       const {parentPort,workerData}=require('node:worker_threads');
       const {PDFDocument,PDFDict,PDFArray,PDFName,PDFStream}=require(workerData.parser);
       (async()=>{
@@ -24,14 +25,32 @@ export async function validatePdf(bytes: Buffer): Promise<void> {
           for(const [,object] of doc.context.enumerateIndirectObjects()) visit(object);
           parentPort.postMessage(true);
         } catch {parentPort.postMessage(false);}
-      })();`, {eval:true,stdout:true,stderr:true,workerData:{parser,bytes},resourceLimits:{maxOldGenerationSizeMb:64,maxYoungGenerationSizeMb:16,stackSizeMb:4}});
+      })();`,
+      {
+        eval: true,
+        stdout: true,
+        stderr: true,
+        workerData: { parser, bytes },
+        resourceLimits: {
+          maxOldGenerationSizeMb: 64,
+          maxYoungGenerationSizeMb: 16,
+          stackSizeMb: 4,
+        },
+      },
+    );
     worker.stdout?.resume();
     worker.stderr?.resume();
-    const finish=(value:boolean)=>{if(settled)return;settled=true;clearTimeout(timer);void worker.terminate();resolve(value);};
-    const timer=setTimeout(()=>finish(false),3000);
-    worker.once("message",value=>finish(value===true));
-    worker.once("error",()=>finish(false));
-    worker.once("exit",()=>finish(false));
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      void worker.terminate();
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(false), 3000);
+    worker.once("message", (value) => finish(value === true));
+    worker.once("error", () => finish(false));
+    worker.once("exit", () => finish(false));
   });
-  if(!valid) throw new AuthError("UNSUPPORTED_MEDIA_TYPE");
+  if (!valid) throw new AuthError("UNSUPPORTED_MEDIA_TYPE");
 }

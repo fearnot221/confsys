@@ -1,25 +1,205 @@
-import {useEffect,useRef,useState} from "react";
-import {useQuery,useQueryClient} from "@tanstack/react-query";
-import {createAuthClient,createOnsiteClient,ApiError} from "@confsys/sdk";
-import {onsitePerson,onsitePass,onsiteList,onsiteRedemption,type OnsitePass,type OnsitePerson} from "@confsys/contracts";
-const client=createOnsiteClient(),auth=createAuthClient();
-export function useOnsite(administrative=false) {
- const queries=useQueryClient(),active=useRef<AbortController|null>(null),keys=useRef(new Map<string,string>());
- const [selectedIds,setSelectedIds]=useState<string[]>([]);
- const [expired,setExpired]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[token,setToken]=useState(""),[pass,setPass]=useState<OnsitePass|null>(null),[person,setPerson]=useState<OnsitePerson|null>(null),[lastRedemption,setLastRedemption]=useState<string|null>(null),[search,setSearch]=useState(""),[offset,setOffset]=useState(0);
- const account=useQuery({queryKey:["private","account"],queryFn:({signal})=>auth.me(signal),enabled:!expired,retry:false});
- const permissions=expired?[]:account.data?.user.permissions??[],canRead=permissions.includes("onsite.read"),canCheckin=permissions.includes("onsite.checkin"),canRedeem=permissions.includes("onsite.redeem"),canUndo=permissions.includes("onsite.undo");
- const directory=useQuery({queryKey:["private","onsite",search,offset],queryFn:async({signal})=>onsiteList.parse(await client.operation("onsiteDirectory",{search,offset},signal)),enabled:administrative&&canRead&&!account.error&&!expired,retry:false});
- function expire(){active.current?.abort();setExpired(true);setSelectedIds([]);setPass(null);setPerson(null);setToken("");setLastRedemption(null);setBusy(false);setError("登入已失效或權限已變更，請重新登入。");void queries.cancelQueries({queryKey:["private"]});queries.removeQueries({queryKey:["private"]});}
- useEffect(()=>{const e=account.error??directory.error;if(e instanceof ApiError&&["SESSION_EXPIRED","FORBIDDEN"].includes(e.code))expire();},[account.error,directory.error]);
- useEffect(()=>()=>active.current?.abort(),[]);
- const perform=async(work:(signal:AbortSignal)=>Promise<void>)=>{active.current?.abort();const c=new AbortController();active.current=c;setBusy(true);setError("");setMessage("");try{await work(c.signal);}catch(e){if(!c.signal.aborted){if(e instanceof ApiError&&["SESSION_EXPIRED","FORBIDDEN"].includes(e.code))expire();else setError(e instanceof ApiError&&e.code==="CONFLICT"?"尚未符合核銷條件、數量已用盡或狀態已更新。請重新查詢。":"操作失敗，請檢查報到碼及輸入後重試。");}}finally{if(active.current===c)setBusy(false);}};
- const refreshPerson=async(signal:AbortSignal)=>{const result=onsitePerson.parse(await client.operation("onsiteLookup",{token},signal));if(!signal.aborted)setPerson(result);await queries.invalidateQueries({queryKey:["private","onsite"]});};
- const mutation=(operation:"onsiteCheckin"|"onsiteRedeem",input:Record<string,unknown>)=>void perform(async signal=>{const key=JSON.stringify([operation,token,input]);let idempotencyKey=keys.current.get(key);if(!idempotencyKey){idempotencyKey=crypto.randomUUID();keys.current.set(key,idempotencyKey);}const result=await client.operation(operation,{token,...input,idempotencyKey},signal);if(signal.aborted)return;if(operation==="onsiteRedeem")setLastRedemption(onsiteRedemption.parse(result).id);await refreshPerson(signal);if(signal.aborted)return;setMessage(operation==="onsiteCheckin"?"報到已確認。":"核銷已確認。");keys.current.delete(key);});
- return {selectedIds,onSelect:(id:string,selected:boolean)=>setSelectedIds(current=>selected?(current.includes(id)||current.length>=100?current:[...current,id]):current.filter(value=>value!==id)),onBadges:()=>{if(selectedIds.length)window.location.assign(`/admin/documents?registrationIds=${encodeURIComponent(selectedIds.join(","))}`);},initialRegistrationId:new URLSearchParams(window.location.search).get("registrationId")??"",administrative,loading:!expired&&(account.isPending||(administrative&&canRead&&directory.isPending)),busy,expired,error:error||(directory.error?"讀取現場名單失敗。":""),message,canRead,canCheckin,canRedeem,canUndo,pass:expired?null:pass,person:expired?null:person,lastRedemption,token,items:!expired&&canRead?directory.data?.items??[]:[],offset,nextOffset:directory.data?.nextOffset??null,
- onToken:(value:string)=>{active.current?.abort();setBusy(false);setToken(value.trim());setPerson(null);setLastRedemption(null);},onSearch:(value:string)=>{setSearch(value);setOffset(0);},onPage:setOffset,
- onPass:(registrationId:string,rotate=false)=>void perform(async signal=>{const result=onsitePass.parse(await client.operation("onsitePass",{registrationId,rotate},signal));if(!signal.aborted)setPass(result);}),
- onLookup:()=>void perform(refreshPerson),onCheckin:()=>mutation("onsiteCheckin",{}),onRedeem:(bookingId:string,quantity:number)=>mutation("onsiteRedeem",{bookingId,quantity}),
- onUndo:(kind:"checkin"|"redemption",id:string,reason:string)=>void perform(async signal=>{await client.operation("onsiteUndo",{kind,id,reason},signal);await refreshPerson(signal);if(!signal.aborted){setMessage("已保存撤銷紀錄。");if(kind==="redemption")setLastRedemption(null);}}),
- };
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createAuthClient, createOnsiteClient, ApiError } from "@confsys/sdk";
+import {
+  onsitePerson,
+  onsitePass,
+  onsiteList,
+  onsiteRedemption,
+  type OnsitePass,
+  type OnsitePerson,
+} from "@confsys/contracts";
+const client = createOnsiteClient(),
+  auth = createAuthClient();
+export function useOnsite(administrative = false) {
+  const queries = useQueryClient(),
+    active = useRef<AbortController | null>(null),
+    keys = useRef(new Map<string, string>());
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [expired, setExpired] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [message, setMessage] = useState(""),
+    [token, setToken] = useState(""),
+    [pass, setPass] = useState<OnsitePass | null>(null),
+    [person, setPerson] = useState<OnsitePerson | null>(null),
+    [lastRedemption, setLastRedemption] = useState<string | null>(null),
+    [search, setSearch] = useState(""),
+    [offset, setOffset] = useState(0);
+  const account = useQuery({
+    queryKey: ["private", "account"],
+    queryFn: ({ signal }) => auth.me(signal),
+    enabled: !expired,
+    retry: false,
+  });
+  const permissions = expired ? [] : (account.data?.user.permissions ?? []),
+    canRead = permissions.includes("onsite.read"),
+    canCheckin = permissions.includes("onsite.checkin"),
+    canRedeem = permissions.includes("onsite.redeem"),
+    canUndo = permissions.includes("onsite.undo");
+  const directory = useQuery({
+    queryKey: ["private", "onsite", search, offset],
+    queryFn: async ({ signal }) =>
+      onsiteList.parse(
+        await client.operation("onsiteDirectory", { search, offset }, signal),
+      ),
+    enabled: administrative && canRead && !account.error && !expired,
+    retry: false,
+  });
+  function expire() {
+    active.current?.abort();
+    setExpired(true);
+    setSelectedIds([]);
+    setPass(null);
+    setPerson(null);
+    setToken("");
+    setLastRedemption(null);
+    setBusy(false);
+    setError("登入已失效或權限已變更，請重新登入。");
+    void queries.cancelQueries({ queryKey: ["private"] });
+    queries.removeQueries({ queryKey: ["private"] });
+  }
+  useEffect(() => {
+    const e = account.error ?? directory.error;
+    if (
+      e instanceof ApiError &&
+      ["SESSION_EXPIRED", "FORBIDDEN"].includes(e.code)
+    )
+      expire();
+  }, [account.error, directory.error]);
+  useEffect(() => () => active.current?.abort(), []);
+  const perform = async (work: (signal: AbortSignal) => Promise<void>) => {
+    active.current?.abort();
+    const c = new AbortController();
+    active.current = c;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await work(c.signal);
+    } catch (e) {
+      if (!c.signal.aborted) {
+        if (
+          e instanceof ApiError &&
+          ["SESSION_EXPIRED", "FORBIDDEN"].includes(e.code)
+        )
+          expire();
+        else
+          setError(
+            e instanceof ApiError && e.code === "CONFLICT"
+              ? "尚未符合核銷條件、數量已用盡或狀態已更新。請重新查詢。"
+              : "操作失敗，請檢查報到碼及輸入後重試。",
+          );
+      }
+    } finally {
+      if (active.current === c) setBusy(false);
+    }
+  };
+  const refreshPerson = async (signal: AbortSignal) => {
+    const result = onsitePerson.parse(
+      await client.operation("onsiteLookup", { token }, signal),
+    );
+    if (!signal.aborted) setPerson(result);
+    await queries.invalidateQueries({ queryKey: ["private", "onsite"] });
+  };
+  const mutation = (
+    operation: "onsiteCheckin" | "onsiteRedeem",
+    input: Record<string, unknown>,
+  ) =>
+    void perform(async (signal) => {
+      const key = JSON.stringify([operation, token, input]);
+      let idempotencyKey = keys.current.get(key);
+      if (!idempotencyKey) {
+        idempotencyKey = crypto.randomUUID();
+        keys.current.set(key, idempotencyKey);
+      }
+      const result = await client.operation(
+        operation,
+        { token, ...input, idempotencyKey },
+        signal,
+      );
+      if (signal.aborted) return;
+      if (operation === "onsiteRedeem")
+        setLastRedemption(onsiteRedemption.parse(result).id);
+      await refreshPerson(signal);
+      if (signal.aborted) return;
+      setMessage(
+        operation === "onsiteCheckin" ? "報到已確認。" : "核銷已確認。",
+      );
+      keys.current.delete(key);
+    });
+  return {
+    selectedIds,
+    onSelect: (id: string, selected: boolean) =>
+      setSelectedIds((current) =>
+        selected
+          ? current.includes(id) || current.length >= 100
+            ? current
+            : [...current, id]
+          : current.filter((value) => value !== id),
+      ),
+    onBadges: () => {
+      if (selectedIds.length)
+        window.location.assign(
+          `/admin/documents?registrationIds=${encodeURIComponent(selectedIds.join(","))}`,
+        );
+    },
+    initialRegistrationId:
+      new URLSearchParams(window.location.search).get("registrationId") ?? "",
+    administrative,
+    loading:
+      !expired &&
+      (account.isPending || (administrative && canRead && directory.isPending)),
+    busy,
+    expired,
+    error: error || (directory.error ? "讀取現場名單失敗。" : ""),
+    message,
+    canRead,
+    canCheckin,
+    canRedeem,
+    canUndo,
+    pass: expired ? null : pass,
+    person: expired ? null : person,
+    lastRedemption,
+    token,
+    items: !expired && canRead ? (directory.data?.items ?? []) : [],
+    offset,
+    nextOffset: directory.data?.nextOffset ?? null,
+    onToken: (value: string) => {
+      active.current?.abort();
+      setBusy(false);
+      setToken(value.trim());
+      setPerson(null);
+      setLastRedemption(null);
+    },
+    onSearch: (value: string) => {
+      setSearch(value);
+      setOffset(0);
+    },
+    onPage: setOffset,
+    onPass: (registrationId: string, rotate = false) =>
+      void perform(async (signal) => {
+        const result = onsitePass.parse(
+          await client.operation(
+            "onsitePass",
+            { registrationId, rotate },
+            signal,
+          ),
+        );
+        if (!signal.aborted) setPass(result);
+      }),
+    onLookup: () => void perform(refreshPerson),
+    onCheckin: () => mutation("onsiteCheckin", {}),
+    onRedeem: (bookingId: string, quantity: number) =>
+      mutation("onsiteRedeem", { bookingId, quantity }),
+    onUndo: (kind: "checkin" | "redemption", id: string, reason: string) =>
+      void perform(async (signal) => {
+        await client.operation("onsiteUndo", { kind, id, reason }, signal);
+        await refreshPerson(signal);
+        if (!signal.aborted) {
+          setMessage("已保存撤銷紀錄。");
+          if (kind === "redemption") setLastRedemption(null);
+        }
+      }),
+  };
 }

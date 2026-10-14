@@ -1,13 +1,297 @@
-import {useState} from "react";
-import type {OnsitePerson,OnsitePass} from "@confsys/contracts";
-type Props={selectedIds:string[];onSelect:(id:string,selected:boolean)=>void;onBadges:()=>void;initialRegistrationId:string;administrative:boolean;loading:boolean;busy:boolean;expired:boolean;error:string;message:string;canRead:boolean;canCheckin:boolean;canRedeem:boolean;canUndo:boolean;pass:OnsitePass|null;person:OnsitePerson|null;lastRedemption:string|null;token:string;items:OnsitePerson[];offset:number;nextOffset:number|null;onToken:(s:string)=>void;onSearch:(s:string)=>void;onPage:(n:number)=>void;onPass:(id:string,rotate?:boolean)=>void;onLookup:()=>void;onCheckin:()=>void;onRedeem:(id:string,n:number)=>void;onUndo:(kind:"checkin"|"redemption",id:string,reason:string)=>void};
-export function OnsiteScreen(p:Props) {
- const [registrationId,setRegistrationId]=useState(p.initialRegistrationId),[search,setSearch]=useState(""),[reason,setReason]=useState("");
- return <main className="layout"><header><h1>{p.administrative?"現場報到與核銷":"我的報到碼"}</h1><a href="/auth/account">帳號</a></header>{p.error&&<p role="alert">{p.error}</p>}{p.message&&<p role="status">{p.message}</p>}{p.expired?<a href="/auth/login">重新登入</a>:p.loading?<p role="status">載入中…</p>:p.administrative?<>
- {!p.canRead?<p>沒有現場服務權限。</p>:<><form onSubmit={e=>{e.preventDefault();p.onLookup();}}><label>掃描器輸入／貼上報到碼<input required autoComplete="off" value={p.token} onChange={e=>p.onToken(e.target.value)} pattern="cs1_[A-Za-z0-9_-]{43}"/></label><button disabled={p.busy}>查詢參與者</button></form>
- {p.person&&<section><h2>{p.person.number} · {p.person.badgeName}</h2><p>{p.person.affiliation}</p><p>{p.person.eligible?"符合現場服務條件":"尚未完成報名／核帳"} · {p.person.checkedInAt?"已報到":"尚未報到"}</p>{p.canCheckin&&<button disabled={p.busy||!p.person.eligible||!!p.person.checkinId} onClick={p.onCheckin}>確認報到</button>}
- <h3>餐飲／活動</h3>{p.person.bookings.length===0?<p>沒有加購項目。</p>:p.person.bookings.map(b=><div key={b.id}><p>{b.label} · {b.mealType} · 已核銷 {b.redeemed}／{b.quantity}</p>{p.canRedeem&&<form onSubmit={e=>{e.preventDefault();p.onRedeem(b.id,Number(new FormData(e.currentTarget).get("quantity")));}}><label>本次核銷數量<input name="quantity" type="number" min={1} max={Math.max(1,b.quantity-b.redeemed)} defaultValue={1} required/></label><button disabled={p.busy||!b.eligible||!p.person?.eligible||b.redeemed>=b.quantity}>確認核銷</button></form>}</div>)}
- {p.canUndo&&<fieldset><legend>更正現場紀錄</legend><label>撤銷理由<input minLength={3} maxLength={300} value={reason} onChange={e=>setReason(e.target.value)}/></label>{p.person.checkinId&&<button disabled={p.busy||reason.trim().length<3} onClick={()=>{if(p.person?.checkinId)p.onUndo("checkin",p.person.checkinId,reason);}}>撤銷此報到</button>}{p.lastRedemption&&<button disabled={p.busy||reason.trim().length<3} onClick={()=>{if(p.lastRedemption)p.onUndo("redemption",p.lastRedemption,reason);}}>撤銷本次核銷</button>}</fieldset>}</section>}
- <form onSubmit={e=>{e.preventDefault();p.onSearch(search);}}><label>查詢名單（名牌姓名／報名編號）<input value={search} maxLength={100} onChange={e=>setSearch(e.target.value)}/></label><button disabled={p.busy}>搜尋</button></form><button disabled={p.busy||p.selectedIds.length===0} onClick={p.onBadges}>製作所選名牌（{p.selectedIds.length}／100）</button><ul>{p.items.map(item=><li key={item.registrationId}><label><input type="checkbox" checked={p.selectedIds.includes(item.registrationId)} disabled={!p.selectedIds.includes(item.registrationId)&&p.selectedIds.length>=100} onChange={e=>p.onSelect(item.registrationId,e.target.checked)}/>選取 {item.number} · {item.badgeName}</label>{item.number} · {item.badgeName} · {item.affiliation} · {item.checkedInAt?"已報到":"未報到"}</li>)}</ul><nav aria-label="現場名單分頁"><button disabled={p.busy||p.offset===0} onClick={()=>p.onPage(Math.max(0,p.offset-20))}>上一頁</button><button disabled={p.busy||p.nextOffset===null} onClick={()=>{if(p.nextOffset!==null)p.onPage(p.nextOffset);}}>下一頁</button></nav></>}
- </>:<><p>此碼僅用於現場報到與餐飲活動核銷，請勿公開分享。可重新產生以撤銷舊碼。</p><form onSubmit={e=>{e.preventDefault();p.onPass(registrationId);}}><label>報名 ID（我的報名頁面）<input required value={registrationId} onChange={e=>setRegistrationId(e.target.value)}/></label><button disabled={p.busy}>顯示報到碼</button></form>{p.pass&&<section><h2>{p.pass.number} · {p.pass.badgeName}</h2><p>{p.pass.affiliation}</p><img key={p.pass.token} src={p.pass.qrPath} alt="現場報到 QR 碼" width={320} height={320}/><label>報到碼文字<input readOnly value={p.pass.token}/></label><button disabled={p.busy} onClick={()=>{if(p.pass)p.onPass(p.pass.registrationId,true);}}>撤銷舊碼並產生新碼</button></section>}</>}</main>;
+import { useState } from "react";
+import type { OnsitePerson, OnsitePass } from "@confsys/contracts";
+type Props = {
+  selectedIds: string[];
+  onSelect: (id: string, selected: boolean) => void;
+  onBadges: () => void;
+  initialRegistrationId: string;
+  administrative: boolean;
+  loading: boolean;
+  busy: boolean;
+  expired: boolean;
+  error: string;
+  message: string;
+  canRead: boolean;
+  canCheckin: boolean;
+  canRedeem: boolean;
+  canUndo: boolean;
+  pass: OnsitePass | null;
+  person: OnsitePerson | null;
+  lastRedemption: string | null;
+  token: string;
+  items: OnsitePerson[];
+  offset: number;
+  nextOffset: number | null;
+  onToken: (s: string) => void;
+  onSearch: (s: string) => void;
+  onPage: (n: number) => void;
+  onPass: (id: string, rotate?: boolean) => void;
+  onLookup: () => void;
+  onCheckin: () => void;
+  onRedeem: (id: string, n: number) => void;
+  onUndo: (kind: "checkin" | "redemption", id: string, reason: string) => void;
+};
+export function OnsiteScreen(p: Props) {
+  const [registrationId, setRegistrationId] = useState(p.initialRegistrationId),
+    [search, setSearch] = useState(""),
+    [reason, setReason] = useState("");
+  return (
+    <main className="layout">
+      <header>
+        <h1>{p.administrative ? "現場報到與核銷" : "我的報到碼"}</h1>
+        <a href="/auth/account">帳號</a>
+      </header>
+      {p.error && <p role="alert">{p.error}</p>}
+      {p.message && <p role="status">{p.message}</p>}
+      {p.expired ? (
+        <a href="/auth/login">重新登入</a>
+      ) : p.loading ? (
+        <p role="status">載入中…</p>
+      ) : p.administrative ? (
+        <>
+          {!p.canRead ? (
+            <p>沒有現場服務權限。</p>
+          ) : (
+            <>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  p.onLookup();
+                }}
+              >
+                <label>
+                  掃描器輸入／貼上報到碼
+                  <input
+                    required
+                    autoComplete="off"
+                    value={p.token}
+                    onChange={(e) => p.onToken(e.target.value)}
+                    pattern="cs1_[A-Za-z0-9_-]{43}"
+                  />
+                </label>
+                <button disabled={p.busy}>查詢參與者</button>
+              </form>
+              {p.person && (
+                <section>
+                  <h2>
+                    {p.person.number} · {p.person.badgeName}
+                  </h2>
+                  <p>{p.person.affiliation}</p>
+                  <p>
+                    {p.person.eligible
+                      ? "符合現場服務條件"
+                      : "尚未完成報名／核帳"}{" "}
+                    · {p.person.checkedInAt ? "已報到" : "尚未報到"}
+                  </p>
+                  {p.canCheckin && (
+                    <button
+                      disabled={
+                        p.busy || !p.person.eligible || !!p.person.checkinId
+                      }
+                      onClick={p.onCheckin}
+                    >
+                      確認報到
+                    </button>
+                  )}
+                  <h3>餐飲／活動</h3>
+                  {p.person.bookings.length === 0 ? (
+                    <p>沒有加購項目。</p>
+                  ) : (
+                    p.person.bookings.map((b) => (
+                      <div key={b.id}>
+                        <p>
+                          {b.label} · {b.mealType} · 已核銷 {b.redeemed}／
+                          {b.quantity}
+                        </p>
+                        {p.canRedeem && (
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              p.onRedeem(
+                                b.id,
+                                Number(
+                                  new FormData(e.currentTarget).get("quantity"),
+                                ),
+                              );
+                            }}
+                          >
+                            <label>
+                              本次核銷數量
+                              <input
+                                name="quantity"
+                                type="number"
+                                min={1}
+                                max={Math.max(1, b.quantity - b.redeemed)}
+                                defaultValue={1}
+                                required
+                              />
+                            </label>
+                            <button
+                              disabled={
+                                p.busy ||
+                                !b.eligible ||
+                                !p.person?.eligible ||
+                                b.redeemed >= b.quantity
+                              }
+                            >
+                              確認核銷
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    ))
+                  )}
+                  {p.canUndo && (
+                    <fieldset>
+                      <legend>更正現場紀錄</legend>
+                      <label>
+                        撤銷理由
+                        <input
+                          minLength={3}
+                          maxLength={300}
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                        />
+                      </label>
+                      {p.person.checkinId && (
+                        <button
+                          disabled={p.busy || reason.trim().length < 3}
+                          onClick={() => {
+                            if (p.person?.checkinId)
+                              p.onUndo("checkin", p.person.checkinId, reason);
+                          }}
+                        >
+                          撤銷此報到
+                        </button>
+                      )}
+                      {p.lastRedemption && (
+                        <button
+                          disabled={p.busy || reason.trim().length < 3}
+                          onClick={() => {
+                            if (p.lastRedemption)
+                              p.onUndo("redemption", p.lastRedemption, reason);
+                          }}
+                        >
+                          撤銷本次核銷
+                        </button>
+                      )}
+                    </fieldset>
+                  )}
+                </section>
+              )}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  p.onSearch(search);
+                }}
+              >
+                <label>
+                  查詢名單（名牌姓名／報名編號）
+                  <input
+                    value={search}
+                    maxLength={100}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </label>
+                <button disabled={p.busy}>搜尋</button>
+              </form>
+              <button
+                disabled={p.busy || p.selectedIds.length === 0}
+                onClick={p.onBadges}
+              >
+                製作所選名牌（{p.selectedIds.length}／100）
+              </button>
+              <ul>
+                {p.items.map((item) => (
+                  <li key={item.registrationId}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={p.selectedIds.includes(item.registrationId)}
+                        disabled={
+                          !p.selectedIds.includes(item.registrationId) &&
+                          p.selectedIds.length >= 100
+                        }
+                        onChange={(e) =>
+                          p.onSelect(item.registrationId, e.target.checked)
+                        }
+                      />
+                      選取 {item.number} · {item.badgeName}
+                    </label>
+                    {item.number} · {item.badgeName} · {item.affiliation} ·{" "}
+                    {item.checkedInAt ? "已報到" : "未報到"}
+                  </li>
+                ))}
+              </ul>
+              <nav aria-label="現場名單分頁">
+                <button
+                  disabled={p.busy || p.offset === 0}
+                  onClick={() => p.onPage(Math.max(0, p.offset - 20))}
+                >
+                  上一頁
+                </button>
+                <button
+                  disabled={p.busy || p.nextOffset === null}
+                  onClick={() => {
+                    if (p.nextOffset !== null) p.onPage(p.nextOffset);
+                  }}
+                >
+                  下一頁
+                </button>
+              </nav>
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <p>
+            此碼僅用於現場報到與餐飲活動核銷，請勿公開分享。可重新產生以撤銷舊碼。
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              p.onPass(registrationId);
+            }}
+          >
+            <label>
+              報名 ID（我的報名頁面）
+              <input
+                required
+                value={registrationId}
+                onChange={(e) => setRegistrationId(e.target.value)}
+              />
+            </label>
+            <button disabled={p.busy}>顯示報到碼</button>
+          </form>
+          {p.pass && (
+            <section>
+              <h2>
+                {p.pass.number} · {p.pass.badgeName}
+              </h2>
+              <p>{p.pass.affiliation}</p>
+              <img
+                key={p.pass.token}
+                src={p.pass.qrPath}
+                alt="現場報到 QR 碼"
+                width={320}
+                height={320}
+              />
+              <label>
+                報到碼文字
+                <input readOnly value={p.pass.token} />
+              </label>
+              <button
+                disabled={p.busy}
+                onClick={() => {
+                  if (p.pass) p.onPass(p.pass.registrationId, true);
+                }}
+              >
+                撤銷舊碼並產生新碼
+              </button>
+            </section>
+          )}
+        </>
+      )}
+    </main>
+  );
 }

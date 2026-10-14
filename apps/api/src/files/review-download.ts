@@ -28,12 +28,14 @@ export function createReviewFileDownload(
     fileId: string,
     requestId: string,
   ) => {
-    const authorized = <T>(work: (db: PoolClient, actorId: string) => Promise<T>) =>
+    const authorized = <T>(
+      work: (db: PoolClient, actorId: string) => Promise<T>,
+    ) =>
       withIdentityTransaction(pool, async (db) => {
         await lockAccessShared(db);
         const actor = await sessionActor(db, raw, config, new Date(), true);
         await authorizeReviewFile(db, actor.id, assignmentId, fileId);
-        await authorizedFileContext(db,fileId);
+        await authorizedFileContext(db, fileId);
         return work(db, actor.id);
       });
     const file = await authorized(async (db) => {
@@ -42,13 +44,27 @@ export function createReviewFileDownload(
         throw new AuthError("NOT_FOUND");
       return row;
     });
-    const bytes = await readPrivate(storage.root, file.storage_key, file.size_bytes, file.sha256);
+    const bytes = await readPrivate(
+      storage.root,
+      file.storage_key,
+      file.size_bytes,
+      file.sha256,
+    );
     return authorized(async (db, actorId) => {
       const current = await findFile(db, fileId);
       if (current.status !== "ready") throw new AuthError("NOT_FOUND");
       await auditFile(db, actorId, fileId, "file.review_downloaded", requestId);
-      const extension = file.media_type === "application/pdf" ? "pdf" : file.media_type === "image/png" ? "png" : "jpg";
-      return { bytes, mediaType: file.media_type, name: `manuscript-${fileId}.${extension}` };
+      const extension =
+        file.media_type === "application/pdf"
+          ? "pdf"
+          : file.media_type === "image/png"
+            ? "png"
+            : "jpg";
+      return {
+        bytes,
+        mediaType: file.media_type,
+        name: `manuscript-${fileId}.${extension}`,
+      };
     });
   };
 }
