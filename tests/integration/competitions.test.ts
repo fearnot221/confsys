@@ -840,3 +840,66 @@ it("pinned post-acceptance registration deadline gates competition actions indep
   ).toMatchObject({ state: "satisfied", registered: true });
   await submit(a);
 });
+
+it("historical verified coauthor aliases fence competition assignment and persisted judging eligibility", async () => {
+  const alias = await account();
+  await f.admin.query(
+    "INSERT INTO confsys.user_roles(user_id,role) VALUES($1,'competition_judge')",
+    [alias.id],
+  );
+  const comp = await competition(),
+    p = await paper({
+      authors: [
+        { name: "Presenter", email: author.email, affiliation: "Synthetic" },
+        { name: "Coauthor", email: alias.email, affiliation: "Synthetic" },
+      ],
+    }),
+    entry = await approve(await enroll(comp, p));
+  const target = f.email();
+  await auth.requestEmailChange(alias.raw, target, id());
+  await auth.confirmEmailChange(
+    alias.raw,
+    { token: (await f.link(alias.email, "email_change")).token },
+    id(),
+  );
+  const fresh = await auth.login(target, password, id());
+  await expect(
+    svc.assign(leader.raw, { entryId: entry.id, judgeId: alias.id }, id()),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  // Operator-only historic assignment fixture verifies read/score fencing independently of assignment validation.
+  const aid = id(),
+    rubric = (await current(comp)).currentRubricId;
+  await f.admin.query(
+    "INSERT INTO confsys.competition_assignments(id,entry_id,competition_id,judge_id,rubric_id) VALUES($1,$2,$3,$4,$5)",
+    [aid, entry.id, comp, alias.id, rubric],
+  );
+  await withIdentityTransaction(f.app, async (db) => {
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [alias.id]);
+    expect(
+      (
+        await db.query(
+          "SELECT eligible FROM confsys.competition_judging_eligibility WHERE id=$1",
+          [aid],
+        )
+      ).rows[0].eligible,
+    ).toBe(false);
+  });
+  expect(
+    (await svc.judging(fresh.raw)).assignments.some((a) => a.id === aid),
+  ).toBe(false);
+  await expect(
+    svc.score(
+      fresh.raw,
+      {
+        assignmentId: aid,
+        expectedVersion: 1,
+        action: "submit",
+        document: {
+          scores: [{ criterionId: "quality", value: 80 }],
+          comment: "Synthetic",
+        },
+      },
+      id(),
+    ),
+  ).rejects.toBeDefined();
+});

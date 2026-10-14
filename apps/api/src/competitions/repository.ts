@@ -209,7 +209,7 @@ export async function assignments(
 ) {
   const rows = (
     await db.query(
-      `SELECT ${assignmentFields} FROM confsys.competition_assignments a JOIN confsys.competition_rubrics r ON r.id=a.rubric_id JOIN confsys.competition_entries e ON e.id=a.entry_id WHERE ($1::uuid IS NULL OR a.judge_id=$1) AND ($2::uuid[] IS NULL OR a.entry_id=ANY($2::uuid[])) ORDER BY a.id LIMIT $4 OFFSET $3`,
+      `SELECT ${assignmentFields} FROM confsys.competition_assignments a JOIN confsys.competition_rubrics r ON r.id=a.rubric_id JOIN confsys.competition_entries e ON e.id=a.entry_id WHERE ($1::uuid IS NULL OR (a.judge_id=$1 AND NOT EXISTS(SELECT 1 FROM confsys.submission_author_conflicts conflict WHERE conflict.revision_id=e.revision_id AND conflict.user_id=a.judge_id))) AND ($2::uuid[] IS NULL OR a.entry_id=ANY($2::uuid[])) ORDER BY a.id LIMIT $4 OFFSET $3`,
       [judgeId, entryIds, offset, judgeId ? 21 : 401],
     )
   ).rows;
