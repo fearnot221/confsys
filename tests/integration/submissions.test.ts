@@ -542,3 +542,68 @@ it("a queued author mutation revalidates session after a concurrent revocation",
   ).toBe("draft");
   author.raw = (await auth.login(author.email, password, rid())).raw;
 });
+
+it("reviewer RLS grants never grant primary author detail, draft editing or withdrawal", async () => {
+  const paper = await draft();
+  const submitted = await service.transition(
+    author.raw,
+    { id: paper.id, expectedVersion: 1, action: "submit" },
+    rid(),
+  );
+  const formId = rid(),
+    assignmentId = rid();
+  await f.admin.query(
+    "INSERT INTO confsys.review_forms(id,version,document,created_by) VALUES($1,1,$2,$3)",
+    [formId, { blindMode: "double", criteria: [] }, leader.id],
+  );
+  await f.admin.query(
+    "INSERT INTO confsys.review_assignments(id,submission_id,revision_id,reviewer_id,form_id,state,created_by) VALUES($1,$2,$3,$4,$5,'accepted',$6)",
+    [
+      assignmentId,
+      paper.id,
+      submitted.currentRevisionId,
+      stranger.id,
+      formId,
+      leader.id,
+    ],
+  );
+  try {
+    // Demonstrate this actor can see the row through reviewer RLS, then assert service ownership still denies.
+    await withIdentityTransaction(f.app, async (db) => {
+      await db.query("SELECT set_config('app.actor_id',$1,true)", [
+        stranger.id,
+      ]);
+      expect(
+        (
+          await db.query("SELECT id FROM confsys.submissions WHERE id=$1", [
+            paper.id,
+          ])
+        ).rowCount,
+      ).toBe(1);
+    });
+    await expect(
+      service.detail(stranger.raw, paper.id, "own"),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      service.save(
+        stranger.raw,
+        { id: paper.id, expectedVersion: 1, document: doc() },
+        rid(),
+      ),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      service.transition(
+        stranger.raw,
+        { id: paper.id, expectedVersion: 1, action: "withdraw" },
+        rid(),
+      ),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  } finally {
+    await f.admin.query("DELETE FROM confsys.review_assignments WHERE id=$1", [
+      assignmentId,
+    ]);
+    await f.admin.query("DELETE FROM confsys.review_forms WHERE id=$1", [
+      formId,
+    ]);
+  }
+});

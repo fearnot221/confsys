@@ -52,9 +52,15 @@ export function createSubmissionService(
       await repo.context(db, actor.id, !!permission);
       return work(db, actor.id);
     });
-  const required = async (db: PoolClient, id: string, lock = false) => {
+  const required = async (
+    db: PoolClient,
+    id: string,
+    lock = false,
+    ownerId?: string,
+  ) => {
     const row = await repo.one(db, id, lock);
-    if (!row) throw new AuthError("NOT_FOUND");
+    if (!row || (ownerId && row.ownerId !== ownerId))
+      throw new AuthError("NOT_FOUND");
     return row;
   };
   return {
@@ -92,8 +98,13 @@ export function createSubmissionService(
       authenticated(
         raw,
         scope === "admin" ? "submissions.read_all" : undefined,
-        async (db) => ({
-          submission: await required(db, id),
+        async (db, actor) => ({
+          submission: await required(
+            db,
+            id,
+            false,
+            scope === "own" ? actor : undefined,
+          ),
           ...(await repo.revisions(db, id, revisionOffset)),
         }),
       ),
@@ -104,6 +115,8 @@ export function createSubmissionService(
         assertSubmissionWindow(settings, new Date());
         assertSubmissionDocument(data.document, settings, false);
         const before = await repo.one(db, data.id, true);
+        if (before && before.ownerId !== actor)
+          throw new AuthError("NOT_FOUND");
         if (!before) {
           if (data.expectedVersion !== 0) throw new AuthError("NOT_FOUND");
           await dependencies.assertFiles(db, actor, data.document);
@@ -134,7 +147,7 @@ export function createSubmissionService(
       const data = submissionTransitionInput.parse(input);
       return authenticated(raw, undefined, async (db, actor) => {
         const settings = await repo.configuration(db, "share"),
-          before = await required(db, data.id, true);
+          before = await required(db, data.id, true, actor);
         assertSubmissionVersion(before, data.expectedVersion);
         if (data.action === "withdraw") {
           if (before.state === "withdrawn") return before;
