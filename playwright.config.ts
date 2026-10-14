@@ -18,6 +18,7 @@ const testEnvironment = {
   ),
   REDIS_URL: localTestUrl("TEST_REDIS_URL", "/1"),
   // Per-run key isolates rate counters and browser CSRF cookies without changing limits.
+  QR_SIGNING_KEY: randomBytes(32).toString("hex"),
   CSRF_SIGNING_KEY: randomBytes(32).toString("hex"),
 };
 export default defineConfig({

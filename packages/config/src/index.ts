@@ -52,6 +52,7 @@ const apiSchema = z.object({
   API_HOST: z.string().default("127.0.0.1"),
   API_PORT: port.default(23000),
   PUBLIC_APP_ORIGIN: z.url(),
+  QR_SIGNING_KEY: z.string().regex(/^[a-f0-9]{64}$/),
   CSRF_SIGNING_KEY: z.string().regex(/^[a-f0-9]{64}$/),
   SESSION_IDLE_SECONDS: seconds.default(1800),
   SESSION_ABSOLUTE_SECONDS: seconds.default(43200),

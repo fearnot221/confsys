@@ -22,6 +22,7 @@ export const settings = {
   PUBLIC_APP_ORIGIN: "http://127.0.0.1:25173",
   MAIL_ENCRYPTION_KEY: key,
   MAIL_KEY_VERSION: "v1",
+  QR_SIGNING_KEY: key,
   CSRF_SIGNING_KEY: key,
 };
 it("separates process configuration, validates origins and production cookie policy", () => {

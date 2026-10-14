@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const roleSchema = z.enum(["conference_staff", "conference_admin", "finance", "chair", "reviewer"]);
+export const roleSchema = z.enum(["conference_staff", "conference_admin", "finance", "chair", "reviewer", "onsite", "competition_judge"]);
 export const permissionSchema = z.enum([
   "accounts.directory.read",
   "access.roles.manage",
@@ -23,6 +23,12 @@ export const permissionSchema = z.enum([
   "reviews.decide",
   "program.manage",
   "program.publish",
+  "onsite.read",
+  "onsite.checkin",
+  "onsite.redeem",
+  "onsite.undo",
+  "competitions.manage",
+  "competitions.score",
 ]);
 export type Role = z.infer<typeof roleSchema>;
 export type Permission = z.infer<typeof permissionSchema>;

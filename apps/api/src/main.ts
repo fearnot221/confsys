@@ -1,3 +1,12 @@
+import {createActivitiesService} from './activities/service.js';
+import {registerActivityRoutes} from './activities/routes.js';
+import {createReceiptsService} from './documents/service.js';
+import {registerReceiptRoutes} from './documents/routes.js';
+import {createReviewService,authorizeReviewFile} from './reviews/service.js';
+import {registerReviewRoutes} from './reviews/routes.js';
+import {createReviewFileDownload} from './files/review-download.js';
+import {createProgramService} from './program/service.js';
+import {registerProgramRoutes} from './program/routes.js';
 import {createFinanceService} from "./finance/service.js";
 import {registerFinanceRoutes} from "./finance/routes.js";
 import {createSubmissionService} from "./submissions/service.js";
@@ -62,6 +71,10 @@ registerRegistrationRoutes(app, config, createRegistrationService(pool,config));
 registerFilesRoutes(app,config,createFilesService(pool,config,{root:config.PRIVATE_STORAGE_ROOT,scannerHost:config.CLAMAV_HOST,scannerPort:config.CLAMAV_PORT}));
 registerSubmissionRoutes(app,config,createSubmissionService(pool,config,submissionDependencies));
 registerFinanceRoutes(app,config,createFinanceService(pool,config));
+registerActivityRoutes(app,config,createActivitiesService(pool,config));
+registerReceiptRoutes(app,config,createReceiptsService(pool,config));
+registerReviewRoutes(app,config,createReviewService(pool,config),createReviewFileDownload(pool,config,{root:config.PRIVATE_STORAGE_ROOT,scannerHost:config.CLAMAV_HOST,scannerPort:config.CLAMAV_PORT},authorizeReviewFile));
+registerProgramRoutes(app,config,createProgramService(pool,config));
 await registerPublicRoutes(app, config, site);
 app.addHook("onClose", async () => {
   redis.disconnect();

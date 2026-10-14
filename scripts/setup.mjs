@@ -38,6 +38,7 @@ function authDefaults() {
     MAILPIT_URL: `http://127.0.0.1:${mailPort}`,
     MAIL_KEY_VERSION: "v1",
     MAIL_ENCRYPTION_KEY: randomBytes(32).toString("hex"),
+    QR_SIGNING_KEY: randomBytes(32).toString("hex"),
     CSRF_SIGNING_KEY: randomBytes(32).toString("hex"),
     SMTP_HOST: "127.0.0.1",
     SMTP_PORT: String(smtpPort),
