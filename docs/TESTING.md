@@ -209,3 +209,15 @@ The finance/activity boundary suite also creates 101 real partial allocations,
 walks the independent allocation pager with an order filter, verifies own/admin
 scope separation, and refunds an older allocation through authenticated HTTP.
 Payment/order pagination cannot silently hide this allocation history.
+
+### Verified mailbox change regression (2026-10-15)
+
+Use the isolated instance's env file and canonical migration 0040. Executed:
+
+```sh
+PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/email-change.test.ts tests/integration/email-change-http.test.ts tests/integration/reviews.test.ts tests/integration/competitions.test.ts
+```
+
+Mailbox service 6/6, HTTP 1/1 and competition 11/11 passed. The initial review run had one failure because this independent branch still held the pre-0027 private-file module; after copying the current integrated file source, `... vitest.mjs run tests/integration/reviews.test.ts` passed 9/9 including the same private download/scanner assertion and new alias conflict test. No assertion was removed. Cases include real Mailpit target delivery, original-account binding, confirmation CSRF, stale proof/epoch, expiry/replay, concurrent consumption and competing target claims, audit-failure rollback, obsolete notification suppression, append-only history RLS, stable ownership, reviewer assignment/candidate exclusion and competition assignment/read/score exclusion.
+
+`pnpm typecheck`, targeted ESLint of changed source/tests and `node scripts/check-boundaries.mjs` passed. `tests/e2e/email-change.spec.ts` is authored for the integrated built application; its browser execution remains pending the main integrator's route/build cycle. This test reads the actual captured confirmation mail, proves GET alone does not mutate, confirms the target and verifies a second browser's old session is revoked.

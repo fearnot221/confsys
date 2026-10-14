@@ -271,3 +271,31 @@ it("superseded or expired mailbox requests never send and confirmation independe
   });
   await auth.confirmEmailChange(a.raw, { token: second.token }, rid());
 });
+
+it("competing accounts cannot confirm the same free mailbox or receive each others ownership", async () => {
+  const a = await active(),
+    b = await active(),
+    target = f.email();
+  await auth.requestEmailChange(a.raw, target, rid());
+  await auth.requestEmailChange(b.raw, target, rid());
+  const one = await f.link(a.email, "email_change"),
+    two = await f.link(b.email, "email_change");
+  const results = await Promise.allSettled([
+    auth.confirmEmailChange(a.raw, { token: one.token }, rid()),
+    auth.confirmEmailChange(b.raw, { token: two.token }, rid()),
+  ]);
+  expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
+  const winner = (await auth.login(target, password, rid())).account.user.id;
+  expect([a.account.user.id, b.account.user.id]).toContain(winner);
+  const loser = winner === a.account.user.id ? b : a;
+  expect((await auth.me(loser.raw)).user.id).toBe(loser.account.user.id);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT id FROM confsys.auth_audit WHERE event='email_changed' AND user_id=ANY($1::uuid[])",
+        [[a.account.user.id, b.account.user.id]],
+      )
+    ).rowCount,
+  ).toBe(1);
+});
