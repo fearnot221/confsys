@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAuthClient, createReviewClient, ApiError } from "@confsys/sdk";
 import {
   type ReviewFormDocument,
+  type ReviewScreening,
   type ReviewAssignment,
   type ReviewScoreDocument,
   type ReviewDecision,
@@ -149,6 +150,35 @@ export function useReviews() {
       void perform(async (signal) => {
         await auth.mutate("reauthenticate", { password }, signal);
         return "密碼已重新驗證。";
+      }),
+    onScreen: (
+      submissionId: string,
+      revisionId: string,
+      outcome: ReviewScreening["outcome"],
+      reason: string,
+    ) =>
+      void perform(async (signal) => {
+        const expectedVersion =
+            board.data?.screenings.find((s) => s.revisionId === revisionId)
+              ?.version ?? 0,
+          input = {
+            submissionId,
+            revisionId,
+            expectedVersion,
+            outcome,
+            reason,
+          };
+        await client.screen({ ...input, id: stableId(input) }, signal);
+        return "初檢已保存為新版本；既有公開結果未被改寫。";
+      }),
+    onRemind: (assignmentId: string, reason: string) =>
+      void perform(async (signal) => {
+        const input = { assignmentId, reason };
+        await client.remind(
+          { ...input, idempotencyKey: stableId(input) },
+          signal,
+        );
+        return "待完成審查提醒已排入寄送；相同操作重試不重複寄送。";
       }),
     onConfigure: (document: ReviewFormDocument) =>
       void perform(async (signal) => {

@@ -5,6 +5,7 @@ import { withIdentityTransaction } from "@confsys/db";
 import { enqueueBusinessNotification } from "@confsys/notifications";
 import {
   reviewFormDocumentSchema,
+  reviewScreenInput,
   reviewAssignInput,
   reviewAssignmentActionInput,
   reviewDecisionInput,
@@ -53,6 +54,15 @@ async function manageTrack(
   if (!(await repo.hasScope(db, actorId, track)))
     throw new AuthError("FORBIDDEN");
 }
+async function assertScreening(
+  db: PoolClient,
+  revisionId: string,
+  required = false,
+) {
+  const state = await repo.screeningStatus(db, revisionId);
+  if (state !== "ready" && (required || state !== "unchecked"))
+    throw new AuthError("CONFLICT");
+}
 async function projection(
   db: PoolClient,
   row: repo.AssignmentRow,
@@ -76,6 +86,7 @@ async function projection(
       authors: [],
     },
     form,
+    screening: await repo.screeningStatus(db, row.revision_id),
     document: { scores: [], authorComment: "", privateComment: "" },
   };
   if (!manager && (row.state === "conflicted" || row.state === "declined"))
@@ -211,7 +222,22 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
             if (!(e instanceof AuthError && e.code === "FORBIDDEN")) throw e;
           }
         }
+        const screenings = [];
+        for (const revisionId of new Set([
+          ...papers.slice(0, 20).map((p) => p.revisionId),
+          ...items.map((a) => a.revisionId),
+        ])) {
+          const latest = await repo.screening(db, revisionId);
+          if (latest) screenings.push(latest);
+        }
         return {
+          screenings,
+          workload: await repo.workload(
+            db,
+            reviewers.slice(0, 20).map((r) => r.id),
+            actor,
+            chairId,
+          ),
           papers: papers.slice(0, 20),
           reviewers: reviewers.slice(0, 20),
           forms: forms.slice(0, 20),
@@ -338,6 +364,103 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
         return { changed: true };
       });
     },
+    async screen(raw: string | undefined, input: unknown, requestId: string) {
+      const data = reviewScreenInput.parse(input);
+      return transaction(raw, "reviews.manage", true, async (db, actor) => {
+        const paper = await repo.paper(db, data.revisionId);
+        if (
+          !paper ||
+          paper.submission_id !== data.submissionId ||
+          paper.state !== "submitted" ||
+          paper.current_revision_id !== data.revisionId
+        )
+          throw new AuthError("CONFLICT");
+        await manageTrack(db, actor.id, repo.paperDocument(paper).trackId);
+        await noConflict(db, paper, actor);
+        const existing = await repo.screeningById(db, data.id);
+        if (existing) {
+          if (
+            existing.revisionId !== data.revisionId ||
+            existing.submissionId !== data.submissionId ||
+            existing.version !== data.expectedVersion + 1 ||
+            existing.outcome !== data.outcome ||
+            existing.reason !== data.reason
+          )
+            throw new AuthError("CONFLICT");
+          return existing;
+        }
+        const current = await repo.screening(db, data.revisionId);
+        if ((current?.version ?? 0) !== data.expectedVersion)
+          throw new AuthError("CONFLICT");
+        await repo.createScreening(db, data, actor.id);
+        await safeAudit(
+          db,
+          actor,
+          "review.initial_screening",
+          data.id,
+          requestId,
+        );
+        for (const reviewerId of await repo.screeningRecipients(
+          db,
+          data.revisionId,
+        ))
+          await notify(
+            db,
+            reviewerId,
+            `review-screening:${data.id}:${reviewerId}`,
+            "審查初檢狀態更新 / Review screening updated",
+            requestId,
+          );
+        const saved = await repo.screeningById(db, data.id);
+        if (!saved) throw new Error("Missing screening");
+        return saved;
+      });
+    },
+    async remind(raw: string | undefined, input: unknown, requestId: string) {
+      const data = reviewEndpoints.reviewRemind.input.parse(input);
+      return transaction(raw, "reviews.manage", true, async (db, actor) => {
+        const row = await repo.assignment(db, data.assignmentId, true);
+        if (!row) throw new AuthError("NOT_FOUND");
+        if (!["invited", "accepted"].includes(row.state))
+          throw new AuthError("CONFLICT");
+        const view = await projection(db, row, actor, true);
+        await assertScreening(
+          db,
+          row.revision_id,
+          view.form.document.requireScreening,
+        );
+        if (Date.parse(view.form.document.closesAt) <= Date.now())
+          throw new AuthError("CONFLICT");
+        const reviewer = await accountById(db, row.reviewer_id);
+        if (
+          reviewer.state !== "active" ||
+          !reviewer.verified ||
+          !permissionsFor(reviewer.roles).includes("reviews.assigned")
+        )
+          throw new AuthError("CONFLICT");
+        const paper = await repo.paper(db, row.revision_id);
+        if (!paper) throw new AuthError("NOT_FOUND");
+        await noConflict(db, paper, { id: reviewer.id, email: reviewer.email });
+        await notify(
+          db,
+          reviewer.id,
+          `review-reminder:${row.id}:${data.idempotencyKey}`,
+          "待完成審查提醒 / Pending review reminder",
+          requestId,
+        );
+        await recordAccess(db, {
+          action: "review.reminder",
+          targetId: actor.id,
+          actorId: actor.id,
+          source: "session",
+          reason: "Explicit review reminder",
+          before: "null",
+          after: JSON.stringify({ assignmentId: row.id, reason: data.reason }),
+          requestId,
+        });
+        return { queued: true as const };
+      });
+    },
     async assign(raw: string | undefined, input: unknown, requestId: string) {
       const data = reviewAssignInput.parse(input);
       return transaction(raw, "reviews.manage", true, async (db, actor) => {
@@ -366,6 +489,11 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
         const form = await repo.form(db, data.formId);
         if (!form || new Date(form.document.closesAt) <= new Date())
           throw new AuthError("CONFLICT");
+        await assertScreening(
+          db,
+          data.revisionId,
+          form.document.requireScreening,
+        );
         if (form.document.mode === "double_blind" && !data.anonymousConfirmed)
           throw new AuthError("INVALID_REQUEST");
         const existing = await repo.assignment(db, data.id);
@@ -418,6 +546,12 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
           await safeAudit(db, actor, "review.conflict", row.id, requestId);
         } else {
           const detail = await projection(db, row, actor);
+          if (data.action !== "decline")
+            await assertScreening(
+              db,
+              row.revision_id,
+              detail.form.document.requireScreening,
+            );
           if (
             row.state === "declined" ||
             row.state === "conflicted" ||
@@ -491,6 +625,12 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
             new Date(data.revisionDeadline) <= new Date())
         )
           throw new AuthError("INVALID_REQUEST");
+        if (data.outcome === "accept_oral" || data.outcome === "accept_poster")
+          await assertScreening(
+            db,
+            data.revisionId,
+            await repo.requiresScreening(db, data.revisionId),
+          );
         const prior = await repo.decision(db, data.id);
         if (prior) {
           if (
@@ -542,6 +682,12 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
           true,
         );
         await noConflict(db, paper, actor);
+        if (row.outcome === "accept_oral" || row.outcome === "accept_poster")
+          await assertScreening(
+            db,
+            row.revision_id,
+            await repo.requiresScreening(db, row.revision_id),
+          );
         if (row.published) return repo.decisionDto(row);
         if (row.revision_deadline && row.revision_deadline <= new Date())
           throw new AuthError("CONFLICT");

@@ -231,6 +231,7 @@ afterAll(async () => {
       [paperIds],
     );
   for (const table of [
+    "review_screenings",
     "review_publications",
     "review_decisions",
     "review_conflicts",
@@ -737,4 +738,243 @@ it("chair conflict declaration is scoped, irreversible and immediately fences de
       (p) => p.submissionId === paper.id,
     ),
   ).toBeUndefined();
+});
+
+it("screening is versioned, role/track scoped, private and gates existing scoring and positive publication", async () => {
+  const p = await submitted(),
+    strict = await reviews.configure(
+      admin.raw,
+      { ...form.document, requireScreening: true },
+      rid(),
+    );
+  await expect(assigned(p, reviewer, strict.id)).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  const input = {
+    id: rid(),
+    submissionId: p.id,
+    revisionId: p.currentRevisionId,
+    expectedVersion: 0,
+    outcome: "ready",
+    reason: "PRIVATE_INITIAL_SCREEN_REASON",
+  };
+  await expect(reviews.screen(author.raw, input, rid())).rejects.toMatchObject({
+    code: "FORBIDDEN",
+  });
+  const first = await reviews.screen(chair.raw, input, rid());
+  expect((await reviews.screen(chair.raw, input, rid())).id).toBe(first.id);
+  const a = await assigned(p, reviewer, strict.id);
+  expect(a.screening).toBe("ready");
+  await withIdentityTransaction(f.app, async (db) => {
+    await context(db, reviewer.id);
+    expect(
+      (
+        await db.query(
+          "SELECT id FROM confsys.review_screenings WHERE revision_id=$1",
+          [p.currentRevisionId],
+        )
+      ).rowCount,
+    ).toBe(0);
+    expect(
+      (
+        await db.query(
+          "SELECT outcome FROM confsys.review_screening_status WHERE revision_id=$1",
+          [p.currentRevisionId],
+        )
+      ).rows[0].outcome,
+    ).toBe("ready");
+  });
+  expect(
+    JSON.stringify(await reviews.assigned(reviewer.raw, {})),
+  ).not.toContain(input.reason);
+  const accepted = await reviews.action(
+      reviewer.raw,
+      { id: a.id, expectedVersion: a.version, action: "accept" },
+      rid(),
+    ),
+    d = await decision(p);
+  const blocked = await reviews.screen(
+    chair.raw,
+    {
+      ...input,
+      id: rid(),
+      expectedVersion: 1,
+      outcome: "ineligible",
+      reason: "Synthetic later eligibility finding",
+    },
+    rid(),
+  );
+  expect(blocked.version).toBe(2);
+  await expect(
+    reviews.action(
+      reviewer.raw,
+      {
+        id: a.id,
+        expectedVersion: accepted.version,
+        action: "save",
+        document: { scores: [], authorComment: "", privateComment: "" },
+      },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    reviews.publish(chair.raw, { id: d.id }, rid()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(decision(p, { expectedVersion: 1 })).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  const correction = await decision(p, {
+    expectedVersion: 1,
+    outcome: "revision_requested",
+    revisionDeadline: new Date(Date.now() + 60000).toISOString(),
+  });
+  await reviews.publish(chair.raw, { id: correction.id }, rid());
+  const declinedPaper = await submitted(),
+    pending = await assigned(declinedPaper);
+  await reviews.screen(
+    admin.raw,
+    {
+      ...input,
+      id: rid(),
+      submissionId: declinedPaper.id,
+      revisionId: declinedPaper.currentRevisionId,
+      outcome: "needs_correction",
+    },
+    rid(),
+  );
+  expect(
+    (
+      await reviews.action(
+        reviewer.raw,
+        { id: pending.id, expectedVersion: pending.version, action: "decline" },
+        rid(),
+      )
+    ).state,
+  ).toBe("declined");
+  const other = await submitted({
+    ...document(),
+    trackId: "other",
+    topicIds: [],
+  });
+  await expect(
+    reviews.screen(
+      chair.raw,
+      {
+        ...input,
+        id: rid(),
+        submissionId: other.id,
+        revisionId: other.currentRevisionId,
+      },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await expect(
+    f.app.query(
+      "UPDATE confsys.review_screenings SET reason='Changed' WHERE id=$1",
+      [first.id],
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+});
+it("screening optimistic versions prevent overwrite and pending reminders are scoped retry-safe outbox events", async () => {
+  const p = await submitted(),
+    input = {
+      submissionId: p.id,
+      revisionId: p.currentRevisionId,
+      expectedVersion: 0,
+      outcome: "ready",
+      reason: "Synthetic concurrent initial screening",
+    };
+  const race = await Promise.allSettled([
+    reviews.screen(admin.raw, { ...input, id: rid() }, rid()),
+    reviews.screen(admin.raw, { ...input, id: rid() }, rid()),
+  ]);
+  expect(race.filter((v) => v.status === "fulfilled")).toHaveLength(1);
+  expect(race.filter((v) => v.status === "rejected")).toHaveLength(1);
+  const before = (await reviews.board(admin.raw, {})).workload.find(
+      (w) => w.reviewerId === reviewer.id,
+    ),
+    a = await assigned(p),
+    after = (await reviews.board(admin.raw, {})).workload.find(
+      (w) => w.reviewerId === reviewer.id,
+    );
+  expect(after?.invited).toBe((before?.invited ?? 0) + 1);
+  const reminder = {
+    assignmentId: a.id,
+    idempotencyKey: rid(),
+    reason: "Synthetic deadline reminder",
+  };
+  await expect(
+    reviews.remind(outsider.raw, reminder, rid()),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await reviews.remind(chair.raw, reminder, rid());
+  await reviews.remind(chair.raw, reminder, rid());
+  const sent = (
+    await f.admin.query(
+      "SELECT message_text FROM confsys.notifications WHERE event_key=$1",
+      [`review-reminder:${a.id}:${reminder.idempotencyKey}`],
+    )
+  ).rows;
+  expect(sent).toHaveLength(1);
+  expect(sent[0].message_text).not.toContain(p.document.title);
+  await score(a);
+  await expect(
+    reviews.remind(chair.raw, { ...reminder, idempotencyKey: rid() }, rid()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+});
+it("initial-screen and audit roll back when the atomic reviewer notification cannot be persisted", async () => {
+  const p = await submitted();
+  await assigned(p);
+  const screenId = rid(),
+    failure = rid();
+  await f.admin.query(
+    `CREATE FUNCTION confsys.test_screen_notice_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.request_id='${failure}' THEN RAISE EXCEPTION 'synthetic screening outbox failure'; END IF; RETURN NEW; END $$`,
+  );
+  await f.admin.query(
+    "CREATE TRIGGER test_screen_notice_failure BEFORE INSERT ON confsys.notifications FOR EACH ROW EXECUTE FUNCTION confsys.test_screen_notice_failure()",
+  );
+  try {
+    await expect(
+      reviews.screen(
+        admin.raw,
+        {
+          id: screenId,
+          submissionId: p.id,
+          revisionId: p.currentRevisionId,
+          expectedVersion: 0,
+          outcome: "needs_correction",
+          reason: "Synthetic atomic initial screening",
+        },
+        failure,
+      ),
+    ).rejects.toThrow("synthetic screening outbox failure");
+    expect(
+      (
+        await f.admin.query(
+          "SELECT id FROM confsys.review_screenings WHERE id=$1",
+          [screenId],
+        )
+      ).rowCount,
+    ).toBe(0);
+    expect(
+      (
+        await f.admin.query(
+          "SELECT id FROM confsys.auth_audit WHERE request_id=$1",
+          [failure],
+        )
+      ).rowCount,
+    ).toBe(0);
+    expect(
+      (
+        await f.admin.query(
+          "SELECT id FROM confsys.notifications WHERE request_id=$1",
+          [failure],
+        )
+      ).rowCount,
+    ).toBe(0);
+  } finally {
+    await f.admin.query(
+      "DROP TRIGGER test_screen_notice_failure ON confsys.notifications",
+    );
+    await f.admin.query("DROP FUNCTION confsys.test_screen_notice_failure()");
+  }
 });

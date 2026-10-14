@@ -1,6 +1,8 @@
 import type { PoolClient } from "pg";
 import {
   reviewFormSchema,
+  reviewScreeningSchema,
+  type ReviewScreening,
   reviewScoreDocumentSchema,
   submissionDocumentSchema,
   type ReviewFormDocument,
@@ -360,6 +362,104 @@ export async function reviewers(db: PoolClient, offset: number) {
     await db.query<{ id: string; email: string }>(
       `SELECT u.id,u.email FROM confsys.users u JOIN confsys.user_roles r ON r.user_id=u.id WHERE u.state='active' AND u.verified_at IS NOT NULL AND r.role='reviewer' ORDER BY u.email,u.id LIMIT 21 OFFSET $1`,
       [offset],
+    )
+  ).rows;
+}
+
+export async function screening(db: PoolClient, revisionId: string) {
+  const r = (
+    await db.query(
+      'SELECT id,submission_id AS "submissionId",revision_id AS "revisionId",version,outcome,reason,created_by AS "createdBy",created_at AS "createdAt" FROM confsys.review_screenings WHERE revision_id=$1 ORDER BY version DESC LIMIT 1',
+      [revisionId],
+    )
+  ).rows[0];
+  return r
+    ? reviewScreeningSchema.parse({
+        ...r,
+        createdAt: r.createdAt.toISOString(),
+      })
+    : null;
+}
+export async function screeningById(db: PoolClient, id: string) {
+  const r = (
+    await db.query(
+      'SELECT id,submission_id AS "submissionId",revision_id AS "revisionId",version,outcome,reason,created_by AS "createdBy",created_at AS "createdAt" FROM confsys.review_screenings WHERE id=$1',
+      [id],
+    )
+  ).rows[0];
+  return r
+    ? reviewScreeningSchema.parse({
+        ...r,
+        createdAt: r.createdAt.toISOString(),
+      })
+    : null;
+}
+export async function screeningStatus(db: PoolClient, revisionId: string) {
+  const r = (
+    await db.query<{ outcome: ReviewScreening["outcome"] }>(
+      "SELECT outcome FROM confsys.review_screening_status WHERE revision_id=$1",
+      [revisionId],
+    )
+  ).rows[0];
+  return r?.outcome ?? ("unchecked" as const);
+}
+export async function createScreening(
+  db: PoolClient,
+  data: {
+    id: string;
+    submissionId: string;
+    revisionId: string;
+    expectedVersion: number;
+    outcome: ReviewScreening["outcome"];
+    reason: string;
+  },
+  actor: string,
+) {
+  await db.query(
+    "INSERT INTO confsys.review_screenings(id,submission_id,revision_id,version,outcome,reason,created_by) VALUES($1,$2,$3,$4,$5,$6,$7)",
+    [
+      data.id,
+      data.submissionId,
+      data.revisionId,
+      data.expectedVersion + 1,
+      data.outcome,
+      data.reason,
+      actor,
+    ],
+  );
+}
+export async function requiresScreening(db: PoolClient, revisionId: string) {
+  return !!(
+    await db.query(
+      "SELECT 1 FROM confsys.review_assignments a JOIN confsys.review_forms f ON f.id=a.form_id WHERE a.revision_id=$1 AND coalesce((f.document->>'requireScreening')::boolean,false) LIMIT 1",
+      [revisionId],
+    )
+  ).rowCount;
+}
+export async function screeningRecipients(db: PoolClient, revisionId: string) {
+  return (
+    await db.query<{ reviewer_id: string }>(
+      "SELECT DISTINCT reviewer_id FROM confsys.review_assignments WHERE revision_id=$1 AND state IN('invited','accepted')",
+      [revisionId],
+    )
+  ).rows.map((r) => r.reviewer_id);
+}
+export async function workload(
+  db: PoolClient,
+  reviewerIds: string[],
+  actor: { id: string; email: string },
+  chairId: string | null,
+) {
+  return (
+    await db.query<{
+      reviewerId: string;
+      invited: number;
+      accepted: number;
+      submitted: number;
+      overdue: number;
+    }>(
+      `SELECT a.reviewer_id AS "reviewerId",count(*) FILTER(WHERE a.state='invited')::int AS invited,count(*) FILTER(WHERE a.state='accepted')::int AS accepted,count(*) FILTER(WHERE a.state='submitted')::int AS submitted,count(*) FILTER(WHERE a.state IN('invited','accepted') AND (f.document->>'closesAt')::timestamptz<=now())::int AS overdue FROM confsys.review_assignments a JOIN confsys.submission_revisions r ON r.id=a.revision_id JOIN confsys.submissions s ON s.id=a.submission_id JOIN confsys.review_forms f ON f.id=a.form_id WHERE a.reviewer_id=ANY($1::uuid[]) AND s.state<>'withdrawn' AND s.owner_id<>$2 AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(r.document->'authors') author WHERE lower(btrim(author->>'email'))=$3) AND NOT EXISTS(SELECT 1 FROM confsys.review_conflicts c WHERE c.submission_id=s.id AND c.user_id=$2) AND ($4::uuid IS NULL OR EXISTS(SELECT 1 FROM confsys.review_chair_scopes scope WHERE scope.user_id=$4 AND scope.track_id=r.document->>'trackId')) GROUP BY a.reviewer_id`,
+      [reviewerIds, actor.id, actor.email, chairId],
     )
   ).rows;
 }

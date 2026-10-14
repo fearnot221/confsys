@@ -100,3 +100,15 @@ Read code/config/migrations/CI and confirmed 9d3e788 contains cc2361d, 520607e, 
 | Minimal native editing forms and text history summary | Field comparison is manual; no full accessibility/browser audit | Later Claude presentation unit: keyboard/assistive-tech audit, ergonomic comparison, keep SDK/data/permission ownership and regression assertions. |
 
 All prior security/operations debt remains: MFA, TLS, trustProxy/IP limits, encryption-key rotation, password screening/Argon2 capacity, retention, backup restore, real providers, load, WCAG and shared-host resource risks. Next minimal unit for new approval: private files/media metadata, bounded content validation/quarantine, authorized access and lifecycle; then invitations/registration per the existing roadmap. None implemented here.
+
+## Continuous Phase 3–5 focused maintainability recheck — 2026-10-15 07:12
+
+Core domain/service/repository, SDK/hook/presentation boundaries remain. Initial screening reuses the access fence, review permissions, conflict/track policy and atomic business notifications. It does not add a second authorization registry or mutate submission/review outcomes. Real PostgreSQL now covers screening version races, nonprivileged reason isolation, blocked downstream actions and notification failure rollback. Submission/program/competition suites also pass, including withdrawal races against publication/scoring. Browser updates still require main integration verification.
+
+| Evidenced remaining item | Practical risk | Acceptance / treatment within authorized scope |
+|---|---|---|
+| Deadline reminders are manual commands; no automatic due-date scheduler or extension of existing assignment deadlines | Administrators must monitor overdue counts and cannot reopen a closed snapshot in place | Record as unfinished workflow; any scheduler must deduplicate real outbox events, while deadline changes need explicit immutable amendment semantics and tests. |
+| Presenter changes use new immutable author revisions, then new published acceptance; no separate presenter-change approval request | Administrative handoff requires explicit re-review and re-publication | Keep current behavior visible; a dedicated approval workflow requires concrete state/contracts and tests before claiming it exists. |
+| Registration checks run at configured submission/competition eligibility points; no automatic post-acceptance registration-deadline enforcement | Accepted presenters may need manual registration follow-up | Add a dated policy and audited enforcement workflow before claiming automatic exclusion or reminders. |
+| Program/competition administration and final scoring serialize through access fence | High-volume throughput remains unmeasured | Preserve correctness regressions; benchmark synthetic contention before replacing the fence. |
+| Native form accessibility fixes cover labels, status/required guidance and expanded sections only | No complete WCAG or cross-browser assurance | Maintain semantic E2E assertions and reserve a full assistive-technology/browser audit for presentation hardening. |

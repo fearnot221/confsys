@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type {
   ReviewAssignment,
+  ReviewScreening,
   ReviewBoard,
   ReviewFormDocument,
   ReviewScoreDocument,
@@ -26,6 +27,13 @@ type Props = {
   onRefresh: () => void;
   onReauthenticate: (password: string) => void;
   onConfigure: (document: ReviewFormDocument) => void;
+  onScreen: (
+    submissionId: string,
+    revisionId: string,
+    outcome: ReviewScreening["outcome"],
+    reason: string,
+  ) => void;
+  onRemind: (assignmentId: string, reason: string) => void;
   onScope: (userId: string, trackId: string, remove: boolean) => void;
   onConflict: (submissionId: string, reason: string) => void;
   onAssign: (
@@ -75,6 +83,10 @@ function ScoreForm({
       assignment.document.privateComment,
     ),
     [reason, setReason] = useState("");
+  const blocked =
+    assignment.screening !== "ready" &&
+    (assignment.form.document.requireScreening ||
+      assignment.screening !== "unchecked");
   const document: ReviewScoreDocument = {
     scores: assignment.form.document.criteria
       .filter((c) => scores[c.id] !== undefined && scores[c.id] !== "")
@@ -88,6 +100,10 @@ function ScoreForm({
       <p>
         狀態：{assignment.state} · 評分表版本 {assignment.form.version} · 截止{" "}
         {assignment.form.document.closesAt}
+      </p>
+      <p>
+        行政初檢：{assignment.screening}
+        {blocked ? "；目前停止接受與評分，仍可婉拒或申報衝突。" : ""}
       </p>
       {assignment.paper.authors.length > 0 && (
         <p>
@@ -112,7 +128,7 @@ function ScoreForm({
       {assignment.state === "invited" && (
         <>
           <button
-            disabled={busy}
+            disabled={busy || blocked}
             onClick={() => onAction(assignment, "accept", document, "")}
           >
             接受指派
@@ -140,7 +156,7 @@ function ScoreForm({
                 min={0}
                 max={c.max}
                 step="any"
-                disabled={assignment.state === "submitted" || busy}
+                disabled={assignment.state === "submitted" || busy || blocked}
                 value={scores[c.id] ?? ""}
                 onChange={(e) =>
                   setScores({ ...scores, [c.id]: e.target.value })
@@ -152,7 +168,7 @@ function ScoreForm({
             給作者的評語
             <textarea
               maxLength={10000}
-              disabled={assignment.state === "submitted" || busy}
+              disabled={assignment.state === "submitted" || busy || blocked}
               value={authorComment}
               onChange={(e) => setAuthorComment(e.target.value)}
             />
@@ -161,17 +177,17 @@ function ScoreForm({
             僅主席可見的內部評語
             <textarea
               maxLength={10000}
-              disabled={assignment.state === "submitted" || busy}
+              disabled={assignment.state === "submitted" || busy || blocked}
               value={privateComment}
               onChange={(e) => setPrivateComment(e.target.value)}
             />
           </label>
           {assignment.state === "accepted" && (
             <>
-              <button disabled={busy}>儲存審查草稿</button>
+              <button disabled={busy || blocked}>儲存審查草稿</button>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || blocked}
                 onClick={() => onAction(assignment, "submit", document, "")}
               >
                 正式送出並鎖定
@@ -216,7 +232,8 @@ function Configure({
 }) {
   const [name, setName] = useState("論文審查"),
     [mode, setMode] = useState<"single_blind" | "double_blind">("double_blind"),
-    [closesAt, setClosesAt] = useState("");
+    [closesAt, setClosesAt] = useState(""),
+    [requireScreening, setRequireScreening] = useState(false);
   const [criteria, setCriteria] = useState([
       { id: "quality", label: "研究品質", max: 5 },
     ]),
@@ -252,6 +269,7 @@ function Configure({
             mode,
             closesAt: new Date(closesAt).toISOString(),
             criteria,
+            requireScreening,
           });
         }}
       >
@@ -263,6 +281,14 @@ function Configure({
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={requireScreening}
+            onChange={(e) => setRequireScreening(e.target.checked)}
+          />
+          指派前須通過行政初檢
         </label>
         <label htmlFor="review-mode">審查模式</label>
         <select
@@ -383,6 +409,8 @@ function Manage({
   busy,
   canDecide,
   onAssign,
+  onScreen,
+  onRemind,
   onConflict,
   onDecide,
   onPublish,
@@ -391,6 +419,8 @@ function Manage({
   busy: boolean;
   canDecide: boolean;
   onAssign: Props["onAssign"];
+  onScreen: Props["onScreen"];
+  onRemind: Props["onRemind"];
   onConflict: Props["onConflict"];
   onDecide: Props["onDecide"];
   onPublish: Props["onPublish"];
@@ -398,7 +428,11 @@ function Manage({
   const [paperId, setPaperId] = useState(""),
     [reviewerId, setReviewerId] = useState(""),
     [formId, setFormId] = useState(""),
-    [anonymous, setAnonymous] = useState(false);
+    [anonymous, setAnonymous] = useState(false),
+    [screenOutcome, setScreenOutcome] =
+      useState<ReviewScreening["outcome"]>("ready"),
+    [screenReason, setScreenReason] = useState(""),
+    [reminderReason, setReminderReason] = useState("");
   const [outcome, setOutcome] =
       useState<ReviewDecision["outcome"]>("accept_oral"),
     [authorMessage, setAuthorMessage] = useState(""),
@@ -478,6 +512,89 @@ function Manage({
         </label>
         <button disabled={busy || !paper}>指派此不可變版本</button>
       </form>
+      <section>
+        <h3>行政初檢</h3>
+        <p>
+          選擇上方投稿，留下初檢版本。未通過初檢可要求補件或不錄取；不得繼續評分或發布錄取。
+        </p>
+        {paper && (
+          <p>
+            目前初檢：
+            {board.screenings.find((s) => s.revisionId === paper.revisionId)
+              ?.outcome ?? "unchecked"}{" "}
+            · 版本{" "}
+            {board.screenings.find((s) => s.revisionId === paper.revisionId)
+              ?.version ?? 0}
+          </p>
+        )}
+        <label htmlFor="screen-outcome">初檢結果</label>
+        <select
+          id="screen-outcome"
+          value={screenOutcome}
+          onChange={(e) =>
+            setScreenOutcome(e.target.value as ReviewScreening["outcome"])
+          }
+        >
+          <option value="ready">通過初檢</option>
+          <option value="needs_correction">需要修正</option>
+          <option value="ineligible">不符合資格</option>
+        </select>
+        <label>
+          初檢理由（內部）
+          <textarea
+            value={screenReason}
+            maxLength={2000}
+            onChange={(e) => setScreenReason(e.target.value)}
+          />
+        </label>
+        <button
+          disabled={busy || !paper || screenReason.trim().length < 3}
+          onClick={() =>
+            paper &&
+            onScreen(
+              paper.submissionId,
+              paper.revisionId,
+              screenOutcome,
+              screenReason,
+            )
+          }
+        >
+          保存初檢新版本
+        </button>
+        {paper &&
+          board.screenings
+            .filter((s) => s.revisionId === paper.revisionId)
+            .map((s) => (
+              <p key={s.id}>
+                {s.reason} · {s.createdAt}
+              </p>
+            ))}
+      </section>
+      <section>
+        <h3>此權限範圍的評審工作量</h3>
+        <p>
+          統計目前未撤稿稿件的指派；逾期是截止已過且仍邀請中／已接受。僅列本頁委員。
+        </p>
+        <ul>
+          {board.reviewers.map((r) => {
+            const w = board.workload.find((w) => w.reviewerId === r.id);
+            return (
+              <li key={r.id}>
+                {r.email}：待接受 {w?.invited ?? 0}、待交 {w?.accepted ?? 0}
+                、已交 {w?.submitted ?? 0}、逾期 {w?.overdue ?? 0}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+      <label>
+        提醒待審理由
+        <textarea
+          value={reminderReason}
+          onChange={(e) => setReminderReason(e.target.value)}
+          maxLength={2000}
+        />
+      </label>
       <h3>審查進度與評語</h3>
       {board.assignments.length === 0 && <p>此頁沒有可查看的指派。</p>}
       {board.assignments.map((a) => (
@@ -487,7 +604,19 @@ function Manage({
             {board.reviewers.find((r) => r.id === a.reviewerId)?.email ??
               a.reviewerId}
           </summary>
-          <p>版本 {a.revisionId}</p>
+          <p>
+            版本 {a.revisionId} · 初檢 {a.screening}
+          </p>
+          <button
+            disabled={
+              busy ||
+              reminderReason.trim().length < 3 ||
+              !["invited", "accepted"].includes(a.state)
+            }
+            onClick={() => onRemind(a.id, reminderReason)}
+          >
+            提醒此待審委員
+          </button>
           <ul>
             {a.document.scores.map((s) => (
               <li key={s.criterionId}>
@@ -645,6 +774,8 @@ export function ReviewsScreen(props: Props) {
           busy={props.busy}
           canDecide={props.canDecide}
           onAssign={props.onAssign}
+          onScreen={props.onScreen}
+          onRemind={props.onRemind}
           onConflict={props.onConflict}
           onDecide={props.onDecide}
           onPublish={props.onPublish}

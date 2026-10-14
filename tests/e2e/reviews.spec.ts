@@ -35,6 +35,7 @@ test.afterAll(async () => {
     [papers],
   );
   for (const table of [
+    "review_screenings",
     "review_publications",
     "review_decisions",
     "review_conflicts",
@@ -157,6 +158,7 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
   await page.goto("/reviews");
   await page.getByLabel("評分表名稱").fill("Synthetic E2E review");
   await page.getByLabel("審查截止（本機時區）").fill("2099-01-01T12:00");
+  await page.getByLabel("指派前須通過行政初檢", { exact: true }).check();
   await page.getByRole("button", { name: "建立評分表新版本" }).click();
   await expect(page.getByRole("status")).toContainText("已建立新的評分表版本");
   await page.getByLabel("主席本地帳號 UUID").fill(id(chairEmail));
@@ -178,7 +180,18 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
   await page
     .getByRole("combobox", { name: "評分表版本", exact: true })
     .selectOption(formId);
-  await page.getByRole("checkbox").check();
+  await page
+    .getByLabel("初檢理由（內部）", { exact: true })
+    .fill("Synthetic browser administrative screening");
+  await page
+    .getByRole("button", { name: "保存初檢新版本", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("初檢已保存");
+  await page
+    .getByLabel("已人工確認稿件內容與中繼資料符合匿名要求（雙盲必要）", {
+      exact: true,
+    })
+    .check();
   await page.getByRole("button", { name: "指派此不可變版本" }).click();
   await expect(page.getByRole("status")).toContainText("已指派不可變投稿版本");
   const reviewerContext = await browser.newContext({

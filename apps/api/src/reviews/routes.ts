@@ -38,6 +38,10 @@ export function registerReviewRoutes(
         if (!input.success) throw new AuthError("INVALID_REQUEST");
         const raw = req.cookies[cookiePolicy(config).name];
         switch (name) {
+          case "reviewScreen":
+            return service.screen(raw, input.data, req.id);
+          case "reviewRemind":
+            return service.remind(raw, input.data, req.id);
           case "reviewBoard":
             return service.board(raw, input.data);
           case "reviewAssigned":

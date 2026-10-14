@@ -3,6 +3,7 @@ import { validateReviewScores } from "../../apps/api/src/reviews/policy.js";
 import type { ReviewFormDocument } from "@confsys/contracts";
 const form: ReviewFormDocument = {
   name: "Synthetic",
+  requireScreening: false,
   mode: "double_blind",
   closesAt: "2099-01-01T00:00:00.000Z",
   criteria: [

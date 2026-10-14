@@ -57,6 +57,10 @@ export function createReviewClient(
     );
   }
   return {
+    screen: (input: unknown, signal: AbortSignal) =>
+      call(reviewEndpoints.reviewScreen, input, signal),
+    remind: (input: unknown, signal: AbortSignal) =>
+      call(reviewEndpoints.reviewRemind, input, signal),
     board: (offset: number, signal: AbortSignal) =>
       call(reviewEndpoints.reviewBoard, { offset }, signal),
     assigned: (offset: number, signal: AbortSignal) =>

@@ -11,6 +11,7 @@ export const reviewFormDocumentSchema = z
     mode: z.enum(["single_blind", "double_blind"]),
     closesAt: z.iso.datetime(),
     criteria: z.array(reviewCriterionSchema).min(1).max(20),
+    requireScreening: z.boolean().default(false),
   })
   .refine(
     (v) => new Set(v.criteria.map((c) => c.id)).size === v.criteria.length,
@@ -52,6 +53,7 @@ export const reviewAssignmentSchema = z.strictObject({
   version: z.number().int(),
   paper: reviewPaperSchema,
   form: reviewFormSchema,
+  screening: z.enum(["unchecked", "ready", "needs_correction", "ineligible"]),
   document: reviewScoreDocumentSchema,
 });
 export type ReviewAssignment = z.infer<typeof reviewAssignmentSchema>;
@@ -72,7 +74,36 @@ export const reviewDecisionSchema = z.strictObject({
   published: z.boolean(),
 });
 export type ReviewDecision = z.infer<typeof reviewDecisionSchema>;
+export const reviewScreeningSchema = z.strictObject({
+  id: z.uuid(),
+  submissionId: z.uuid(),
+  revisionId: z.uuid(),
+  version: z.number().int().min(1),
+  outcome: z.enum(["ready", "needs_correction", "ineligible"]),
+  reason: text(2000).min(3),
+  createdBy: z.uuid(),
+  createdAt: z.string(),
+});
+export type ReviewScreening = z.infer<typeof reviewScreeningSchema>;
+export const reviewScreenInput = z.strictObject({
+  id: z.uuid(),
+  submissionId: z.uuid(),
+  revisionId: z.uuid(),
+  expectedVersion: z.number().int().min(0),
+  outcome: z.enum(["ready", "needs_correction", "ineligible"]),
+  reason: text(2000).min(3),
+});
 export const reviewBoardSchema = z.strictObject({
+  screenings: z.array(reviewScreeningSchema),
+  workload: z.array(
+    z.strictObject({
+      reviewerId: z.uuid(),
+      invited: z.number().int(),
+      accepted: z.number().int(),
+      submitted: z.number().int(),
+      overdue: z.number().int(),
+    }),
+  ),
   papers: z.array(
     z.strictObject({
       submissionId: z.uuid(),
@@ -135,6 +166,22 @@ export const reviewPageInput = z.strictObject({
   offset: z.coerce.number().int().min(0).max(100000).default(0),
 });
 export const reviewEndpoints = {
+  reviewScreen: {
+    method: "post",
+    path: "/api/reviews/screen",
+    input: reviewScreenInput,
+    output: reviewScreeningSchema,
+  },
+  reviewRemind: {
+    method: "post",
+    path: "/api/reviews/remind",
+    input: z.strictObject({
+      assignmentId: z.uuid(),
+      idempotencyKey: z.uuid(),
+      reason: text(2000).min(3),
+    }),
+    output: z.strictObject({ queued: z.literal(true) }),
+  },
   reviewConflict: {
     method: "post",
     path: "/api/reviews/conflict",
