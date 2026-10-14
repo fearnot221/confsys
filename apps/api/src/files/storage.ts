@@ -41,8 +41,6 @@ export async function prepareContent(content: string, purpose: string) {
   const pdf = /^%PDF-1\.[0-9]/.test(bytes.subarray(0, 8).toString("ascii"));
   if (pdf) {
     if (purpose === "site_media" || !/%%EOF\s*$/.test(bytes.subarray(-1024).toString("latin1"))) throw new AuthError("UNSUPPORTED_MEDIA_TYPE");
-    // Active PDF actions and embedded files are outside the accepted document subset.
-    if (/\/(?:JavaScript|JS|Launch|EmbeddedFile|OpenAction|AA)\b/.test(bytes.toString("latin1"))) throw new AuthError("UNSUPPORTED_MEDIA_TYPE");
     await validatePdf(bytes);
     return { bytes, mediaType: "application/pdf" as const };
   }
