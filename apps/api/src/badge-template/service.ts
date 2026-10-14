@@ -61,8 +61,14 @@ export function createBadgeTemplateService(pool: Pool, config: ApiConfig) {
           throw new AuthError("CONFLICT");
         try {
           await previewPdf(data.document);
-        } catch {
-          throw new AuthError("INVALID_REQUEST");
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            (error.message.startsWith("Badge text") ||
+              error.message.includes("unsupported glyph"))
+          )
+            throw new AuthError("INVALID_REQUEST");
+          throw error;
         }
         await repo.save(db, actor, before.version + 1, data.document);
         await audit(
