@@ -71,6 +71,7 @@ export function PublicSiteContent({
   const links = p?.links.length ? p.links : fp?.links;
   const href = (next: SitePage, lang = locale) =>
     preview ? `#preview-${lang}-${next}` : `/${lang}/${next}`;
+  const mediaUrl = (id: string) => preview ? `/api/files/${id}/download` : `/api/media/${id}`;
   return (
     <div className="layout public-site">
       <a className="skip-link" href="#site-main">
@@ -78,6 +79,7 @@ export function PublicSiteContent({
       </a>
       <header>
         <a className="brand" href={href("home")}>
+          {d?.media?.logoId && <img src={mediaUrl(d.media.logoId)} alt="" width="64" height="64" className="site-logo" />}
           {t?.name || site.conferenceName}
         </a>
         <nav aria-label="帳號 / Account">
@@ -108,6 +110,7 @@ export function PublicSiteContent({
         </nav>
       )}
       <main id="site-main">
+        {page === "home" && d?.media?.heroId && <img src={mediaUrl(d.media.heroId)} alt="" className="site-hero" />}
         <section className="intro">
           <p className="eyebrow">{l[page]}</p>
           <h1>

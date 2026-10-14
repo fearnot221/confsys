@@ -27,6 +27,7 @@ type Props = {
   confirmation: string | null;
   canWrite: boolean;
   canPublish: boolean;
+  canMedia: boolean;
   onLocale: (v: SiteLocale) => void;
   onPage: (v: SitePage) => void;
   onHistoryPage: (v: number) => void;
@@ -178,6 +179,11 @@ export function SiteScreen(p: Props) {
                   </div>
                 ))}
               </div>
+              <fieldset disabled={!p.canMedia || p.busy}>
+                <legend>官網圖片</legend>
+                <p>先至 <a href="/account/files" target="_blank" rel="noreferrer">私人檔案</a> 上傳用途為官網媒體的圖片，檢查完成後貼上檔案 ID。草稿不會公開圖片。</p>
+                {(["logoId", "heroId"] as const).map(key => <label key={key}>{key === "logoId" ? "Logo 檔案 ID" : "主視覺檔案 ID"}<input value={d.media?.[key] ?? ""} onChange={e => set("media",{logoId:d.media?.logoId ?? null,heroId:d.media?.heroId ?? null,[key]:e.target.value || null})} /></label>)}
+              </fieldset>
               <Locale value={p.locale} onChange={p.onLocale} />
               {t &&
                 (

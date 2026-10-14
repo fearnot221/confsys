@@ -20,7 +20,9 @@ export async function validatePdf(bytes: Buffer): Promise<void> {
           }
           parentPort.postMessage(true);
         } catch {parentPort.postMessage(false);}
-      })();`, {eval:true,workerData:{parser,bytes},resourceLimits:{maxOldGenerationSizeMb:64,maxYoungGenerationSizeMb:16,stackSizeMb:4}});
+      })();`, {eval:true,stdout:true,stderr:true,workerData:{parser,bytes},resourceLimits:{maxOldGenerationSizeMb:64,maxYoungGenerationSizeMb:16,stackSizeMb:4}});
+    worker.stdout?.resume();
+    worker.stderr?.resume();
     const finish=(value:boolean)=>{if(settled)return;settled=true;clearTimeout(timer);void worker.terminate();resolve(value);};
     const timer=setTimeout(()=>finish(false),3000);
     worker.once("message",value=>finish(value===true));

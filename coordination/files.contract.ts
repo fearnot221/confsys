@@ -3,7 +3,7 @@ export const filePurposes = ["manuscript", "payment_evidence", "site_media"] as 
 export const fileUploadInput = z.strictObject({
   purpose: z.enum(filePurposes),
   name: z.string().min(1).max(180).regex(/^[^\x00-\x1f\x7f/\\]+$/),
-  content: z.string().min(4).max(11184812).regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/),
+  content: z.string().min(4).max(11184812).regex(/^[A-Za-z0-9+/]*={0,2}$/),
 });
 export const fileAssetSchema = z.strictObject({
   id: z.uuid(), purpose: z.enum(filePurposes), name: z.string(),

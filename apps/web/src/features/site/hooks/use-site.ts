@@ -190,6 +190,7 @@ export function useSite() {
     confirmation,
     canWrite: canRead && permissions.includes("site.draft.write"),
     canPublish: canRead && permissions.includes("site.publish"),
+    canMedia: canRead && permissions.includes("files.media.manage"),
     onLocale: setLocale,
     onPage: setPage,
     onHistoryPage: setOffset,

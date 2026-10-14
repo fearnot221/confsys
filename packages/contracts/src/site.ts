@@ -61,6 +61,7 @@ const translation = z.strictObject({
 // Structural schemas remain JSON-schema representable; semantic validation is shared below.
 export const siteDocumentSchema = z.strictObject({
   schemaVersion: z.literal(1),
+  media: z.strictObject({logoId: z.uuid().nullable(), heroId: z.uuid().nullable()}).optional(),
   defaultLocale: z.enum(siteLocales),
   enabledLocales: z.array(z.enum(siteLocales)).min(1).max(2),
   startDate: z.string().max(10),

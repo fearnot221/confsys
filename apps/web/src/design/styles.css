@@ -312,3 +312,6 @@ header a {
 .site-editor nav {display:flex;gap:16px;flex-wrap:wrap;}
 .site-editor fieldset {border:1px solid var(--line);min-width:0;}
 @media(max-width:600px){.site-editor .fields{grid-template-columns:1fr}.site-languages{margin-left:0}}
+
+.site-logo { object-fit: contain; }
+.site-hero { display: block; width: 100%; max-height: 480px; object-fit: contain; }
