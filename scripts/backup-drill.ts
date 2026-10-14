@@ -13,6 +13,8 @@ import { execFileSync } from "node:child_process";
 import { createServer } from "node:net";
 import { randomUUID, createHash } from "node:crypto";
 import { createPool, withIdentityTransaction } from "@confsys/db";
+import { seal, unseal } from "@confsys/notifications";
+import { passHash, passToken } from "../packages/documents/src/token.js";
 const { values } = parseArgs({
   options: {
     "source-env": { type: "string" },
@@ -462,6 +464,53 @@ try {
   record(
     "Restored into fresh isolated PostgreSQL and new private volume; snapshots/references/generated PDFs/exports are identical",
   );
+  const cryptoProbeId = randomUUID(),
+    cryptoProbe = seal(
+      "Synthetic recovery key probe",
+      cryptoProbeId,
+      sourceEnv.MAIL_ENCRYPTION_KEY!,
+      sourceEnv.MAIL_KEY_VERSION!,
+    );
+  if (
+    unseal(
+      cryptoProbe,
+      cryptoProbeId,
+      destinationEnv.MAIL_ENCRYPTION_KEY!,
+      destinationEnv.MAIL_KEY_VERSION!,
+    ) !== "Synthetic recovery key probe"
+  )
+    throw new Error("Recovered mail key cannot decrypt source envelope");
+  const envelopes = (
+    await destinationDb.query(
+      "SELECT notification_id,key_version,ciphertext FROM confsys.notification_secrets LIMIT 1001",
+    )
+  ).rows;
+  const tokens = (
+    await destinationDb.query(
+      "SELECT token_id,token_hash FROM confsys.onsite_tokens LIMIT 1001",
+    )
+  ).rows;
+  if (envelopes.length > 1000 || tokens.length > 1000)
+    throw new Error("Recovery key samples exceed bounded drill size");
+  for (const envelope of envelopes)
+    unseal(
+      envelope.ciphertext,
+      envelope.notification_id,
+      destinationEnv.MAIL_ENCRYPTION_KEY!,
+      envelope.key_version,
+    );
+  for (const token of tokens)
+    if (
+      passHash(passToken(token.token_id, destinationEnv.QR_SIGNING_KEY!)) !==
+      token.token_hash
+    )
+      throw new Error("Recovered QR key does not match stored token");
+  report.restoredEncryptedEnvelopeCount = envelopes.length;
+  report.restoredQrTokenCount = tokens.length;
+  record(
+    `Recovered keys decrypt source envelope probe and ${envelopes.length} stored envelopes; ${tokens.length} stored QR token hashes match (zero means no fixture sample)`,
+  );
+
   appDb = createPool(destinationEnv.DATABASE_URL!, 1);
   const roles = (
     await appDb.query(
