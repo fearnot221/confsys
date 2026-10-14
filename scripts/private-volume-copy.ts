@@ -143,8 +143,8 @@ export async function copyPrivateVolume(
     await chown(`${destination}/manifest.json`, ownerUid, ownerGid);
   }
   if (mode === "restore") {
-    await chown(destination, ownerUid, ownerGid);
     await chmod(destination, 0o700);
+    await chown(destination, ownerUid, ownerGid);
   }
   return { files: manifest.length, bytes: total };
 }
