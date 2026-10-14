@@ -9,15 +9,19 @@ export async function validatePdf(bytes: Buffer): Promise<void> {
     let settled = false;
     const worker = new Worker(`
       const {parentPort,workerData}=require('node:worker_threads');
-      const {PDFDocument}=require(workerData.parser);
+      const {PDFDocument,PDFDict,PDFArray,PDFName,PDFStream}=require(workerData.parser);
       (async()=>{
         try {
           const doc=await PDFDocument.load(workerData.bytes,{ignoreEncryption:false,throwOnInvalidObject:true,updateMetadata:false});
           if(doc.getPageCount()<1 || doc.getPageCount()>500) throw new Error('pages');
-          for(const [,object] of doc.context.enumerateIndirectObjects()) {
-            const representation=object.toString().replace(/#([a-fA-F0-9]{2})/g,(_,v)=>String.fromCharCode(parseInt(v,16)));
-            if(/\\/(?:JavaScript|JS|Launch|EmbeddedFile|OpenAction|AA)\\b/.test(representation)) throw new Error('active');
-          }
+          const forbidden=new Set(['JavaScript','JS','Launch','EmbeddedFile','OpenAction','AA']);
+          const visit=(object)=>{
+            if(object instanceof PDFName) {if(forbidden.has(object.decodeText())) throw new Error('active');}
+            else if(object instanceof PDFDict) {for(const [key,value] of object.entries()){visit(key);visit(value);}}
+            else if(object instanceof PDFArray) {for(const value of object.asArray())visit(value);}
+            else if(object instanceof PDFStream) visit(object.dict);
+          };
+          for(const [,object] of doc.context.enumerateIndirectObjects()) visit(object);
           parentPort.postMessage(true);
         } catch {parentPort.postMessage(false);}
       })();`, {eval:true,stdout:true,stderr:true,workerData:{parser,bytes},resourceLimits:{maxOldGenerationSizeMb:64,maxYoungGenerationSizeMb:16,stackSizeMb:4}});
