@@ -87,6 +87,9 @@ importers:
       '@confsys/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@confsys/documents':
+        specifier: workspace:*
+        version: link:../../packages/documents
       '@confsys/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
@@ -96,9 +99,6 @@ importers:
       '@fastify/csrf-protection':
         specifier: 8.0.2
         version: 8.0.2
-      '@pdf-lib/fontkit':
-        specifier: 1.1.1
-        version: 1.1.1
       argon2:
         specifier: 0.45.1
         version: 0.45.1
@@ -199,6 +199,18 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  packages/documents:
+    dependencies:
+      '@confsys/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@pdf-lib/fontkit':
+        specifier: 1.1.1
+        version: 1.1.1
+      pdf-lib:
+        specifier: 1.17.1
+        version: 1.17.1
 
   packages/notifications:
     dependencies:

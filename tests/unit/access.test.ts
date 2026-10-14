@@ -30,6 +30,17 @@ it("fixed explicit grants deny unknown roles, permissions and missing actors", (
     "submissions.manage",
     "submissions.read_all",
     "reviews.manage",
+    "program.manage",
+    "program.publish",
+    "onsite.read",
+    "onsite.checkin",
+    "onsite.redeem",
+    "onsite.undo",
+    "competitions.manage",
+    "reporting.read",
+    "reporting.export",
+    "authors.preview",
+    "notifications.manage",
   ]);
   for (const roles of [undefined, [], ["conference_staff"]])
     expect(() => requirePermission(roles, "access.roles.manage")).toThrow();

@@ -1,3 +1,5 @@
+import {reportingEndpoints} from './reporting.js';
+export * from './reporting.js';
 import {competitionEndpoints} from './competitions.js';
 export * from './competitions.js';
 import {onsiteEndpoints} from './onsite.js';
@@ -86,6 +88,7 @@ export function openApiDocument() {
       ...modulePaths(activityEndpoints),
       ...modulePaths(onsiteEndpoints),
       ...modulePaths(competitionEndpoints),
+      ...modulePaths(reportingEndpoints),
       [routes.instance]: {
         get: {
           operationId: "getInstance",

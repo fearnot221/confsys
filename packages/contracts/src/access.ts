@@ -28,6 +28,10 @@ export const permissionSchema = z.enum([
   "onsite.redeem",
   "onsite.undo",
   "competitions.manage",
+  "reporting.read",
+  "reporting.export",
+  "authors.preview",
+  "notifications.manage",
   "competitions.score",
 ]);
 export type Role = z.infer<typeof roleSchema>;

@@ -30,6 +30,10 @@ export const rolePermissions: Readonly<Record<Role, readonly Permission[]>> = {
     "onsite.redeem",
     "onsite.undo",
     "competitions.manage",
+  "reporting.read",
+  "reporting.export",
+  "authors.preview",
+  "notifications.manage",
   ],
 };
 export function permissionsFor(roles: readonly string[]): Permission[] {
