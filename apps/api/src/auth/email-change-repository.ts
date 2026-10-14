@@ -32,19 +32,17 @@ export async function emailChangeToken(db: PoolClient, hash: string) {
     )
   ).rows[0];
 }
-export async function rememberVerifiedEmail(db: PoolClient, userId: string) {
-  await db.query(
-    "INSERT INTO confsys.verified_email_history(user_id,email,verified_at) SELECT id,email,verified_at FROM confsys.users WHERE id=$1 AND verified_at IS NOT NULL ON CONFLICT DO NOTHING",
-    [userId],
-  );
-}
-export async function replaceEmail(
+export async function consumeConfirmedEmail(
   db: PoolClient,
   userId: string,
-  email: string,
+  hash: string,
 ) {
-  await db.query(
-    "UPDATE confsys.users SET email=$2,verified_at=now(),credential_version=credential_version+1 WHERE id=$1",
-    [userId, email],
+  return (
+    (
+      await db.query<{ changed: boolean }>(
+        "SELECT confsys.confirm_email_change($1,$2) AS changed",
+        [userId, hash],
+      )
+    ).rows[0]?.changed === true
   );
 }

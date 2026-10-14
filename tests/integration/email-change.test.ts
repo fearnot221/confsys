@@ -299,3 +299,73 @@ it("competing accounts cannot confirm the same free mailbox or receive each othe
     ).rowCount,
   ).toBe(1);
 });
+
+it("runtime retains no arbitrary email UPDATE and the definer accepts only a bound unconsumed confirmation token", async () => {
+  expect(
+    (
+      await f.admin.query(
+        "SELECT count(*)::int AS grants FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a WHERE p.oid='confsys.confirm_email_change(uuid,text)'::regprocedure AND a.grantee=0 AND a.privilege_type='EXECUTE'",
+      )
+    ).rows[0].grants,
+  ).toBe(0);
+  const a = await active(),
+    other = await active();
+  await expect(
+    f.app.query("UPDATE confsys.users SET email=email WHERE false"),
+  ).rejects.toMatchObject({ code: "42501" });
+  await auth.requestEmailChange(a.raw, f.email(), rid());
+  const change = await f.link(a.email, "email_change");
+  await withIdentityTransaction(f.app, async (db) => {
+    expect(
+      (
+        await db.query(
+          "SELECT confsys.confirm_email_change($1,$2) AS changed",
+          [a.account.user.id, tokenHash(change.token)],
+        )
+      ).rows[0].changed,
+    ).toBe(false);
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [
+      other.account.user.id,
+    ]);
+    expect(
+      (
+        await db.query(
+          "SELECT confsys.confirm_email_change($1,$2) AS changed",
+          [a.account.user.id, tokenHash(change.token)],
+        )
+      ).rows[0].changed,
+    ).toBe(false);
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [
+      a.account.user.id,
+    ]);
+    expect(
+      (
+        await db.query(
+          "SELECT confsys.confirm_email_change($1,$2) AS changed",
+          [a.account.user.id, "0".repeat(64)],
+        )
+      ).rows[0].changed,
+    ).toBe(false);
+  });
+  expect((await auth.me(a.raw)).user.email).toBe(a.email);
+  await auth.confirmEmailChange(a.raw, { token: change.token }, rid());
+  await withIdentityTransaction(f.app, async (db) => {
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [
+      a.account.user.id,
+    ]);
+    expect(
+      (
+        await db.query(
+          "SELECT confsys.confirm_email_change($1,$2) AS changed",
+          [a.account.user.id, tokenHash(change.token)],
+        )
+      ).rows[0].changed,
+    ).toBe(false);
+  });
+  await expect(
+    f.worker.query("SELECT confsys.confirm_email_change($1,$2)", [
+      a.account.user.id,
+      tokenHash(change.token),
+    ]),
+  ).rejects.toMatchObject({ code: "42501" });
+});

@@ -9,7 +9,6 @@ import {
   audit,
   findUser,
   lockUser,
-  markTokenUsed,
   revokeTokens,
   revokeSessions,
 } from "./repository.js";
@@ -87,10 +86,10 @@ export function createEmailChangeService(pool: Pool, config: ApiConfig) {
           await db.query("SELECT set_config('app.actor_id',$1,true)", [
             actor.id,
           ]);
-          await repo.rememberVerifiedEmail(db, actor.id);
-          await repo.replaceEmail(db, actor.id, change.email);
-          await repo.rememberVerifiedEmail(db, actor.id);
-          await markTokenUsed(db, change.id, new Date());
+          if (
+            !(await repo.consumeConfirmedEmail(db, actor.id, tokenHash(token)))
+          )
+            throw new AuthError("INVALID_TOKEN");
           for (const purpose of ["verify", "reset", "email_change"])
             await revokeTokens(db, actor.id, purpose, new Date());
           await revokeSessions(db, actor.id, new Date());
