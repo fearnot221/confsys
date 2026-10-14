@@ -1,12 +1,13 @@
 # Roadmap
 
-Scope follows SPEC. This delivery is limited to authorized Phase 1.1; Phase 1.2 and later units still require approval.
+Scope follows SPEC. This delivery is limited to authorized Phase 1.1b; Phase 1.2 and later units still require approval.
 
 | Phase | Status / scope |
 |---|---|
 | 0 | Implemented engineering foundation, real service UI, contracts, isolation tests, CI configuration and docs; evidence in PHASE0_DELIVERY |
 | 1.1 | Implemented identity lifecycle/session plus required identity audit/outbox/worker/Mailpit; see PHASE1_1_DELIVERY |
-| 1.2+ | Not started: memberships/scoped permissions/invitations, conference settings/public pages and private-file foundations |
+| 1.1b | Single-conference deployment correction; runtime display, isolated resource template and dual-instance regression |
+| 1.2+ | Not started: local conference roles/resource permissions/controlled administrator initialization, invitations, settings/public pages and private files |
 | 2 | Not started: registration, pricing, capacity, manual reconciliation, group payments, meals, receipts |
 | 3 | Not started: submission, revisions, private content validation/quarantine |
 | 4 | Not started: assignments, conflicts, review and decision publication |
@@ -14,15 +15,15 @@ Scope follows SPEC. This delivery is limited to authorized Phase 1.1; Phase 1.2 
 | 6 | Not started: check-in/redemption, documents, notifications, exports, selected provider sandboxes |
 | 7 | Not started: Claude read-only UI audit then isolated presentation PRs; end-to-end launch verification |
 
-## Phase 1 increments (only 1.1 authorized)
+## Phase 1 increments (only 1.1b currently authorized)
 
-1. **Identity + real session slice:** users/identities, verification/reset/session tables and audit/outbox foundation; register/verify/login/logout UI and APIs; local Mailpit only; password hashing, CSRF/Origin, rotation/revocation tests. No production known-password seeds.
-2. **Organization/conference access slice:** memberships, scoped role templates, two orgs/three synthetic conferences, trusted context resolver replacing test-only assumptions; full RLS/composite constraints; real conference switch with cache/form isolation tests.
-3. **Conference/series settings slice:** timezone/currency/locales, immutable settings versions, draft create/edit; clone whitelisted configuration only with dates reconfirmed and new identifiers.
-4. **Published site slice:** draft/revision/public projection, Vite-compatible prerender or server-rendered public shell; public HTML validation, locale/SEO basics, no private-data leak.
-5. **Shared reliability completion:** invitations + persisted outbox dispatcher/attempts/unknown outcomes; private file framework, bounded validation/quarantine and authorization; complete Phase 1 acceptance regression.
+1. **1.1 retained:** local registration/verification/reset/session, CSRF/Origin, audit/outbox/worker/Mailpit, race and crash recovery.
+2. **1.1b current:** correct single-conference model in contracts/config/Compose/UI/mail/docs/tests, same-build dual-instance isolation. No role/CMS/business modules.
+3. **1.2 proposed, requires approval:** local permission model and policies first; then operator-authorized one-time audited administrator bootstrap; then bounded role-grant/revoke UI. Include resource-ID substitution, revoked permissions and author/reviewer self-review exclusion when resources exist. Administrator MFA remains a launch gate. Original membership/scope-resolver and conference-switch plans are cancelled.
+4. **Later settings/site:** versioned local conference configuration, dates/timezone/currency/locales, public draft/revision/projection and locale/SEO. Future reuse exports/imports whitelisted settings into a fresh instance; never clone account/business DBs.
+5. **Later reliability:** local invitations and resource-specific notification policy; private file framework with validation/quarantine/download authorization. Preserve all original registration/finance/submission/review/competition/program/on-site/mail/statistics phases above.
 
-Each slice needs usable UI, real API, errors, authorization, migrations/tests and docs. Contracts must be coordinated before presentation changes. Phase 1.1 is authorized in the current request; stop after it. Other slices require separate confirmation.
+Each unit needs real UI/API/errors/permissions/tests/docs. Stop after 1.1b; no implicit Phase 1.2 approval.
 
 Open questions that do not block Phase 0: hosting, volumes/traffic, external mail/payment provider, SSO, receipt requirements, data retention and anonymization policy. No provider/production-readiness claim is made.
 
@@ -30,7 +31,7 @@ Open questions that do not block Phase 0: hosting, volumes/traffic, external mai
 
 Focused source review of baseline `c6f1d5f`, covering API/worker entry points, config, transaction helper/migrations, SDK/data hook, import checks, build distribution and tests. This review adds enduring requirements, not Phase 1 authorization. No full rewrite or new framework is justified by the present health-only API and synthetic worker.
 
-Current boundaries are explicit: DTO/SDK/data hook/presentation are separated, `withTenant` uses transaction-local settings and a single checked-out client, and app/worker isolation is exercised by actual nonprivileged-role tests. No concrete safety/correctness blocker was demonstrated for the existing Phase 0 behavior in this focused review. This is not a comprehensive security assessment or permission to add business access without authorization.
+At that Phase 0 baseline, boundaries were explicit: DTO/SDK/data hook/presentation are separated, `withTenant` uses transaction-local settings and a single checked-out client, and app/worker isolation is exercised by actual nonprivileged-role tests. No concrete safety/correctness blocker was demonstrated for the existing Phase 0 behavior in this focused review. This is not a comprehensive security assessment or permission to add business access without authorization.
 
 | ID / evidence | Practical risk and scope | Treatment point and acceptance criteria |
 |---|---|---|
@@ -64,4 +65,10 @@ Baseline `c10b025` contains `c6f1d5f`; clean status and ancestry checked before 
 | Local weak-password blocklist and configured Argon2 minimum, no breach corpus/load benchmark | Some common compromised passwords pass; production capacity is unmeasured | Before any production identity use: vetted broader offline/breach screening, password/Argon2 concurrency benchmarks and operational limits; no MFA/high-privilege readiness claim. |
 | Basic auth UI uses existing engineering primitives; Chromium only | Complete accessibility and cross-browser assurance unavailable | Later presentation phase: Claude-owned accessibility/design audit; verify keyboard/assistive tech and browser matrix without moving SDK/permissions into components. |
 
-Next minimal authorized-by-future-approval work should be split: **1.2a** membership schema and trusted scope resolver with two-org/three-conference RLS/permission tests; **1.2b** real scoped membership/switch UI with cache isolation; **1.2c** explicit invitation acceptance/revocation using extended scoped notification policies. None is started by this delivery. High-privilege launch remains conditional on MFA.
+## Phase 1.1b focused recheck — 2026-10-15
+
+Verified `f1126ad` includes `c10b025`/`c6f1d5f`. M1–M5 fixes remain; no auth rewrite warranted. Current blockers addressed: hard-coded shared Compose name/ports, build/runtime display absence and contradictory product assumptions. Unused tenant helper/fixture retired with explicit replacement matrix in TESTING. Identity schema/migrations and least-privilege grants unchanged. All previous remaining debt above stays open.
+
+Additional bounded debt: shared-host Docker projects do not constrain host/Docker administrators or guarantee CPU/memory availability. Before public deployment review network/firewall/resource limits and separate queue/cache services; validate TLS, secret management, backup/restore and exact image digests for each instance. Local loopback infra ports are a development convenience, not a production exposure policy.
+
+No file adapter/metadata exists, so private file isolation is unimplemented and must be tested in its authorized unit. Runtime display env is intentionally minimal; editable/versioned settings and white-list import are future units. Update each instance independently using an explicit version/digest, documented config requirements, migration/backup/recovery; no central upgrade controller is planned here.

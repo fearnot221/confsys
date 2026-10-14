@@ -1,5 +1,8 @@
 # 給 Codex 的第一輪提示詞：Phase 0
 
+> Historical record. The shared multi-tenant/global-account premise and membership/switch follow-up are superseded by [ADR 0003](../docs/adr/0003-single-conference.md). Original implementation/test claims below describe their dated delivery, not current authorization.
+
+
 請在目前 repository 建立一套「可供多組織、多場研討會與跨年度重複使用」的完整研討會管理平台。
 
 先完整閱讀 `AGENTS.md` 與 `docs/SPEC.md`。規格中的完整功能是產品路線圖，**本輪只授權 Phase 0，不要一口氣實作全部系統，也不要自行進入 Phase 1**。

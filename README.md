@@ -1,79 +1,58 @@
-# 研討會管理平台
+# 可重複部署的研討會管理系統
 
-可供多組織、多研討會與跨年度重複使用的平台。**已實作 Phase 0 工程底座與 Phase 1.1 帳號生命週期／Session**；組織、會議、報名、付款、投稿等功能尚未實作。原始需求保留於 [SPEC](docs/SPEC.md)，舊截圖只作功能參考。
+**一份程式碼，每場研討會獨立部署，每個實例只服務一場。** 帳號、Session、token、資料、佇列與郵件各自獨立；不是全域帳號跨研討會平台。主辦單位是介紹／聯絡資料，不是 tenant。產品決策見 [SPEC](docs/SPEC.md)／[ADR 0003](docs/adr/0003-single-conference.md)。
+
+目前有 Phase 0 工程底座、Phase 1.1 真實帳號生命週期，以及 Phase 1.1b 單研討會校正。角色、CMS、報名、付款、投稿尚未實作；[ROADMAP](docs/ROADMAP.md) 的 Phase 1.2 需要另行授權。
 
 ## 本地啟動
 
-需要 Docker Compose v2、Node **24.21.0**（`.nvmrc` / `.node-version`）及 pnpm **10.34.7**。請先切換 Node 版本；全域原有 Node 不會由本專案修改。
+使用 Docker Compose v2、Node **24.21.0** 與 pnpm **10.34.7**。先選未使用的 ports；不得停止其他專案服務。
 
 ```sh
-npm install --global pnpm@10.34.7
 pnpm install --frozen-lockfile
+# 可指定 CONFSYS_ENV_FILE=/absolute/path/conference.env，預設本工作樹 .env
+# 初次建立可另指定 COMPOSE_PROJECT_NAME、CONFERENCE_NAME、PUBLIC_APP_ORIGIN 與各 *_PORT
 pnpm env:setup
 pnpm infra:up
 pnpm db:migrate
 pnpm dev
 ```
 
-`env:setup` 產生隨機本地密碼；既有值不覆寫，只補齊缺少的 auth 設定與隨機金鑰。不要使用 `pnpm setup`，那是 pnpm 自身的 shell 設定指令。migration 必須獨立執行，API 不會代跑。
+`env:setup` 產生 mode-0600 隨機密碼與密鑰，重跑保留已有值，僅補缺少的設定。不要用 pnpm 內建的 `pnpm setup`。設定檔不可提交；自訂路徑亦須自行排除於 Git/build context。`.instances/` 已同時排除。API／worker 僅收到各自經驗證的設定。
 
-- Web：[http://127.0.0.1:25173](http://127.0.0.1:25173)，真實服務狀態、繁中／英文、手動更新／錯誤重試。
-- API：`http://127.0.0.1:23000/api/health/live` 與 `/api/health/ready`。
-- Worker：`http://127.0.0.1:23001/health/ready`，只在本地開發暴露。
-- 郵件捕捉：[http://127.0.0.1:28025](http://127.0.0.1:28025)，SMTP 21025；獨立 worker 寄送驗證／重設／密碼變更通知。
-- PostgreSQL：localhost:25432；Redis：localhost:26379。
+預設 Web 25173、API 23000、worker 23001、PostgreSQL 25432、Redis 26379、Mailpit UI 28025／SMTP 21025，全部本地。可用 `WEB_PORT`、`API_PORT`、`WORKER_PORT`、`POSTGRES_PORT`、`REDIS_PORT`、`MAILPIT_PORT`、`SMTP_PORT` 避免衝突；canonical `PUBLIC_APP_ORIGIN` 必須對應 Web URL。不同實例必須使用不同 hostname，僅換 port 不隔離 Cookie。範例雙實例由 `pnpm test:instances` 建立。
 
-開發埠避免與機器上既有服務衝突。帳號入口：[登入](http://127.0.0.1:25173/auth/login)、[註冊](http://127.0.0.1:25173/auth/register)。註冊後到 Mailpit 找合成信箱的郵件，開啟連結並明確設定密碼，再正常登入。忘記密碼亦由 Mailpit 取信；重設會撤銷既有登入。登入不授予組織／會議權限。未實作路由仍為 404。
+開啟 `/auth/register` → 使用合成 `@example.invalid` 信箱 → 在該實例 Mailpit 找驗證信 → 明確送出新密碼 → `/auth/login` → `/auth/account`。支援重寄、重設與登出。頁面標題、登入頁、帳號頁與郵件由 runtime `CONFERENCE_NAME` 呈現；`/` 保留服務診斷頁。沒有假角色或業務資料。
 
-## 全容器啟動
+## 全容器啟動與選擇實例
 
 ```sh
-pnpm env:setup
+# 設定 env 的 APP_IMAGE 為本次明確版本 tag／digest；勿默默升級其他實例
+pnpm compose --profile app build api
 pnpm infra:up
-docker compose --profile app build
-docker compose --profile app run --rm migrate
-docker compose --profile app up -d --no-build --wait api worker web
+pnpm compose --profile app run --rm migrate
+pnpm compose --profile app up -d --no-build --wait api worker web
 pnpm smoke:stack
 pnpm smoke:auth
-```
-
-Web 同樣在 25173；容器內 API／worker 不映射到宿主機。API 與 worker 以 node 非 root 使用者執行；有 readiness、資源上限及 graceful shutdown。此映像保留開發依賴以便 Phase 0 review，正式映像瘦身與安全部署仍待後續工作。
-
-```sh
-docker compose --profile app stop web api worker
+# 只停止已選定實例；保留資料
+pnpm compose --profile app stop web api worker
 pnpm infra:down
 ```
 
-`down` 保留資料 volumes；`down -v` 會刪除本地資料，僅 CI 使用。不要任意刪除 `.env` 後沿用舊 volume，因資料庫密碼不會因環境檔改變而自動輪換。
+`CONFSYS_ENV_FILE=... pnpm compose ...` 明確載入該檔的 project name；沒有隱藏的 `confsys-phase0` 預設。所有 pnpm migration／smoke／dev／測試命令亦支援此選擇。不同 project 的 volumes/networks 不共享；只讀 bootstrap SQL 共用原始碼。Web/API/worker 使用同一 image，不需為名稱或網域重建。資料庫與 runtime 憑證分離，migration 不在 API 啟動時執行。
 
-## 品質指令
+`down` 保留 volumes；不要對使用者資料執行 `down -v`，不要刪除設定後沿用失去密碼的 volume。尚無檔案 adapter 或私有下載；不宣稱檔案功能已驗證。此 Compose 是 HTTP／Mailpit 開發模板，production TLS、備份還原、外部 provider 等限制見 [OPERATIONS](docs/OPERATIONS.md)。
 
-先完成 `infra:up`、`db:migrate`，確保未有本專案 dev／容器 Web 佔用 E2E 埠：
+## 驗證與協作
 
 ```sh
-pnpm db:migrate:test
 pnpm exec playwright install chromium
 pnpm check
+pnpm test:instances
 ```
 
-`check` 順序執行 `pnpm lint`、`pnpm typecheck`、`pnpm test:unit`、`pnpm test:integration`、`pnpm test:contract`、`pnpm build`、`pnpm test:e2e`。Linux CI 安裝瀏覽器用 `pnpm exec playwright install --with-deps chromium`。
+`check` 依序執行 lint、typecheck、unit、真實 PostgreSQL／Redis／Mailpit integration、contract、clean build、Playwright E2E。E2E 不重用已佔用服務，host E2E 與選定容器 Web 不能同時使用相同 port。雙實例入口使用 35173–35174、35432–35433、36379–36380、38025–38026、31025–31026，需先確認空閒。精確步驟、測試替換對照與安全清理見 [TESTING](docs/TESTING.md)；本輪證據見 [PHASE1_1B_DELIVERY](docs/PHASE1_1B_DELIVERY.md)。
 
-契約改動後用 `pnpm contract:generate` 更新已提交 OpenAPI，再跑 contract checks。各指令與覆蓋限制見 [TESTING](docs/TESTING.md)，本輪實際結果見 [PHASE1_1_DELIVERY](docs/PHASE1_1_DELIVERY.md)，Phase 0 歷史見 [PHASE0_DELIVERY](docs/PHASE0_DELIVERY.md)。GitHub Actions 覆蓋 PR／main push；尚未 push，不能將本地通過稱作雲端 CI 通過。
+API/DB/policy/contracts/SDK/hooks/CI 由 Codex 負責；後期 Claude 改善純呈現元件、layout、tokens 與 accessibility。`presentation → hooks → SDK → contracts/API`，元件不讀 token、不 fetch、不定義業務授權。[ARCHITECTURE](docs/ARCHITECTURE.md)、[PERMISSIONS](docs/PERMISSIONS.md)、[UI_CONTRACT](docs/UI_CONTRACT.md)、[DATA_CONTRACT](docs/DATA_CONTRACT.md) 提供入口與責任邊界。
 
-## 結構與協作
-
-`apps/web` → data hooks → `packages/sdk` → `packages/contracts`；`apps/api` 是 modular monolith，`apps/worker` 獨立執行。`packages/db` 封裝連線與交易、`packages/ui` 只接受 props／callbacks、`packages/config` 驗證環境。
-
-- [Architecture](docs/ARCHITECTURE.md) / [Permissions](docs/PERMISSIONS.md)
-- [UI contract](docs/UI_CONTRACT.md) / [Data contract](docs/DATA_CONTRACT.md)
-- [Roadmap](docs/ROADMAP.md) / [Operations](docs/OPERATIONS.md) / [ADR](docs/adr/0001-phase0-foundation.md)
-
-不含 production seeds、外部郵件／金流 credentials、production data。Phase 0 的 tenant 範例只存在 `confsys_test.phase0_rls`，測試後刪除；它不是登入授權系統。Phase 1.1 完成後停止，Phase 1.2 需另行授權。高權限正式上線仍需 MFA，不能將本輪稱作 production-ready。
-
-## 帳號流程與本輪設定
-
-UI 路由為 `/auth/register`、`/auth/waiting`、`/auth/verify`、`/auth/login`、`/auth/forgot`、`/auth/reset`、`/auth/account`。密碼 15–128 個 Unicode 字元，不 trim；禁止部分常見／重複密碼。Email trim + 全部小寫，保留 `+tag` 與點。
-
-`PUBLIC_APP_ORIGIN` 決定寄信連結及唯一允許的 Origin；正式模式必須 HTTPS。本地開發／測試只允許 loopback HTTP。`MAIL_ENCRYPTION_KEY`、`MAIL_KEY_VERSION`、`CSRF_SIGNING_KEY` 由 setup 產生，不能提交或印到日誌。完整 TTL、限流、故障與金鑰操作見 [OPERATIONS](docs/OPERATIONS.md)。
-
-Host dev 與 E2E 的 API／worker 由 `scripts/run-process.ts` 啟動，子程序只收到各自驗證過的設定。E2E 使用 `confsys_test`／Redis DB 1、每次新的 CSRF key；必須先跑 `pnpm db:migrate:test`。測試不刪除既有 volumes 或清空 Mailpit。
+只使用合成資料與 Mailpit；沒有 production seeds／真信／金流。完成本輪本地提交後停止，不 push、merge 或開始 Phase 1.2。

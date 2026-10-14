@@ -8,38 +8,37 @@ Use pinned Node 24.21.0 and pnpm 10.34.7. Install dependencies, generate local e
 |---|---|
 | `pnpm lint` | ESLint + AST presentation/import boundaries |
 | `pnpm typecheck` | strict TypeScript across apps, packages and tests |
-| `pnpm test:unit` | config secrecy/failure, context validation, HTTP readiness failure, real structured 404/request ID |
-| `pnpm test:integration` | real PostgreSQL RLS/constraints/transaction tests and Redis BullMQ jobs |
+| `pnpm test:unit` | config secrecy/failure,  HTTP readiness failure, real structured 404/request ID |
+| `pnpm test:integration` | real PostgreSQL runtime grants/constraints/transaction tests and Redis BullMQ jobs |
 | `pnpm test:contract` | committed OpenAPI drift, Fastify schemas/SDK and invalid DTO responses |
 | `pnpm build` | TS server/packages and Vite production build |
 | `pnpm test:e2e` | starts built API/worker + Vite, Chromium real health, locale/refresh/mobile, network failure/retry |
 | `pnpm check` | all seven gates above in order |
 | `pnpm smoke:stack` | running container stack health + Mailpit health + synthetic job through independent worker process |
-| `pnpm smoke:auth` | fixed loopback container Web → real CSRF/register/Mailpit/verify/login/refresh/logout through reverse proxy (Chromium required) |
+| `pnpm smoke:auth` | selected local container Web → real CSRF/register/Mailpit/verify/login/refresh/logout through reverse proxy (Chromium required) |
 
 Playwright requires `pnpm exec playwright install chromium`; Linux CI adds `--with-deps`. E2E intentionally refuses to reuse an existing server, so it cannot accidentally validate unrelated local processes. Stop this project's dev/app stack first. E2E uses built API/worker; run `pnpm build` before standalone E2E. It captures screenshots under ignored `test-results/` and traces only on failure.
 
-## RLS evidence
+## Retired tenant fixture and replacement evidence
 
-`tests/fixtures/rls.sql` creates `phase0_rls` only in `confsys_test`, under an advisory lock. Fixtures use random UUIDs, two organizations, three conferences (two in one organization), synthetic notes and attachments. No passwords/users or production seeds. Schema is dropped on completion; next run cleans stale fixture after acquiring the same lock. Test fixture is not part of production migrations.
+Phase 0's test-only `phase0_rls` schema, `withTenant` helper and tenant input unit case are retired because there is no shared tenant deployment. No applied migration/table RLS is disabled. Authentication/grant/race/crash tests are retained.
 
-Both actual `confsys_app` and `confsys_worker` logins exercise:
+| Old check | Current protection and executable evidence |
+|---|---|
+| Two orgs / three conferences SELECT/INSERT/UPDATE/DELETE and scope-reassignment denial | Independent PostgreSQL databases and runtime credentials; `test:instances` proves A-only account absent in B, foreign Session/token rejected, resets preserve B state, and independent DB/network/volumes |
+| Missing/partial tenant context; invalid tenant IDs | No tenant parameter/resolver or DB selector exists. `contract/instance` checks canonical Host; auth regressions deny absent/invalid sessions/CSRF. Local resource permissions remain future scope, not claimed as implemented |
+| Non-owner/non-superuser/non-bypass; SET ROLE/ALTER/TRUNCATE denied | `integration/database.test.ts` exercises both actual roles; `integration/auth.test.ts` retains sensitive-table/column-grant denials |
+| Commit/rollback/pool reuse/concurrent callbacks | `integration/database.test.ts` uses one-connection pools and real transactions; auth integration retains atomic outbox rollback and concurrency/race cases |
+| Composite tenant FK rejects cross-tenant parent | No production tenant FK existed. Ordinary FK/check/unique constraints remain enforced in database/auth integration; separate-instance DBs cannot reference another instance's rows |
+| Drizzle tenant demo | Removed with unused demo helper; existing dependency pin retained, no speculative replacement abstraction |
 
-1. Non-owner/NOSUPERUSER/NOBYPASSRLS and cannot SET ROLE migrator, ALTER RLS or TRUNCATE.
-2. Scoped SELECT/INSERT/UPDATE/DELETE, including Drizzle on the transaction connection.
-3. Cross-organization AND same-organization cross-conference SELECT/UPDATE/DELETE return no rows; INSERT and scope reassignment fail with 42501.
-4. Missing/partial context deny; single-connection pool verifies same backend PID after commit with no remaining data visibility.
-5. Rollback removes inserted data and transaction context.
-6. Composite foreign keys reject cross-scope parent references (23503).
-7. Concurrent callers queue on a single pooled connection without scope leakage.
+The old 16 tenant integration cases and one tenant-input unit case are replaced by four DB privilege/transaction cases, two instance contract/config cases and the real dual-instance suite. Deployment isolation does not substitute for future local role/resource tests.
 
 Redis integration uses a unique queue in local test DB 1; it executes a real worker, verifies output/deduplication and two failed attempts for an unsupported job, then removes only its own queue. No FLUSHALL and no application data mutation. Unit/contract tests deliberately inject dependency probes or in-memory HTTP transport; they do not substitute for real service tests.
 
 ## Coverage limits
 
-No account/login, CSRF, session, payment, submission, upload, outbox, email-delivery or full business E2E exists. Network-error E2E deliberately aborts a browser request; healthy E2E uses real servers. Full browser matrix, WCAG certification, load/security penetration, production deployment and backup restore drills remain unverified. GitHub Actions YAML is configured for PR and main; cloud execution requires a remote repository and push.
-
-Exact local execution results, resolved failures and counts live in `PHASE0_DELIVERY.md`. Never mark checks passing solely because scripts or CI YAML exist.
+Account/login/CSRF/session/outbox and capture-mail regression exists. No roles/CMS/payment/submission/upload/private-download or external provider is implemented. Network-error E2E deliberately aborts requests while healthy flows use real services. TLS, full browser/WCAG, load/penetration, backup restore and cloud CI are unverified. Historical counts in PHASE0/PHASE1_1 delivery files are not current evidence; see PHASE1_1B_DELIVERY.
 
 ## Test and documentation maintenance
 
@@ -64,11 +63,11 @@ Start with README setup, the [architecture entry-point map](ARCHITECTURE.md#entr
 | Presentation import fails | Trace component → feature hook → SDK; move data behavior to its owner rather than disabling the boundary rule |
 | Built behavior differs from source | Check package-local `dist` and staging `dist`; investigate stale artifacts before changing source or migrations; scheduled build-cleanup work is in ROADMAP |
 
-Log-format limitations currently make some worker/DB failures harder to distinguish; the roadmap schedules sanitized correlation and failure tests. That limitation does not justify exposing raw secrets for debugging.
+Structured sanitized logging exists; full metrics/alerts and deployment diagnostics remain roadmap work. Never expose secrets to debug failures.
 
 ## Phase 1.1 verification (current)
 
-The Phase 0 coverage limitations above describe its original delivery. Account/CSRF/session/outbox/capture-mail tests now exist; production providers, complete tenancy, MFA and production operations still do not. Run `pnpm db:migrate:test` before standalone E2E. `pnpm check` runs all gates, including the integration suite that prepares the test schema. Existing Phase 0 files/assertions are retained.
+Account/CSRF/session/outbox/capture-mail tests exist; production providers, local business permissions, MFA and production operations still do not. Run `pnpm db:migrate:test` before standalone E2E. `pnpm check` runs all gates, including the integration suite that prepares the test schema. The tenant fixture is retired with replacement evidence above; non-tenant auth regressions remain.
 
 | Test entry | Evidence |
 |---|---|
@@ -84,3 +83,26 @@ The Phase 0 coverage limitations above describe its original delivery. Account/C
 Integration requires Docker Compose access for temporary migration databases. It uses existing local cluster roles and creates only `confsys_test_blank_<random>` / `confsys_test_upgrade_<random>` databases, drops only those it created, never existing app/test DBs or volumes. Auth fixtures delete only their unique email-prefix records. Mailpit queries use unique synthetic recipient addresses; no inbox wipe. No real provider credentials.
 
 E2E starts built API/worker with role-filtered environment, `confsys_test` and Redis DB 1, fresh per-run CSRF key (same actual rate thresholds), plus Vite. No bypass of password hashing, CSRF or sessions. Token links come only from actual Mailpit messages in UI tests. Test-only helper `mail-crash.ts` has no production fault toggle: it signals SMTP acceptance through IPC, and the parent terminates the process before the accepted DB write. Lease expiry is advanced in isolated test records rather than waiting/sleeping for a minute. Race tests use explicit Promise barriers. Final exact results and unverified areas are in [PHASE1_1_DELIVERY](PHASE1_1_DELIVERY.md).
+
+## Dual-instance same-build acceptance
+
+`pnpm test:instances` creates fresh `.instances/<random-run>/a.env` and `b.env`, distinct `confsys-p11b-<run>-a/b` projects, one versioned `confsys:p11b-<run>` image and actual independent PostgreSQL/Redis/Mailpit/API/worker/Web. It refuses to replace existing containers by using fresh names; occupied ports cause failure, never stop other services. Required free ports: Web 35173/35174, DB 35432/35433, Redis 36379/36380, Mailpit 38025/38026, SMTP 31025/31026. Browser canonical origins are `http://a.localhost:35173` and `http://b.localhost:35174`. Install Chromium first.
+
+The suite checks runtime titles/names, explicit DTO/bundle secrecy, distinct random secrets, same image IDs, mounts/networks, A-only registration, same-email separate passwords, browser host-only cookies in one context, manually cross-sent Session/verification/reset tokens, A reset/revoke/logout versus B password/session/audit, canonical capture mail and forged Host, stopped A worker while B processes mail, restart A, A-only migration and both original smoke commands with unchanged B state. Existing browser regression separately proves late responses/private cache invalidation. Output `.instances/<run>/evidence.json` contains no secrets; screenshots are supplementary. Raw env/tokens/traces remain ignored and must not be published.
+
+The runner keeps its identifiable synthetic resources for inspection on success or failure. Free its ports before rerunning, using only the files for that run:
+
+```sh
+CONFSYS_ENV_FILE=.instances/<run>/a.env pnpm compose --profile app down -v
+CONFSYS_ENV_FILE=.instances/<run>/b.env pnpm compose --profile app down -v
+```
+
+These delete only that test run's synthetic volumes. Never run global prune or apply these commands to user environments. Keep env files until cleanup/recovery is finished; no script automatically resets existing secrets. For one selected instance:
+
+```sh
+CONFSYS_ENV_FILE=.instances/<run>/a.env pnpm compose --profile app run --rm migrate
+CONFSYS_ENV_FILE=.instances/<run>/a.env pnpm smoke:stack
+CONFSYS_ENV_FILE=.instances/<run>/a.env pnpm smoke:auth
+```
+
+For host full regression while the user's 25173/28025 are occupied, initialize this worktree with COMPOSE_PROJECT_NAME=confsys-p11b-regression, WEB_PORT=35175, API_PORT=33000, WORKER_PORT=33001, POSTGRES_PORT=35434, REDIS_PORT=36381, MAILPIT_PORT=38027, SMTP_PORT=31027 before env:setup. Then infra:up/db:migrate/check use only those resources. Standalone E2E requires db:migrate:test and build first. No production data is used.

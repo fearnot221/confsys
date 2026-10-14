@@ -1,5 +1,8 @@
 # ADR 0001 — Phase 0 foundation and ownership
 
+> Historical record. The shared multi-tenant/global-account premise and membership/switch follow-up are superseded by [ADR 0003](0003-single-conference.md). Original implementation/test claims below describe their dated delivery, not current authorization.
+
+
 Status: accepted for Phase 0 scope, 2026-10-15. Phase 1 remains unapproved.
 
 ## Repository inventory and assumptions

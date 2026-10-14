@@ -1,5 +1,8 @@
 # Phase 1.1 delivery — 2026-10-15
 
+> Historical record. The shared multi-tenant/global-account premise and membership/switch follow-up are superseded by [ADR 0003](adr/0003-single-conference.md). Original implementation/test claims below describe their dated delivery, not current authorization.
+
+
 Scope: account lifecycle and server-side sessions, including the minimum identity outbox/independent worker/Mailpit/audit needed to complete verification and password recovery. Phase 1.2 is not started; this is not completion of all Phase 1 or a production-readiness claim.
 
 ## Git baseline and workspace

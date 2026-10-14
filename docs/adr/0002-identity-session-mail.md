@@ -1,5 +1,8 @@
 # ADR 0002 — Phase 1.1 identity, session and capture-only mail
 
+> Historical record. The shared multi-tenant/global-account premise and membership/switch follow-up are superseded by [ADR 0003](0003-single-conference.md). Original implementation/test claims below describe their dated delivery, not current authorization.
+
+
 Accepted within Phase 1.1 on 2026-10-15. No tenancy/membership, MFA product, external SMTP provider or Phase 1.2 authorization.
 
 ## Identity and credentials

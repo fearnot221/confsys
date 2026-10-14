@@ -1,5 +1,8 @@
 # Phase 0 delivery — 2026-10-15
 
+> Historical record. The shared multi-tenant/global-account premise and membership/switch follow-up are superseded by [ADR 0003](adr/0003-single-conference.md). Original implementation/test claims below describe their dated delivery, not current authorization.
+
+
 Branch: `codex/phase-0`. Delivery commit is the commit containing this report (`git log -1 --oneline`); final chat records its exact hash. No remote, PR, merge or production deployment was created. User approved initializing this folder as a standalone repository because Git initially resolved to the home directory. Other project work was not staged or committed here.
 
 ## Implemented and usable

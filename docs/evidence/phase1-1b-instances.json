@@ -1,0 +1,41 @@
+{
+  "run": "6a184271",
+  "image": "confsys:p11b-6a184271",
+  "checks": [
+    "Same immutable image for both Web/API/worker; independent credentials, networks and data volumes; process config separation",
+    "Same browser context resolves both localhost hostnames; runtime display/title and public DTO/bundle secrecy",
+    "A-only identity absent in B; identical email independent passwords; verification token rejection in B does not consume A; host-only cookies coexist; foreign session rejected",
+    "Reset/revoke/logout A leave B password/session/audit unchanged; foreign reset token invalid; forged Host rejected and forwarded Host cannot poison canonical mail URL",
+    "Stopped A worker retains durable mail; live B worker processes only B; restarting A delivers only to A Mailpit",
+    "A-only stop/restart/migration/smoke leaves B available and B schema/data unchanged"
+  ],
+  "imageId": "sha256:7406a2fa4bf9a0559f8015ba04e8599ed3bdada2ce83e3008817c463c6c47c99",
+  "resources": [
+    {
+      "project": "confsys-p11b-6a184271-a",
+      "origin": "http://a.localhost:35173",
+      "envFile": ".instances/6a184271/a.env",
+      "networks": [
+        "confsys-p11b-6a184271-a_default"
+      ],
+      "volumes": [
+        "confsys-p11b-6a184271-a_postgres-data",
+        "confsys-p11b-6a184271-a_mailpit-data",
+        "confsys-p11b-6a184271-a_redis-data"
+      ]
+    },
+    {
+      "project": "confsys-p11b-6a184271-b",
+      "origin": "http://b.localhost:35174",
+      "envFile": ".instances/6a184271/b.env",
+      "networks": [
+        "confsys-p11b-6a184271-b_default"
+      ],
+      "volumes": [
+        "confsys-p11b-6a184271-b_postgres-data",
+        "confsys-p11b-6a184271-b_redis-data",
+        "confsys-p11b-6a184271-b_mailpit-data"
+      ]
+    }
+  ]
+}

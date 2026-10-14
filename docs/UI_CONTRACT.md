@@ -18,7 +18,7 @@ ESLint forbids forbidden packages and network/browser credential globals in UI. 
 
 Accessibility baseline: semantic main/header/section, one h1, labeled language button, 44px controls, visible focus, text status in addition to color, polite live status, mobile wrapping. Playwright verifies language/document lang, status, manual retry and no horizontal overflow at 390px. Full WCAG 2.2 AA, assistive technology and all-browser testing are unverified.
 
-Phase 1 hooks must use keys including organization/conference/subject/permission version as applicable; switch/logout must clear sensitive query state and form selections. This health screen has only a global, public infrastructure key. Future states include empty, permission denied, expired session, closed deadline and unsaved changes; not fabricated in Phase 0.
+Future private hooks must use subject/resource/permission-version keys as applicable; logout/revocation must clear sensitive state and form selections. Instances do not share a browser origin or server cache. This health screen has only a global, public infrastructure key. Future states include empty, permission denied, expired session, closed deadline and unsaved changes; not fabricated in Phase 0.
 
 ## Maintaining the boundary during feature work
 
@@ -28,10 +28,12 @@ When a boundary genuinely needs to change, update the contract/view model, its t
 
 ## Phase 1.1 account presentation
 
-Auth routes use the existing primitives and CSS. `AuthScreen` receives mode, busy/loading, safe message/error, optional account email, submit callback and retry callback. Email/password inputs are local form state; no CSRF/session/verification token, DB object, SDK instance or permission policy enters presentation props. The hook reads the verification fragment and passes it directly through SDK on explicit submission.
+Auth routes use the existing primitives and CSS. `AuthScreen` receives the runtime conference name, mode, busy/loading, safe message/error, optional account email, submit callback and retry callback. Email/password inputs are local form state; no CSRF/session/verification token, DB object, SDK instance or permission policy enters presentation props. The hook reads the verification fragment and passes it directly through SDK on explicit submission.
 
 SDK bootstraps CSRF for every mutation, sends same-origin cookies and validates contract schemas. Auth hook owns cancellation, query removal, mutation outcomes and error translation. Login/logout perform a full navigation to discard the previous query client. Session-expired refetch also clears private data, including stale successful query results. All GET/POST auth responses are no-store. No localStorage/sessionStorage credential or identity persistence.
 
 Forms cover pending submit, accepted-but-not-delivered mail, explicit verification/reset success, invalid/expired links, session expiry, rate limit, temporary failure and retry. Inputs have native labels/autocomplete, associated error/help text and live announcements. Browser E2E tests use real passwords, CSRF, sessions, worker and Mailpit; no fake account fixture renders. Full WCAG/browser-matrix certification remains unverified.
 
 The AST check now resolves relative/aliased imports and re-exports, traverses each presentation source and the contracts sources, accepts UI-to-UI dependencies, and tolerates feature folders without components. Auth is included automatically. Regression fixtures prove forbidden indirect source paths; this does not claim a complete JavaScript security proof.
+
+`useInstance` loads the minimal `/api/instance` DTO through SDK. Auth forms wait for configuration and provide an explicit error/retry state; no fabricated account or default tenant is rendered. Document title, shell and account copy refer to this conference. Names never enter Vite build settings.

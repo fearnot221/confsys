@@ -6,6 +6,7 @@ Zod schemas in `packages/contracts/src/index.ts` generate JSON Schemas used by F
 
 | Endpoint | Response |
 |---|---|
+| GET `/api/instance` | 200 `{conferenceName:string}`; runtime display only, no secrets or server env |
 | GET `/api/health/live` | 200 `{status:"alive"}` |
 | GET `/api/health/ready` | 200 `{status:"ready",dependencies:{postgres:"up",redis:"up",worker:"up"}}` |
 | GET `/api/health/ready` when unavailable | 503 `{status:"not_ready",dependencies:{...}}`, each `up` or `down` |
@@ -22,17 +23,17 @@ Schema changes must be delivered as new migrations through the documented runner
 
 New environment variables must have centralized validation in `packages/config`, safe defaults or explicit requiredness, and synchronized `.env.example`, setup/Compose/CI and relevant README/operations guidance. Migration/test-only settings should have explicit validators for their purpose; never log their values on validation failure. Current gaps are recorded in the roadmap, not represented as already fixed.
 
-Maintain a consistent public error envelope, structured log fields and explicit job outcomes. Use stable event/error codes, service/operation, request/event/job ID and attempt where applicable; include tenant identifiers only when needed and access-controlled. Never log request bodies or raw error objects without reviewing their contents: passwords, session/invitation/reset tokens, provider credentials and unnecessary personal/manuscript data are forbidden. Internal diagnostics may distinguish failure categories without exposing them in public DTOs.
+Maintain a consistent public error envelope, structured log fields and explicit job outcomes. Use stable event/error codes, service/operation, request/event/job ID and attempt where applicable; include local actor/resource identifiers only when needed and access-controlled. Never log request bodies or raw error objects without reviewing their contents: passwords, session/invitation/reset tokens, provider credentials and unnecessary personal/manuscript data are forbidden. Internal diagnostics may distinguish failure categories without exposing them in public DTOs.
 
-Catching an error must preserve its failure semantics (for example, dependency down → 503, rejected job → failed/retryable outcome) and provide safe diagnostic context. Do not turn errors into empty success, assert an invalid payload into a DTO, or silently swallow unexpected failures. A deliberate suppression needs an explained reason and an observable failure path. These are ongoing requirements; the current mixed worker/DB log formats remain a tracked Phase 0 limitation.
+Catching an error must preserve its failure semantics (for example, dependency down → 503, rejected job → failed/retryable outcome) and provide safe diagnostic context. Do not turn errors into empty success, assert an invalid payload into a DTO, or silently swallow unexpected failures. A deliberate suppression needs an explained reason and an observable failure path. These are ongoing requirements; safe structured logging was added in Phase 1.1; metrics/alerts remain tracked deployment work.
 
 ## Conventions for later phases — not endpoints yet
 
-- Identifiers: UUID strings. Tenant fields are explicit in private DTOs where needed, but request IDs do not confer authority. Public DTOs whitelist only published data.
+- Identifiers: UUID strings. Resource relationships are explicit where needed, but supplied IDs do not confer authority or select a database. Public DTOs whitelist only published data.
 - Timestamps: ISO 8601 UTC, plus separately configured IANA conference timezone. Deadline half-open interval `opens_at <= now < closes_at` uses server time.
 - Money: integer minor units encoded as decimal strings to avoid JS precision loss, explicit currency; immutable price/receipt snapshots. Final per-endpoint schemas will be reviewed before release.
 - Pagination: bounded page size and opaque cursor; deterministic stable sort; filter/scope included in cursor validation. No pagination endpoint yet.
-- Mutations: validated idempotency key scoped to actor/conference/operation with DB unique constraints, canonical request hash and replay response; same key/different input must conflict.
+- Mutations: validated idempotency key scoped to local actor/operation with DB unique constraints, canonical request hash and replay response; same key/different input must conflict.
 - Business, registration, payment, submission, decision, presentation and competition states stay separate. Draft submission is never rejection.
 - Schema changes: additive first, regenerate OpenAPI, SDK and runtime validation tests, coordinated core/presentation review. Never expose an ORM row as a response by convenience.
 - Published/historical results refer to immutable snapshots/revisions. Private file access reauthorizes both task creation and download.
@@ -57,8 +58,10 @@ All schemas, error codes and operation definitions live in `packages/contracts/s
 
 Mutation requests require exact configured Origin and `x-csrf-token`. Error envelope remains `{error:{code,message,requestId}}`; messages contain safe stable codes. Auth codes map 400 invalid request/token/weak password, 401 invalid credentials/session expired, 403 CSRF rejected/forbidden, 409 conflict, 413 request too large, 415 unsupported media type, 429 rate limited (Retry-After 900), 503 service unavailable, 500 unexpected internal failure. Unknown routes remain 404. SDK preserves code/status/requestId and rejects malformed DTOs. No raw exception is serialized.
 
-Migration `0002_identity.sql` adds users (global normalized unique email/state/credential version), hashed one-time tokens, hashed sessions, minimal auth audit, notifications and separately restricted encrypted delivery secrets. FK/check constraints enforce identity linkage and allowed states/purposes. Worker eligibility view omits all hashes. Public DTOs expose no DB rows, roles, credential version, internal risks or memberships.
+Migration `0002_identity.sql` adds users (instance-local normalized unique email/state/credential version), hashed one-time tokens, hashed sessions, minimal auth audit, notifications and separately restricted encrypted delivery secrets. FK/check constraints enforce identity linkage and allowed states/purposes. Worker eligibility view omits all hashes. Public DTOs expose no DB rows, roles, credential version, internal risks or memberships.
 
 This is an additive upgrade from Phase 0, no user backfill or rewrite of 0001. Stop old app processes, migrate separately, then start matching API/worker. Fresh and isolated Phase 0 upgrade tests preserve checksum/history and existing fixture data. Failed migrations roll back as one transaction. Use a reviewed forward migration to repair; never edit applied SQL/checksums or drop local volumes to recover. Detailed lifetime/cleanup/uncertainty policy: [OPERATIONS](OPERATIONS.md).
 
 Migration `0003_identity_grants.sql` narrows runtime UPDATE privileges to required lifecycle/delivery columns and limits the worker eligibility projection to pending/processing notifications. It is a separate forward migration because 0002 had already been exercised locally; 0001/0002 are not rewritten. Actual-role regression rejects recipient/token reassignment, email edits and expiration/hash rewrites outside the implemented services.
+
+Phase 1.1b needs no schema migration: 0001–0003 and their checksums are unchanged. Global-identity wording in applied 0002 is historical; the schema already stores one independent account namespace per DB. Existing accounts, hashes, audit/outbox and sessions remain compatible. No table receives an artificial conference ID.

@@ -1,8 +1,8 @@
 # 可重複使用的研討會管理平台｜產品與工程規格
 
-版本：0.1（開發提案）  
+版本：0.2（單研討會獨立部署決策）
 日期：2026-10-15  
-狀態：供 Codex 建立架構與分階段開發使用；尚非已實作或已驗證的系統。
+狀態：產品目標與工程契約；已實作範圍以 Phase 0、1.1 與 1.1b 交付證據為準，其餘仍待分階段授權與驗證。
 
 ## 0. 需求來源與決策界線
 
@@ -10,13 +10,13 @@
 
 - 建置完整研討會系統，提供的三張舊系統截圖作為功能基線。
 - **不得沿用截圖的前端樣式或版面**；視覺與操作方式需要重新設計。
-- 必須可以供多個研討會重複使用，不能只服務單一研討會。
+- 同一套軟體及部署模板可供多個研討會重複使用；每個獨立實例只服務一場。
 - 核心技術：PostgreSQL、Redis、Node.js、Vite。
 - 前期主要由 Codex 開發；後期才加入 Claude Code 優化前端。
 
 ### 本規格提出的實作預設
 
-採一份程式碼、一套可同時承載多組織與多研討會的部署；同一份程式亦可獨立自架。前端補上 React／TypeScript，後端採 Fastify，資料層採 Drizzle ORM／node-postgres。這些是本提案的選型，不應描述成使用者原本已指定。
+依使用者正式選擇 A，採一份程式碼、共同版本與部署模板，每場研討會獨立部署。帳號、Session、token、角色及業務資料均為實例本地資料；不做全域帳號平台或各會議專用 fork。前端補上 React／TypeScript，後端採 Fastify，資料層採 Drizzle ORM／node-postgres。這些是本提案的選型，不應描述成使用者原本已指定。
 
 產品新增規則、狀態機、資安與驗收要求是本規格提出的設計，不代表能從截圖證明舊系統已具備這些機制。尚未確認的外部整合不得以假流程宣稱完成。
 
@@ -26,13 +26,13 @@
 
 第一版假設：
 
-- 一個組織可管理多場研討會；不同組織可同時使用平台。
-- 同一使用者可跨會議參與，但資料可見性與權限各自獨立。
+- 主辦單位可營運多場會議，但每場使用獨立實例；主辦單位是介紹／聯絡／收據資料，不是 Organization tenant。
+- 同一 Email 可在不同實例分別註冊，帳號互不連結；不跨實例搜尋或同步。
 - 預設語系為繁體中文及英文；每場會議可選擇啟用語系。
 - 每場會議設定 IANA 時區與單一結算幣別，範例使用 Asia/Taipei 與 TWD，但不得寫死。
 - 第一個可運作的收費流程以人工匯款／人工核帳為基線；線上金流供應商待確認，不假裝已有串接。
 - 第一版現場報到採線上核銷；離線同步不是預設承諾。
-- 第一版使用平台路徑 `/c/:conferenceSlug`。自訂網域屬後續擴充，登入初期集中於平台網域。
+- 使用者直接進入本研討會 hostname；沒有選組織／選會議入口。正式環境使用不同 hostname、HTTPS 與 host-only Cookie。
 - 不先建置 SaaS 訂閱計費、直播平台、任意程式碼網站編輯器、任意工作流程引擎或 AI 自動決定論文錄取。
 - 基本證書屬延伸功能，不要求第一版開發完整自由排版證書編輯器。
 
@@ -53,7 +53,7 @@
 
 只採執行當時已確認受維護、非 beta／RC 的相容穩定版本。版本須寫入 lockfile、packageManager、Node 版本設定與映像標籤；不得盲用 `latest`。既有 repository 若已有其他選型，先提出差異 ADR，不得無聲重建或替換。
 
-Vite 是建置工具，React 負責介面。[R1] Fastify 的路由驗證採 schema-based 機制；開發者維護的 API schemas 與使用者可編輯表單定義必須分開，不可把租戶提供的任意 schema／程式直接送進編譯式驗證流程。[R2]
+Vite 是建置工具，React 負責介面。[R1] Fastify 的路由驗證採 schema-based 機制；開發者維護的 API schemas 與使用者可編輯表單定義必須分開，不可把使用者提供的任意 schema／程式直接送進編譯式驗證流程。[R2]
 
 ## 3. 系統架構
 
@@ -80,55 +80,35 @@ API 與 worker 共用同一組 domain services 與 repository 邊界，以不同
 
 PostgreSQL 是所有不可遺失業務狀態的權威來源。Redis 丟失／重啟後，系統應能從 DB 中的 outbox、任務與業務紀錄恢復處理，不以 Redis key 是否存在判定已繳費、已錄取或已寄達。
 
-## 4. 多組織、多研討會與跨年度複用
+## 4. 單研討會部署與跨年度複用
 
-### 4.1 層級
+### 4.1 部署邊界
 
-```text
-Platform
-  ├─ Organization A
-  │    ├─ ConferenceSeries（可選：某學會年會）
-  │    │    ├─ Conference 2026
-  │    │    └─ Conference 2027
-  │    └─ Conference（獨立專題研討會）
-  └─ Organization B
-       └─ Conference
-```
+同一 repository、版本及 images 可部署 A、B；各自有 Web、API、worker、PostgreSQL、Redis 與未來私有儲存。開發／測試各自 Mailpit。每個實例固定連到自己的服務，不依 request Host、header 或 conference ID 動態選 DB。API／worker 維持最小權限與 migration 身分分離；無 default organization／membership。
 
-Organization 是組織級租戶邊界；Conference 是事件級授權與業務邊界。同組織不同會議也不能自動互見全部資料。ConferenceSeries 只用於歷屆歸類及設定沿用，不共享該屆的投稿、費用或審查結果。
+Compose project 隔離 network、volume 及服務命名；不得用固定全域 container_name、external 共用資料 volume 或把所有 DB／Redis 接到共享 proxy network。只有必要 ingress 接代理網路。各實例獨立資源仍共用宿主 kernel，不能視為 VM 等級隔離；宿主／Docker 管理者及資源耗盡風險需獨立管理。
 
-### 4.2 各場會議可設定
+### 4.2 各場會議設定
 
-名稱、slug、Logo／主視覺、主題色、聯絡資訊、時區、啟用語系、會議日期、各種截止時間、官網內容、投稿類型、track／topic、報名身分、費率、餐飲／活動、審查方式、評分規準、競賽規則、寄信模板、列印模板、模組開關及公開範圍。
+本輪只有經 server config 驗證的名稱與 canonical origin，公開 DTO 明確只含顯示名稱；同一 build 在 runtime 載入。正式可編輯會議設定／版本管理與 CMS 留待後續：Logo、主題色、聯絡資訊、時區、語系、日期、業務窗口、track／topic、費率、模板及公開範圍。不寫死學會、年份或活動日期。
 
-不把學會名稱、2024 年、1/24～1/26、固定午餐天數、30 MB 或圖片中的 deadline 寫死在程式裡。30 MB 可作某一份範例設定，但不是平台常數。
+### 4.3 下屆複用
 
-### 4.3 從上屆建立新會議
+部署全新實例。後續才開發白名單設定匯出／匯入：品牌、官網草稿、表單定義、票種／費率規則、topic、評分表及模板。匯入草稿須重新確認日期及產生 ID；不複製帳號、密碼 hash、Session、token、角色、參與紀錄、稿件、付款、通知、稽核或密鑰。不以完整 DB 複製初始化新會議。備份還原是同一場會議災難復原，與新實例初始化分開。
 
-可勾選複製：品牌、官網草稿、表單定義、票種／費率規則、topic、評分表、郵件與列印模板。
+### 4.4 實例內安全
 
-不得複製：使用者參與紀錄、報名、訂單、付款／退款、稿件、原始檔、審查、得獎、報到、寄信紀錄、任務及統計。
+角色、資源擁有者、track 與審查指派仍須在後端授權。資料庫約束及適用的資源級 RLS 作縱深保護；runtime 非 owner／superuser／BYPASSRLS，交易 context 如有需要必須 transaction-local。worker 從可信 DB 工作載入當前資料並重檢政策；快取、檔案、匯出與下載不可只依前綴授權。不預建尚未採用的 tenant resolver 或把缺少授權視為放行。
 
-新會議預設 draft，重新產生 ID／編號範圍；所有新日期必須確認，不能直接帶入過期 deadline。工作人員權限預設不複製，必要時重新邀請。外部服務密鑰與付款帳戶不可因 clone 被複製到其他組織。
+### 4.5 Cookie、token、郵件
 
-### 4.4 隔離機制
-
-- 會議業務資料明確有 `organization_id`、`conference_id`；組織級資料只需組織 scope；全域身分資料另行限制，不機械式替所有表加入會議 ID。
-- API 先由 session／授權與已解析的會議建立可信 tenant context，不能直接信任 request body 的 tenant ID。
-- 檢查路徑、資源本身、membership 與操作權限是否一致。隱藏按鈕不是授權。[R3]
-- 關聯使用涵蓋 tenant scope 的 composite foreign keys；子項不能引用另一會議的父項。
-- 對適用業務表使用 PostgreSQL RLS 作第二道防線；`USING`／`WITH CHECK`、角色 grants 與交易 context 都須測試。
-- migration role 與 application／worker role 分離。App role 不可為 superuser、table owner 或有 BYPASSRLS；不能宣稱「有開 RLS 就必然隔離」。PostgreSQL 明確存在上述 bypass 行為。[R4]
-- DB pool 每次 scoped operation 必須在同一 transaction／connection 內設定 transaction-local context；不可在 pooled connection 上遺留全域 SET。
-- cache key、檔案位置、匯出、下載權限與 job payload 同樣要有 scope；tenant 前綴不是檔案授權的替代品。[R5]
-- worker 從可信任的 DB job／outbox 重新載入 scope 與資料；不可相信使用者可控制的 payload 直接授權。
-- 平台維運存取租戶敏感資料需獨立的授權路徑、理由、時限與稽核；不得在一般 middleware 放永久全域 bypass。
+Cookie 不以 port 隔離，正式不同會議使用不同 hostname，不設父網域 Domain；HTTPS 使用 Secure／HttpOnly／SameSite 及 CSRF／Origin 檢查。開發 HTTP 只允許 loopback 或單層受控 *.localhost。Session／token 即使手動跨送另一實例也必須因本地 DB 無有效紀錄被拒。郵件 URL 僅由可信 server config 產生，不讀任意 Host／轉址輸入。
 
 ## 5. 帳號、角色與權限
 
 ### 5.1 身分與參與資料分離
 
-一個 User 可具有多個外部登入 identity、組織 membership、會議 membership、報名、投稿與審查指派。
+User 是本實例帳號，可有本場報名、投稿與審查指派；未來外部登入 identity 也只屬於本實例。
 
 使用者個人檔案、該場會議報名快照及論文作者資料不是同一張資料。更新個人資料不能無提示地改寫已發行收據、歷史作者單位或已發布議程。
 
@@ -138,8 +118,6 @@ Organization 是組織級租戶邊界；Conference 是事件級授權與業務�
 
 | 範圍 | 角色 | 邊界 |
 |---|---|---|
-| Platform | 平台維運者 | 平台設定／組織生命週期；敏感租戶操作走受控支援流程 |
-| Organization | 組織管理員 | 建立會議、組織設定、授權管理；委派不得超越自己可委派範圍 |
 | Conference | 會議管理員／秘書處 | 指定會議行政作業 |
 | Conference | 財務人員 | 報名費、核帳、退款、收據；不因此取得匿名審查資料 |
 | Conference / Track | 主席／分組召集人 | 被授權會議或 track 的指派與決議 |
@@ -148,7 +126,7 @@ Organization 是組織級租戶邊界；Conference 是事件級授權與業務�
 | Conference | 現場工作人員 | 報到、名牌、餐券／活動核銷所需最小資料 |
 | Own resources | 參與者／作者／報告者 | 自己有權管理的報名、稿件及文件 |
 
-實作採 scoped roles + granular permissions + resource relationships。同人可以同時是 A 會議作者與 B 會議審查者；也可能在同一會議兼作者與審查者，但不能審查或自行決議自己的論文。先提供固定角色模板與明確 permission matrix，不在首輪開發任意權限規則 DSL。
+實作採 scoped roles + granular permissions + resource relationships。同一個本地帳號可在本會議兼作者與審查者，但不能自審或自行決議自己的論文。角色與受控管理員初始化留待 Phase 1.2；第一個公開註冊者不能自動成為管理員。先提供固定角色模板與明確 permission matrix，不在首輪開發任意權限規則 DSL。
 
 ### 5.3 登入與安全
 
@@ -244,7 +222,7 @@ Organization 是組織級租戶邊界；Conference 是事件級授權與業務�
 
 提供依會議與角色／狀態篩選受眾、收件預覽、模板版本、排程、寄送進度、provider message ID、失敗與退信紀錄。舊畫面的「郵件備份」重新定義為可稽核的通知紀錄／必要內容保存，不默認要備份整個外部信箱。
 
-依組織設定寄件身分，再授權各會議使用；From、Reply-To、envelope sender 各自明確。只有已被郵件服務／管理員政策授權的寄件身分可啟用；填入網域或 DNS 設定存在不等於一定能從該地址寄信。密鑰不得送到前端或出現在日誌。
+每個實例獨立設定並驗證本會議寄件身分；From、Reply-To、envelope sender 各自明確。只有已被郵件服務／管理員政策授權的寄件身分可啟用；填入網域或 DNS 設定存在不等於一定能從該地址寄信。密鑰不得送到前端或出現在日誌。
 
 Dev／CI／Preview 使用郵件捕捉服務或 allowlist，不對真實參與者寄信。SMTP／provider 回覆接受只標記 submitted／accepted，不宣稱已送達收件匣；delivery／bounce 以可取得的供應商事件為準，無事件則維持未知。
 
@@ -290,7 +268,7 @@ Dev／CI／Preview 使用郵件捕捉服務或 allowlist，不對真實參與者
 
 ### 8.1 檔案
 
-DB 保存 FileAsset metadata、tenant scope、owner、用途、storage key、size、checksum、檔案版本、安全檢查狀態與公開狀態；bytes 放儲存服務。
+DB 保存 FileAsset metadata、資源關聯、owner、用途、storage key、size、checksum、檔案版本、安全檢查狀態與公開狀態；bytes 放儲存服務。
 
 限制檔案大小／數量、允許類型、實際內容與用途；不相信副檔名或瀏覽器 Content-Type。使用 server-generated key，私人稿件不存 public webroot；上線前需完成適當的掃描／隔離措施。外部服務掃描不得擅自外送保密論文。[R7]
 
@@ -306,7 +284,7 @@ DB 保存 FileAsset metadata、tenant scope、owner、用途、storage key、siz
 
 BullMQ job 需要可重試與冪等。[R8] 外部寄信／金流不能僅憑 job ID 宣稱 exactly-once：外部成功、內部尚未記錄的中斷要透過 provider idempotency／查詢／對帳處理；純 SMTP 無法確認時保留 unknown 狀態，避免無限自動重寄。
 
-作業執行前檢查最新狀態與授權／系統工作政策，避免向已撤銷結果、取消活動或錯誤租戶寄出舊通知。
+作業執行前檢查最新狀態與授權／系統工作政策，避免向已撤銷結果、取消活動或錯誤資源擁有者寄出舊通知。
 
 ### 8.3 Redis 用途與部署
 
@@ -314,7 +292,7 @@ BullMQ job 需要可重試與冪等。[R8] 外部寄信／金流不能僅憑 job
 
 `redis-cache` 供可重建快取／限流；正式環境與 queue 分開 instance。不同 logical DB number 仍共用實例記憶體／eviction，不當成真正隔離。開發可共享單一 noeviction instance，但正式部署需保持清楚分工。
 
-cache key 至少依功能含 org／conference／locale／版本；私人資料另含 subject／permission version。會議切換清除／隔離 Web query cache；登出及撤權不能留下可用的私人資料頁面。
+cache key 依功能含 locale／版本；私人資料另含 subject／permission version。不同實例不共用 Redis；登出及撤權不能留下可用的私人資料頁面。
 
 Redis queue 不可用時，可在 PostgreSQL 已可靠保存 outbox 的前提下回報已接收業務、通知待處理；不能回報「已寄信」。登入限流等安全依賴故障需明定 fail-safe 行為，不能全域無條件放行。
 
@@ -325,7 +303,7 @@ Redis queue 不可用時，可在 PostgreSQL 已可靠保存 outbox 的前提下
 | 模組 | 核心 entities |
 |---|---|
 | Identity | User、AuthIdentity、Session、Invitation、VerificationToken |
-| Tenancy | Organization、OrganizationMembership、ConferenceSeries、Conference、ConferenceMembership、RoleBinding |
+| Local access | 本會議 RoleBinding、Permission、Resource relationship（Phase 1.2 待授權） |
 | Configuration / CMS | ConferenceSettingsVersion、DeadlineWindow、FormDefinitionVersion、Page、PageRevision、News、Sponsor |
 | Registration | Registration、RegistrationAnswerSnapshot、TicketType、PriceRule、CapacityReservation |
 | Finance | Order、OrderItem、Payment、PaymentAllocation、Refund、Receipt、ReceiptRevision |
@@ -347,9 +325,9 @@ Redis queue 不可用時，可在 PostgreSQL 已可靠保存 outbox 的前提下
 
 - 公開官網以品牌、重要日期、徵稿／報名 CTA 與可搜尋議程為主；不沿用舊表格首頁。
 - 參與者首頁是任務／狀態工作台，不是堆滿全部行政選單。
-- 行政後台採側邊導覽、清楚的會議切換、篩選表格、批次操作、側邊詳細資訊／編輯表單。
+- 行政後台採側邊導覽、清楚的本會議識別、篩選表格、批次操作、側邊詳細資訊／編輯表單。
 - 審查工作台將稿件閱讀、評分、評語、儲存／送出、截止時間與利益衝突放在同一條明確流程。
-- 會議 context 持續可見，跨會議切換要防止沿用表單／快取／批次選取。
+- 本會議識別持續可見；登出／撤權清除私人表單、快取與批次選取，拒絕晚到回應恢復私人資料。
 - 具備 loading、empty、error、retry、permission denied、session expired、deadline closed 與 unsaved changes 狀態。
 - 使用鍵盤可操作的語意元件、清楚 focus、表單 label、錯誤關聯與不只靠顏色的狀態提示；以 WCAG 2.2 AA 為驗收目標，但不得未測試就宣稱完全符合。
 - Codex 階段必須已是可操作、接真 API 的介面。Claude Code 進場是改善資訊架構／視覺／互動，不是補做全部功能前端。
@@ -370,7 +348,7 @@ packages/
   contracts/             # Zod schemas、DTO、errors、OpenAPI source
   sdk/                   # typed API client
   ui/                    # 純 UI；不得依賴 sdk／db
-  db/                    # schema、migrations、tenant context helpers
+  db/                    # schema、migrations、transaction helpers
   domain/                # 可共用狀態機／業務規則，無 Web UI 依賴
   config/                # lint／TypeScript 共用設定
 infra/
@@ -402,7 +380,7 @@ Claude 進場前先 read-only audit 並提交改造方案；契約改動由 Code
 - Conventional Commits；不得未授權自動 merge。
 - CI 至少有 lint、typecheck、unit tests、DB／Redis integration tests、contract checks、build；可操作頁面加入 Playwright E2E。
 - 必要檢查同時覆蓋 PR 與 main，避免 squash merge 後 main 無任何驗證。
-- 權限／租戶測試為 merge gate，不是選做。
+- 權限／實例隔離測試為 merge gate，不是選做。
 - 開發使用 Docker Compose；API／worker 依賴 readiness，容器有非 root 執行、資源限制及 graceful shutdown。
 - PostgreSQL／Redis 不直接暴露公網；預設不把 production secrets 寫入 `.env.example` 或映像。
 - preview 與 production 的 DB、Redis、storage、寄信設定完全隔離；preview 不跑真實金流、不寄真實批次信。
@@ -419,29 +397,28 @@ Claude 進場前先 read-only audit 並提交改造方案；契約改動由 Code
 
 完成 repository 盤點、ADR、workspace、Web／API／worker 最小可啟動程式、DB／Redis／郵件捕捉開發環境、健康檢查、CI、contracts 基礎及 ownership 文件。
 
-加入極小但真正可執行的 DB tenant-context／RLS 範例與隔離整合測試，以驗證未來採用的 connection／transaction 邊界；這不等於完整帳號系統已完成。必要的例子只使用受限測試資料與測試專用 schema，不暴露偽登入 API。
+Phase 0 曾有測試專用 tenant-context／RLS 範例；Phase 1.1b 退役未採用的租戶示範。保留實際 runtime 最小權限、交易回滾／pool reuse／FK 測試，並以雙部署測試驗證目前隔離邊界；不宣稱範例等於真實資源授權。
 
 交付：乾淨 clone 可啟動、實際執行驗證指令、API／worker readiness、真實 PostgreSQL／Redis 整合測試、版本鎖定與 Phase 1 計畫。完成後停止，未經確認不開始 Phase 1。
 
-### Phase 1：帳號、多租戶、會議設定與基礎官網
+### Phase 1：本地帳號、權限、會議設定與基礎官網
 
-完成註冊／驗證／登入／登出／重設、membership／角色與權限、組織、會議與 series、會議切換、設定版本、基礎公開內容、invite／audit／outbox 與私有檔案框架。前述共用能力不是拖到 Phase 6 才開始。
-
-seed 至少兩個組織、三場會議，其中同組織兩屆會議；使用合成使用者，展示不同角色。
-
-驗收：真實登入使用者只看到應見資料；跨組織與同組織跨會議讀写都被阻止；會議切換不洩漏 cache；clone 只帶設定；公開 API 不含未公開／私人資料；Email 邀請在開發郵件捕捉服務可驗證。
+1.1 已實作註冊／驗證／登入／登出／重設、Session、CSRF、audit／outbox／worker／Mailpit。
+1.1b 本輪限定校正單研討會獨立部署、runtime 名稱及雙實例隔離，保留既有安全回歸。
+原 membership／scope resolver 計畫取消。1.2 待授權實作本研討會角色、資源權限及可稽核、維運授權的一次性管理員初始化；不得以第一個公開註冊者取得權限。管理員 MFA 仍為上線門檻。
+後續再實作版本化會議設定、基礎公開內容、邀請與私有檔案框架。只用合成資料；公開投影不含私人資料，角色撤銷與資源 ID 替換應被拒絕。不同實例帳號／Cookie／Session／token／worker／mail／資料隔離需實測。
 
 ### Phase 2：報名、費率、人工核帳、團體繳費與餐飲
 
 完成個人工作台、報名表、版本化規則、費率快照、訂單、付款分配、人工核帳、取消／退款紀錄、餐飲／活動、基本收據。
 
-驗收：早鳥邊界、名額競爭、重複送出、團體部分付款、跨會議分配拒絕、退款上限、收據重印／作廢與行政紀錄。人工核帳端到端可用；外部金流未選定則仍明列未完成。
+驗收：早鳥邊界、名額競爭、重複送出、團體部分付款、跨實例資料不可引用、退款上限、收據重印／作廢與行政紀錄。人工核帳端到端可用；外部金流未選定則仍明列未完成。
 
 ### Phase 3：投稿與版本／檔案
 
 完成作者、共同作者、報告者、track／topic、稿件草稿／提交／修改／撤稿、簡報與影片連結、必要的競賽意願欄位及上傳安全。
 
-驗收：草稿不誤判拒稿、deadline 邊界、版本不可變、檔案 tenant 隔離、非作者不可編輯、投稿與報名關係符合會議設定。
+驗收：草稿不誤判拒稿、deadline 邊界、版本不可變、私有檔案依本地資源權限隔離、非作者不可編輯、投稿與報名關係符合會議設定。
 
 ### Phase 4：審查與決議發布
 
@@ -467,14 +444,14 @@ seed 至少兩個組織、三場會議，其中同組織兩屆會議；使用合
 
 先 read-only UI／UX audit，接著獨立 UI PR：官網、後台、工作台、審查流程、手機版、鍵盤操作與視覺一致性。Codex 保持 core ownership 並做 regression／contract review。
 
-最後以真實流程演練報名至現場結案，完成備份還原、負載、寄信、資安、權限、跨租戶與桌機／行動裝置驗證。安全與測試從 Phase 0 持續進行，這一階段不是第一次做資安。
+最後以真實流程演練報名至現場結案，完成備份還原、負載、寄信、資安、權限、跨實例與桌機／行動裝置驗證。安全與測試從 Phase 0 持續進行，這一階段不是第一次做資安。
 
 ## 13. 核心驗收矩陣
 
 | 情境 | 期望 |
 |---|---|
-| A 組織管理者拿到 B 組織資源 UUID | API／DB policy 不讓其讀取或修改；不洩漏資源細節 |
-| A1 會議工作人員讀取同組織 A2 稿件 | 除非有明確 A2 授權，否則拒絕 |
+| A Session／token 手動傳到 B 實例 | 本地 DB 沒有有效紀錄，拒絕；A token 不被消耗 |
+| 本會議工作人員讀取無權限稿件 | 即使同一實例仍拒絕，不洩漏資源細節 |
 | 審查者也是投稿作者 | 自己或有衝突稿件不得被指派／自評／自行決議 |
 | 同一表單重複按送出 | 一筆業務結果，回傳一致的 idempotent response |
 | 兩人競爭最後一個名額 | 至多一人取得名額，另一人依規則候補／拒絕 |
@@ -488,7 +465,7 @@ seed 至少兩個組織、三場會議，其中同組織兩屆會議；使用合
 | 決議通知 worker retry | 不重複建立業務事件；外部不確定送信狀態可追蹤 |
 | QR code 再掃一次 | 顯示已核銷，不新增第二次核銷 |
 | 重印收據 | 原號碼與原內容快照；新更正有明确歷程 |
-| Clone 下屆會議 | 設定 draft，可確認日期；無個資／稿件／付款／密鑰 |
+| 下屆部署新實例 | 日後只匯入白名單設定草稿，重確認日期；無帳號／Session／稿件／付款／密鑰 |
 | 撤銷使用者權限後下載匯出 | 重新授權並拒絕，既有短效 URL 限制已文件化 |
 | 從備份還原 | 在隔離環境實際驗證資料、檔案引用與必要金鑰可用 |
 
@@ -498,7 +475,7 @@ seed 至少兩個組織、三場會議，其中同組織兩屆會議；使用合
 2. 實作內容與可操作的使用流程。
 3. migration／API／契約／環境變數變更。
 4. 實際執行的指令、結果與失敗原因；未執行的明列未驗證。
-5. 權限／租戶隔離／狀態機／重試的驗證證據。
+5. 權限／實例隔離／狀態機／重試的驗證證據。
 6. 截圖或 preview（環境允許時），但截圖不取代端到端驗證。
 7. 已知限制、阻擋項、未選定供應商、下一個最小工作單元。
 8. 未經授權不得 merge／部署 production／寄真信／操作真金流。

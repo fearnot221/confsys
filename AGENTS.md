@@ -2,9 +2,9 @@
 
 ## Product and scope
 
-Build a reusable academic conference management platform, not a single-event website. Read `docs/SPEC.md` before implementation. The supplied legacy screenshots are functional references only; never reproduce their visual design.
+Build reusable academic conference software: one codebase and one independently deployed instance per conference. Read `docs/SPEC.md` before implementation. The supplied legacy screenshots are functional references only; never reproduce their visual design.
 
-One organization can operate multiple conferences. Different organizations share the application but must not share private data. Conference-level boundaries also apply within one organization.
+Each deployment serves exactly one conference with its own accounts, sessions, tokens, database, Redis, mail and storage. A host organization is descriptive/contact data, not a tenant. No global identity, organization membership, conference switching, default tenant or cross-instance SSO. This Phase 1.1b user decision supersedes the earlier multi-tenant product premise (ADR 0003).
 
 The owner requested PostgreSQL, Redis, Node.js and Vite. Proposed additions are React, TypeScript, Fastify, Drizzle ORM / node-postgres, BullMQ, Tailwind CSS / shadcn/ui, React Router, TanStack Query, React Hook Form / Zod, REST / OpenAPI, Vitest and Playwright. Use compatible, supported, stable versions; verify and pin them. Do not silently replace an existing repository's stack.
 
@@ -29,7 +29,7 @@ Every agent uses a separate branch/worktree. Do not modify another agent's workt
 Maintainability, handoff, debugging and extension are ongoing acceptance criteria, not a final refactoring phase. Apply these rules within the currently authorized scope; they do not authorize the next phase, production operations or architectural rewrites.
 
 - Organize code by business domain with clear, one-way dependencies. HTTP handlers handle input, validation, invocation and response; application/domain services explicitly own authorization, business rules and transaction boundaries; repositories perform scoped persistence without HTTP or UI behavior.
-- API and worker reuse the same business rules. Generic helpers, generic CRUD and repository abstractions must never bypass trusted tenant context, authorization or database constraints. Introduce layers when a real responsibility exists, not to populate empty folders.
+- API and worker reuse the same business rules. Generic helpers, generic CRUD and repository abstractions must never bypass trusted actor/resource context, authorization or database constraints. Introduce layers when a real responsibility exists, not to populate empty folders.
 - Use clear business names, small cohesive functions and readable control flow. Comments explain why and important constraints. Judge responsibility and complexity rather than arbitrary file-line limits.
 - Abstract existing duplication or stable boundaries. Do not speculate with large frameworks, generic engines or redundant wrappers. Avoid unrelated renaming, moves and formatting rewrites.
 - Do not conceal type, contract or runtime errors with excessive `any`, unchecked assertions, silent catches or false-success fallbacks. Deliberate error translation must preserve a truthful failure outcome and safe diagnostic information.
@@ -44,9 +44,9 @@ Before the next authorized development unit, perform a focused Phase 0 review ag
 
 ## Security and business invariants
 
-- Scope business resources by organization and conference. Resolve trusted context from authentication, memberships and resource ownership, not arbitrary request fields.
+- Resolve local actor, permissions and resource ownership from server authentication and persisted relationships, never client-supplied scope. Each deployment has a fixed database; requests cannot select another instance.
 - Enforce authorization on every relevant backend action and file access. Public endpoints return explicit published projections only.
-- Test cross-organization AND same-organization/cross-conference access. Missing context is deny-by-default.
+- Test cross-instance account/session/token/mail/data isolation and local resource authorization as implemented. Missing actor/resource authorization is deny-by-default.
 - Use composite constraints and appropriate PostgreSQL RLS. App/worker roles must not silently bypass RLS. Pool context must be transaction-local, and tests must use the actual non-privileged role.
 - Use server-side sessions with safe cookies and CSRF protection. Do not store long-lived bearer tokens in localStorage or send plaintext passwords.
 - Separate registration, order, payment, submission, review decision, presentation and competition states. Draft submission is never a rejection.
@@ -73,7 +73,7 @@ Use synthetic fixture data only. No production seeds with known passwords. Keep 
 
 ## Delivery report
 
-Report: branch/commit; implemented scope; usable flow; schema/API/env changes; exact executed commands and results; tenant/permission test evidence; limitations and unverified areas; next minimal step.
+Report: branch/commit; implemented scope; usable flow; schema/API/env changes; exact executed commands and results; instance/permission test evidence; limitations and unverified areas; next minimal step.
 
 Distinguish implemented, mocked, unconfigured and unverified. No invented benchmark, external-provider verification, test result, PR URL or production-readiness claim.
 
@@ -90,4 +90,4 @@ Use Node 24.21.0 and pnpm 10.34.7. Setup: `pnpm install --frozen-lockfile`, `pnp
 
 Required gates: `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:integration`, `pnpm test:contract`, `pnpm build`, `pnpm test:e2e`; `pnpm check` runs them in order. Install Chromium first with `pnpm exec playwright install chromium`. Standalone E2E also requires `pnpm db:migrate:test` (local `confsys_test` only). Container smoke: `pnpm smoke:stack` after starting the app profile. See README and docs/TESTING.md for exact prerequisites and limitations.
 
-Do not claim the RLS fixture is a real authenticated tenant resolver. Phase 1 is not authorized by the existence of Phase 0 files.
+The retired Phase 0 tenant fixture is historical, not deployment-isolation evidence. Phase 1.1b is the current authorized unit; Phase 1.2 requires fresh approval. Use CONFSYS_ENV_FILE to select configuration for all commands and pnpm compose for explicit project operations. pnpm test:instances builds one image and verifies two synthetic deployments; see TESTING for ports and cleanup. Original worktrees and existing services must remain untouched.
