@@ -4,6 +4,7 @@ import { withIdentityTransaction } from "@confsys/db";
 import { enqueueBusinessNotification } from "@confsys/notifications";
 import { effectivePublicSite } from "../site/branding.js";
 import {
+  submissionEndpoints,
   submissionSaveInput,
   submissionTransitionInput,
   submissionConfigInput,
@@ -75,6 +76,46 @@ export function createSubmissionService(
     return row;
   };
   return {
+    registrationReminder: (
+      raw: string | undefined,
+      input: unknown,
+      requestId: string,
+    ) => {
+      const data =
+        submissionEndpoints.submissionRegistrationReminder.input.parse(input);
+      return authenticated(raw, "submissions.manage", async (db, actor) => {
+        const submission = await required(db, data.id);
+        if (submission.state !== "submitted" || !submission.currentRevisionId)
+          throw new AuthError("CONFLICT");
+        const requirement = await repo.registrationRequirement(
+          db,
+          submission.currentRevisionId,
+        );
+        if (!requirement || !["pending", "overdue"].includes(requirement.state))
+          throw new AuthError("CONFLICT");
+        const brand = await effectivePublicSite(db, config.CONFERENCE_NAME);
+        await enqueueBusinessNotification(
+          db,
+          { CONFERENCE_NAME: brand.conferenceName },
+          {
+            userId: submission.ownerId,
+            eventKey: `submission-registration-reminder:${submission.currentRevisionId}:${data.idempotencyKey}`,
+            subject: "錄取後報名提醒",
+            text: `請登入研討會系統查看您的報名待辦與期限：${config.PUBLIC_APP_ORIGIN}/submissions`,
+            requestId,
+          },
+        );
+        await repo.audit(
+          db,
+          actor,
+          "submission.registration_reminder",
+          requestId,
+          submission.id,
+          submission.version,
+        );
+        return { queued: true as const };
+      });
+    },
     config: (raw: string | undefined) =>
       authenticated(raw, undefined, (db) => repo.configuration(db)),
     configure: (raw: string | undefined, input: unknown, requestId: string) => {
@@ -109,15 +150,24 @@ export function createSubmissionService(
       authenticated(
         raw,
         scope === "admin" ? "submissions.read_all" : undefined,
-        async (db, actor) => ({
-          submission: await required(
+        async (db, actor) => {
+          const submission = await required(
             db,
             id,
             false,
             scope === "own" ? actor : undefined,
-          ),
-          ...(await repo.revisions(db, id, revisionOffset)),
-        }),
+          );
+          return {
+            submission,
+            registrationRequirement: submission.currentRevisionId
+              ? await repo.registrationRequirement(
+                  db,
+                  submission.currentRevisionId,
+                )
+              : null,
+            ...(await repo.revisions(db, id, revisionOffset)),
+          };
+        },
       ),
     save: (raw: string | undefined, input: unknown, requestId: string) => {
       const data = submissionSaveInput.parse(input);

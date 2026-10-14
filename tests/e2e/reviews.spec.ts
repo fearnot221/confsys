@@ -114,6 +114,7 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
       ...config,
       opensAt: "2020-01-01T00:00:00.000Z",
       closesAt: "2099-01-01T00:00:00.000Z",
+      acceptedRegistrationDeadline: "2099-02-01T00:00:00.000Z",
       requireAttachment: false,
       requireRegistration: false,
       tracks: [{ id: "science", name: "Science", topics: [] }],
@@ -247,6 +248,9 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
       .getByRole("combobox", { name: "正式投稿", exact: true })
       .selectOption(paper.id);
     await chairPage
+      .getByRole("combobox", { name: "決議", exact: true })
+      .selectOption("accept_oral");
+    await chairPage
       .getByLabel("發布後給作者的訊息")
       .fill("PUBLIC_BROWSER_DECISION");
     await chairPage
@@ -273,6 +277,12 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
     await expect(
       authorPage.getByText("PUBLIC_BROWSER_FEEDBACK", { exact: true }),
     ).toBeVisible();
+    await expect(
+      authorPage.getByRole("complementary", { name: "錄取後報名要求" }),
+    ).toContainText("尚待完成報名");
+    await expect(
+      authorPage.getByRole("link", { name: "前往報名", exact: true }),
+    ).toHaveAttribute("href", "/registration");
     await expect(
       authorPage.getByText("PRIVATE_BROWSER_REVIEW", { exact: false }),
     ).toHaveCount(0);

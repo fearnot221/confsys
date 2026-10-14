@@ -17,6 +17,7 @@ const config: SubmissionConfig = {
   opensAt: "2026-10-15T00:00:00Z",
   closesAt: "2026-10-16T00:00:00Z",
   requireRegistration: false,
+  acceptedRegistrationDeadline: null,
   requireAttachment: false,
   mode: "abstract",
   presenterMustBeSubmitter: false,
@@ -172,5 +173,33 @@ it("legacy config projects abstract mode without changing snapshots and full pap
   });
   expect(() =>
     assertSubmissionDocument(doc, { ...config, mode: "full_paper" }, true),
+  ).toThrow();
+});
+it("post-acceptance registration deadline is optional for legacy snapshots and strictly follows submission close", () => {
+  const { acceptedRegistrationDeadline, ...legacy } = config;
+  expect(acceptedRegistrationDeadline).toBeNull();
+  expect(
+    submissionConfigSchema.parse(legacy).acceptedRegistrationDeadline,
+  ).toBeNull();
+  for (const deadline of [config.closesAt, config.opensAt])
+    expect(() =>
+      assertSubmissionConfig({
+        ...config,
+        acceptedRegistrationDeadline: deadline,
+      }),
+    ).toThrow();
+  expect(() =>
+    assertSubmissionConfig({
+      ...config,
+      acceptedRegistrationDeadline: "2026-10-17T00:00:00Z",
+    }),
+  ).not.toThrow();
+  expect(() =>
+    assertSubmissionConfig({
+      ...config,
+      opensAt: null,
+      closesAt: null,
+      acceptedRegistrationDeadline: "2026-10-17T00:00:00Z",
+    }),
   ).toThrow();
 });

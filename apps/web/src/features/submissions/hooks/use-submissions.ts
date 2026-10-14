@@ -36,7 +36,8 @@ const blank = (): SubmissionDocument => ({
 export function useSubmissions(admin = false) {
   const queries = useQueryClient(),
     epoch = useRef(0),
-    controller = useRef<AbortController | null>(null);
+    controller = useRef<AbortController | null>(null),
+    reminderKeys = useRef(new Map<string, string>());
   const [expired, setExpired] = useState(false),
     [offset, setOffset] = useState(0),
     [revisionOffset, setRevisionOffset] = useState(0),
@@ -181,6 +182,10 @@ export function useSubmissions(admin = false) {
     nextOffset: list.data?.nextOffset ?? null,
     current: allowed ? effective : null,
     revisions: allowed ? (detail.data?.revisions ?? []) : [],
+    registrationRequirement:
+      allowed && !detail.error
+        ? (detail.data?.registrationRequirement ?? null)
+        : null,
     settings: allowed ? (settings ?? config.data ?? null) : null,
     canConfigure:
       allowed &&
@@ -254,6 +259,19 @@ export function useSubmissions(admin = false) {
         link.download = `submission-${id}`;
         link.click();
         URL.revokeObjectURL(url);
+      }),
+    onRegistrationReminder: () =>
+      void perform(async (signal) => {
+        if (!effective) return;
+        const key =
+          reminderKeys.current.get(effective.id) ?? crypto.randomUUID();
+        reminderKeys.current.set(effective.id, key);
+        await client(
+          "submissionRegistrationReminder",
+          { id: effective.id, idempotencyKey: key },
+          signal,
+        );
+        setMessage("已建立報名提醒通知；實際寄送進度請查看通知中心。");
       }),
     onSettings: setSettings,
     onReload: () => {

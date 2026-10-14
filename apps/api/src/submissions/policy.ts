@@ -27,6 +27,13 @@ export function assertSubmissionConfig(config: SubmissionConfig) {
       Date.parse(config.opensAt) >= Date.parse(config.closesAt))
   )
     throw new AuthError("INVALID_REQUEST");
+  if (
+    config.acceptedRegistrationDeadline &&
+    (!config.closesAt ||
+      Date.parse(config.acceptedRegistrationDeadline) <=
+        Date.parse(config.closesAt))
+  )
+    throw new AuthError("INVALID_REQUEST");
   const ids = config.tracks.map((t) => t.id);
   if (
     new Set(ids).size !== ids.length ||

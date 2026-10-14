@@ -1,3 +1,4 @@
+import { registrationRequirement } from "../submissions/repository.js";
 import type { PoolClient } from "pg";
 import {
   reviewFormSchema,
@@ -319,22 +320,26 @@ export async function authorResults(
   const rows = (
     await db.query<{
       submissionId: string;
+      revisionId: string;
       outcome: ReviewDecision["outcome"];
       authorMessage: string;
       revisionDeadline: Date | null;
       publishedAt: Date;
       authorComments: string[];
     }>(
-      `SELECT submission_id AS "submissionId",outcome,author_message AS "authorMessage",revision_deadline AS "revisionDeadline",published_at AS "publishedAt",author_comments AS "authorComments" FROM confsys.review_author_results ORDER BY published_at DESC,submission_id LIMIT 21 OFFSET $1`,
+      `SELECT revision_id AS "revisionId",submission_id AS "submissionId",outcome,author_message AS "authorMessage",revision_deadline AS "revisionDeadline",published_at AS "publishedAt",author_comments AS "authorComments" FROM confsys.review_author_results ORDER BY published_at DESC,submission_id LIMIT 21 OFFSET $1`,
       [offset],
     )
   ).rows;
   return {
-    items: rows.slice(0, 20).map((r) => ({
-      ...r,
-      revisionDeadline: r.revisionDeadline?.toISOString() ?? null,
-      publishedAt: r.publishedAt.toISOString(),
-    })),
+    items: await Promise.all(
+      rows.slice(0, 20).map(async ({ revisionId, ...r }) => ({
+        ...r,
+        registrationRequirement: await registrationRequirement(db, revisionId),
+        revisionDeadline: r.revisionDeadline?.toISOString() ?? null,
+        publishedAt: r.publishedAt.toISOString(),
+      })),
+    ),
     nextOffset: rows.length > 20 ? offset + 20 : null,
   };
 }

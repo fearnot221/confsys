@@ -36,6 +36,8 @@ export function registerSubmissionRoutes(
           throw new AuthError("INVALID_REQUEST");
         const raw = req.cookies[cookiePolicy(config).name];
         switch (name) {
+          case "submissionRegistrationReminder":
+            return service.registrationReminder(raw, req.body, req.id);
           case "submissionConfig":
             return service.config(raw);
           case "submissionConfigure":

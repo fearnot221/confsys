@@ -7,6 +7,7 @@ import {
   submissionConfigSchema,
   type SubmissionDocument,
   type SubmissionConfig,
+  type SubmissionRegistrationRequirement,
 } from "@confsys/contracts";
 import { AuthError } from "../auth/errors.js";
 export async function context(db: PoolClient, actorId: string, admin: boolean) {
@@ -161,6 +162,9 @@ export async function publishedAcceptedRevision(db: PoolClient, id: string) {
   ).rows[0];
   if (!row || !["accept_oral", "accept_poster"].includes(row.outcome))
     throw new AuthError("CONFLICT");
+  const registration = await registrationRequirement(db, id);
+  if (!registration || registration.state === "overdue")
+    throw new AuthError("CONFLICT");
   return {
     id,
     submissionId: row.submission_id,
@@ -168,5 +172,36 @@ export async function publishedAcceptedRevision(db: PoolClient, id: string) {
     document: submissionDocumentSchema.parse(row.document),
     presentation:
       row.outcome === "accept_oral" ? ("oral" as const) : ("poster" as const),
+  };
+}
+
+export async function registrationRequirement(
+  db: PoolClient,
+  revisionId: string,
+): Promise<SubmissionRegistrationRequirement | null> {
+  const row = (
+    await db.query<{
+      deadline: Date | null;
+      registered: boolean;
+      eligible: boolean;
+      accepted: boolean;
+    }>(
+      "SELECT deadline,registered,eligible,accepted FROM confsys.submission_registration_status WHERE revision_id=$1",
+      [revisionId],
+    )
+  ).rows[0];
+  if (!row) return null;
+  return {
+    revisionId,
+    deadline: row.deadline?.toISOString() ?? null,
+    registered: row.registered,
+    state:
+      !row.accepted || !row.deadline
+        ? "not_required"
+        : row.registered
+          ? "satisfied"
+          : row.eligible
+            ? "pending"
+            : "overdue",
   };
 }

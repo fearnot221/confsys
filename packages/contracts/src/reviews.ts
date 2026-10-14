@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { submissionRegistrationRequirementSchema } from "./submissions.js";
 const text = (max: number) => z.string().trim().max(max);
 export const reviewCriterionSchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9-]{1,60}$/),
@@ -151,6 +152,7 @@ export const reviewDecisionInput = z.strictObject({
 });
 export const reviewAuthorResultSchema = z.strictObject({
   submissionId: z.uuid(),
+  registrationRequirement: submissionRegistrationRequirementSchema.nullable(),
   outcome: z.enum([
     "accept_oral",
     "accept_poster",

@@ -1,3 +1,4 @@
+import { RegistrationRequirement } from "../../submissions/components/registration-requirement.js";
 import { useState } from "react";
 import type {
   ReviewAssignment,
@@ -809,6 +810,9 @@ export function ReviewsScreen(props: Props) {
                 {r.outcome} · 發布 {r.publishedAt}
               </p>
               <p>{r.authorMessage}</p>
+              <RegistrationRequirement
+                requirement={r.registrationRequirement}
+              />
               {r.revisionDeadline && <p>補件截止：{r.revisionDeadline}</p>}
               {r.authorComments.map((text, i) => (
                 <blockquote key={i}>{text}</blockquote>

@@ -102,6 +102,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await configure({
     requireRegistration: false,
+    acceptedRegistrationDeadline: null,
     requireAttachment: false,
     mode: "abstract",
     presenterMustBeSubmitter: false,
@@ -763,4 +764,89 @@ it("configurable presenter identity and full-paper/slide PDF rules are enforced 
       )
     ).rows[0].config_snapshot,
   ).toMatchObject({ mode: "full_paper", presenterMustBeSubmitter: true });
+});
+
+it("pins optional post-acceptance registration deadlines and exposes status only to owner or authorized administrator", async () => {
+  const deadline = new Date(Date.now() + 7200000).toISOString();
+  await configure({ acceptedRegistrationDeadline: deadline });
+  const p = await draft();
+  const submitted = await service.transition(
+    author.raw,
+    { id: p.id, expectedVersion: p.version, action: "submit" },
+    rid(),
+  );
+  const revisionId = submitted.currentRevisionId!;
+  const decisionId = rid();
+  try {
+    expect(
+      (await service.detail(author.raw, p.id, "own")).registrationRequirement,
+    ).toMatchObject({ deadline, state: "not_required", registered: false });
+    await f.admin.query(
+      "INSERT INTO confsys.review_decisions(id,submission_id,revision_id,version,outcome,author_message,internal_reason,decided_by) VALUES($1,$2,$3,1,'accept_oral','Accepted','Synthetic fixture',$4)",
+      [decisionId, p.id, revisionId, leader.id],
+    );
+    await f.admin.query(
+      "INSERT INTO confsys.review_publications(submission_id,decision_id,published_by) VALUES($1,$2,$3)",
+      [p.id, decisionId, leader.id],
+    );
+    const reminder = { id: p.id, idempotencyKey: rid() };
+    await expect(
+      service.registrationReminder(author.raw, reminder, rid()),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await service.registrationReminder(leader.raw, reminder, rid());
+    await service.registrationReminder(leader.raw, reminder, rid());
+    const notice = (
+      await f.admin.query(
+        "SELECT message_text FROM confsys.notifications WHERE event_key=$1",
+        [
+          `submission-registration-reminder:${revisionId}:${reminder.idempotencyKey}`,
+        ],
+      )
+    ).rows;
+    expect(notice).toHaveLength(1);
+    expect(notice[0].message_text).not.toContain(p.document.title);
+    expect(notice[0].message_text).not.toContain(p.document.abstract);
+    await configure({ acceptedRegistrationDeadline: null });
+    expect(
+      (await service.detail(author.raw, p.id, "own")).registrationRequirement,
+    ).toMatchObject({
+      revisionId,
+      deadline,
+      state: "pending",
+      registered: false,
+    });
+    expect(
+      (await service.detail(leader.raw, p.id, "admin")).registrationRequirement,
+    ).toMatchObject({ deadline, state: "pending" });
+    await expect(
+      service.detail(stranger.raw, p.id, "own"),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(
+      (
+        await f.app.query(
+          "SELECT * FROM confsys.submission_registration_status WHERE revision_id=$1",
+          [revisionId],
+        )
+      ).rows,
+    ).toHaveLength(0);
+    await expect(
+      f.app.query("SELECT * FROM confsys.submission_registration_policy"),
+    ).rejects.toMatchObject({ code: "42501" });
+    // Operator-only synthetic historical fixture represents an elapsed immutable policy snapshot.
+    await f.admin.query(
+      "UPDATE confsys.submission_revisions SET config_snapshot=jsonb_set(config_snapshot,'{acceptedRegistrationDeadline}',to_jsonb($2::text)) WHERE id=$1",
+      [revisionId, new Date(Date.now() - 1000).toISOString()],
+    );
+    expect(
+      (await service.detail(author.raw, p.id, "own")).registrationRequirement,
+    ).toMatchObject({ state: "overdue" });
+  } finally {
+    await f.admin.query(
+      "DELETE FROM confsys.review_publications WHERE submission_id=$1",
+      [p.id],
+    );
+    await f.admin.query("DELETE FROM confsys.review_decisions WHERE id=$1", [
+      decisionId,
+    ]);
+  }
 });

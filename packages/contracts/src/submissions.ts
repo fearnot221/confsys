@@ -44,6 +44,7 @@ export const submissionConfigSchema = z.strictObject({
   opensAt: z.iso.datetime().nullable(),
   closesAt: z.iso.datetime().nullable(),
   requireRegistration: z.boolean(),
+  acceptedRegistrationDeadline: z.iso.datetime().nullable().default(null),
   requireAttachment: z.boolean(),
   mode: z.enum(["abstract", "full_paper"]).default("abstract"),
   presenterMustBeSubmitter: z.boolean().default(false),
@@ -69,8 +70,18 @@ export const submissionRevisionSchema = z.strictObject({
   document: submissionDocumentSchema,
   submittedAt: z.string(),
 });
+export const submissionRegistrationRequirementSchema = z.strictObject({
+  revisionId: z.uuid(),
+  deadline: z.iso.datetime().nullable(),
+  registered: z.boolean(),
+  state: z.enum(["not_required", "pending", "overdue", "satisfied"]),
+});
+export type SubmissionRegistrationRequirement = z.infer<
+  typeof submissionRegistrationRequirementSchema
+>;
 export const submissionDetailSchema = z.strictObject({
   submission: submissionSchema,
+  registrationRequirement: submissionRegistrationRequirementSchema.nullable(),
   revisions: z.array(submissionRevisionSchema),
   nextRevisionOffset: z.number().int().nullable(),
 });
@@ -94,6 +105,12 @@ export const submissionTransitionInput = z.strictObject({
 });
 export const submissionConfigInput = submissionConfigSchema;
 export const submissionEndpoints = {
+  submissionRegistrationReminder: {
+    method: "post",
+    path: "/api/submissions/registration-reminder",
+    input: z.strictObject({ id: z.uuid(), idempotencyKey: z.uuid() }),
+    output: z.strictObject({ queued: z.literal(true) }),
+  },
   submissionConfig: {
     method: "get",
     path: "/api/submissions/config",

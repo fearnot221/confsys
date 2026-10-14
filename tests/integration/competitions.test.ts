@@ -772,3 +772,70 @@ it("a queued judge score rechecks qualification after an author withdrawal commi
     ).rowCount,
   ).toBe(0);
 });
+
+it("pinned post-acceptance registration deadline gates competition actions independently of competition registration rules", async () => {
+  const c = await competition({ requireRegistration: false });
+  const p = await paper();
+  const e = await approve(await enroll(c, p));
+  const a = await assignment(e.id);
+  // Operator-only historical fixture models a deadline that elapsed after an assignment was accepted.
+  await f.admin.query(
+    "UPDATE confsys.submission_revisions SET config_snapshot=jsonb_set(config_snapshot,'{acceptedRegistrationDeadline}',to_jsonb($2::text)) WHERE id=$1",
+    [p.currentRevisionId, new Date(Date.now() - 1000).toISOString()],
+  );
+  const another = await competition({ requireRegistration: false });
+  await expect(enroll(another, p)).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(submit(a)).rejects.toMatchObject({ code: "CONFLICT" });
+  await withIdentityTransaction(f.app, async (db) => {
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [judge.id]);
+    expect(
+      (
+        await db.query(
+          "SELECT * FROM confsys.submission_registration_status WHERE revision_id=$1",
+          [p.currentRevisionId],
+        )
+      ).rows,
+    ).toHaveLength(0);
+    expect(
+      (
+        await db.query(
+          "SELECT eligible FROM confsys.competition_judging_eligibility WHERE id=$1",
+          [a.id],
+        )
+      ).rows[0],
+    ).toEqual({ eligible: false });
+  });
+  if (
+    !(
+      await f.admin.query(
+        "SELECT 1 FROM confsys.registrations WHERE user_id=$1",
+        [author.id],
+      )
+    ).rowCount
+  ) {
+    registrationVersion = Number(
+      (
+        await f.admin.query(
+          "SELECT coalesce(max(version),0)+1 AS version FROM confsys.registration_config_versions",
+        )
+      ).rows[0].version,
+    );
+    await f.admin.query(
+      "INSERT INTO confsys.registration_config_versions(version,document,created_by) VALUES($1,'{}',$2)",
+      [registrationVersion, leader.id],
+    );
+    await f.admin.query(
+      "INSERT INTO confsys.registrations(id,user_id,config_version,ticket_id,ticket_name,state,badge_name,affiliation,answers,consent_snapshot,idempotency_key,request_hash) VALUES($1,$2,$3,$4,'Synthetic','cancelled','Synthetic','Institute','{}','Synthetic consent',$5,'synthetic')",
+      [id(), author.id, registrationVersion, id(), id()],
+    );
+  }
+  // Registration is confirmed late, without changing the immutable deadline or pretending payment happened.
+  await f.admin.query(
+    "UPDATE confsys.registrations SET state='confirmed' WHERE user_id=$1",
+    [author.id],
+  );
+  expect(
+    (await submissions.detail(author.raw, p.id, "own")).registrationRequirement,
+  ).toMatchObject({ state: "satisfied", registered: true });
+  await submit(a);
+});

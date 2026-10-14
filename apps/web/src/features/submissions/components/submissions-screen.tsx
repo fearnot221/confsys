@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { RegistrationRequirement } from "./registration-requirement.js";
 import type {
   Submission,
   SubmissionConfig,
   SubmissionDocument,
+  SubmissionRegistrationRequirement,
 } from "@confsys/contracts";
 type Revision = {
   id: string;
@@ -23,6 +25,7 @@ type Props = {
   nextOffset: number | null;
   current: Submission | null;
   revisions: Revision[];
+  registrationRequirement: SubmissionRegistrationRequirement | null;
   settings: SubmissionConfig | null;
   canConfigure: boolean;
   dirty: boolean;
@@ -41,6 +44,7 @@ type Props = {
   onSave: () => void;
   onTransition: (action: "submit" | "withdraw") => void;
   onConfigure: () => void;
+  onRegistrationReminder: () => void;
 };
 export function SubmissionsScreen(p: Props) {
   const [confirm, setConfirm] = useState<"submit" | "withdraw" | null>(null),
@@ -106,6 +110,21 @@ export function SubmissionsScreen(p: Props) {
                 }
               />
             </label>
+            <label>
+              錄取後報名截止（UTC ISO；留空表示不要求）
+              <input
+                value={config.acceptedRegistrationDeadline ?? ""}
+                onChange={(e) =>
+                  p.onSettings({
+                    ...config,
+                    acceptedRegistrationDeadline: e.target.value || null,
+                  })
+                }
+              />
+            </label>
+            <p>
+              此期限須晚於投稿截止，於正式提交時保存；後續設定變更不追溯改寫已提交版本。
+            </p>
             <label>
               <input
                 type="checkbox"
@@ -355,6 +374,21 @@ export function SubmissionsScreen(p: Props) {
           </button>
         </section>
       )}
+      {current && (
+        <RegistrationRequirement
+          requirement={p.registrationRequirement}
+          administrative={p.admin}
+        />
+      )}
+      {current &&
+        p.admin &&
+        p.canConfigure &&
+        p.registrationRequirement &&
+        ["pending", "overdue"].includes(p.registrationRequirement.state) && (
+          <button disabled={p.busy} onClick={p.onRegistrationReminder}>
+            發送錄取後報名提醒
+          </button>
+        )}
       {current && d && (
         <section>
           <h2>{p.admin ? "檢視稿件" : "編輯稿件"}</h2>

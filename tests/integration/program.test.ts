@@ -440,6 +440,28 @@ it("only exact published accepted revision can be scheduled; draft outcomes and 
       "UPDATE confsys.program_publication_slots SET slot_id=slot_id WHERE false",
     ),
   ).rejects.toMatchObject({ code: "42501" });
+  // Operator-only elapsed-policy fixture: published history stays visible while new actions are gated.
+  await f.admin.query(
+    "UPDATE confsys.submission_revisions SET config_snapshot=jsonb_set(config_snapshot,'{acceptedRegistrationDeadline}',to_jsonb($2::text)) WHERE id=$1",
+    [submitted.currentRevisionId, new Date(Date.now() - 1000).toISOString()],
+  );
+  await expect(
+    program.slot(
+      leader.raw,
+      { expectedVersion: await version(), item: slot },
+      id(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await room();
+  await expect(
+    program.publish(leader.raw, { expectedVersion: await version() }, id()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(await program.public()).toEqual(published);
+  expect(await program.mine(author.raw)).toEqual(personal);
+  await f.admin.query(
+    "UPDATE confsys.submission_revisions SET config_snapshot=config_snapshot-'acceptedRegistrationDeadline' WHERE id=$1",
+    [submitted.currentRevisionId],
+  );
   // A private draft edit cannot move the author's published schedule.
   await program.slot(
     leader.raw,
