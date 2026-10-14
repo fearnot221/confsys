@@ -35,6 +35,8 @@ export function registerProgramRoutes(
         switch (name) {
           case "programPublic":
             return service.public();
+          case "programMine":
+            return service.mine(raw);
           case "programDraft":
             return service.draft(raw);
           case "programRoom":

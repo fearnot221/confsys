@@ -261,6 +261,10 @@ export async function publish(
     [id, version, JSON.stringify(document), actor],
   );
   await db.query(
+    "INSERT INTO confsys.program_publication_slots(publication_id,slot_id,submission_id,revision_id) SELECT $1,id,submission_id,revision_id FROM confsys.program_slots WHERE submission_id IS NOT NULL AND revision_id IS NOT NULL",
+    [id],
+  );
+  await db.query(
     "UPDATE confsys.program_state SET active_publication_id=$1 WHERE singleton=true",
     [id],
   );
@@ -273,4 +277,24 @@ export async function publishedFor(db: PoolClient, version: number) {
       [version],
     )
   ).rows[0]?.id;
+}
+
+export async function personalProgram(db: PoolClient, actorId: string) {
+  const publication = await publicProgram(db);
+  if (!publication.publicationId) return publication;
+  // Explicit owner check remains required even if another role broadens submission RLS.
+  const rows = await db.query<{ slot_id: string }>(
+    "SELECT mapping.slot_id FROM confsys.program_publication_slots mapping JOIN confsys.submissions s ON s.id=mapping.submission_id WHERE mapping.publication_id=$1 AND s.owner_id=$2",
+    [publication.publicationId, actorId],
+  );
+  const owned = new Set(rows.rows.map((row) => row.slot_id));
+  return {
+    ...publication,
+    sessions: publication.sessions
+      .map((session) => ({
+        ...session,
+        slots: session.slots.filter((slot) => owned.has(slot.id)),
+      }))
+      .filter((session) => session.slots.length > 0),
+  };
 }

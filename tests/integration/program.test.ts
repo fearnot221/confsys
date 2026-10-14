@@ -119,6 +119,10 @@ afterAll(async () => {
     [baseline.version, baseline.active_publication_id],
   );
   await f.admin.query(
+    "DELETE FROM confsys.program_publication_slots WHERE publication_id IN (SELECT id FROM confsys.program_publications WHERE published_by=$1)",
+    [leader.id],
+  );
+  await f.admin.query(
     "DELETE FROM confsys.program_publications WHERE published_by=$1",
     [leader.id],
   );
@@ -180,6 +184,10 @@ it("unauthenticated and ordinary users cannot read drafts or mutate program", as
       ),
     ).rejects.toMatchObject({ code: raw ? "FORBIDDEN" : "SESSION_EXPIRED" });
   }
+  await expect(program.mine(undefined)).rejects.toMatchObject({
+    code: "SESSION_EXPIRED",
+  });
+  expect(await program.mine(author.raw)).toMatchObject({ sessions: [] });
   expect(await program.public()).toMatchObject({
     publicationId: null,
     sessions: [],
@@ -419,6 +427,33 @@ it("only exact published accepted revision can be scheduled; draft outcomes and 
   );
   expect(JSON.stringify(published)).toContain(document.title);
   expect(JSON.stringify(published)).not.toContain(document.abstract);
+  const personal = await program.mine(author.raw);
+  expect(personal.sessions).toHaveLength(1);
+  expect(personal.sessions[0]?.slots.map((item) => item.id)).toEqual([slot.id]);
+  expect(personal.publicationId).toBe(published.publicationId);
+  expect(await program.mine(leader.raw)).toMatchObject({ sessions: [] });
+  expect(
+    (await f.app.query("SELECT * FROM confsys.program_publication_slots")).rows,
+  ).toHaveLength(0);
+  await expect(
+    f.app.query(
+      "UPDATE confsys.program_publication_slots SET slot_id=slot_id WHERE false",
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+  // A private draft edit cannot move the author's published schedule.
+  await program.slot(
+    leader.raw,
+    {
+      expectedVersion: await version(),
+      item: {
+        ...slot,
+        startsAt: "2030-02-01T01:15:00Z",
+        endsAt: "2030-02-01T01:45:00Z",
+      },
+    },
+    id(),
+  );
+  expect(await program.mine(author.raw)).toEqual(personal);
   const event = await f.admin.query(
     "SELECT count(*) FROM confsys.notifications WHERE event_key=$1",
     [`program:${published.publicationId}:${author.id}`],
@@ -477,4 +512,49 @@ it("only exact published accepted revision can be scheduled; draft outcomes and 
     await Promise.allSettled([withdrawal, ...(publishing ? [publishing] : [])]);
   }
   expect(await program.public()).toEqual(published);
+  expect(await program.mine(author.raw)).toEqual(personal);
+});
+it("personal schedule HTTP requires authentication and keeps the filtered response private", async () => {
+  const { buildApp } = await import("../../apps/api/src/app.js");
+  const { registerAuthRoutes } =
+    await import("../../apps/api/src/auth/routes.js");
+  const { registerProgramRoutes } =
+    await import("../../apps/api/src/program/routes.js");
+  const { createRateLimiter } =
+    await import("../../apps/api/src/auth/rate-limit.js");
+  const { Redis } = await import("ioredis");
+  const redis = new Redis(f.config.REDIS_URL);
+  const up = async () => {};
+  const server = buildApp({ postgres: up, redis: up, worker: up });
+  await registerAuthRoutes(server, {
+    config: f.config,
+    service: auth,
+    limit: createRateLimiter(
+      redis,
+      f.config.CSRF_SIGNING_KEY,
+      `program-${id()}`,
+    ),
+  });
+  registerProgramRoutes(server, f.config, program);
+  const host = new URL(f.config.PUBLIC_APP_ORIGIN).host;
+  try {
+    expect(
+      (await server.inject({ url: "/api/program/mine", headers: { host } }))
+        .statusCode,
+    ).toBe(401);
+    const result = await server.inject({
+      url: "/api/program/mine",
+      headers: { host, cookie: `dev-session=${author.raw}` },
+    });
+    expect(result.statusCode).toBe(200);
+    expect(result.json()).toEqual(await program.mine(author.raw));
+    expect(result.headers["cache-control"]).toBe("no-store");
+    expect(result.headers["x-robots-tag"]).toBe("noindex, nofollow");
+    expect(JSON.stringify(result.json())).not.toMatch(
+      /ownerId|submissionId|revisionId|example\.invalid/,
+    );
+  } finally {
+    await server.close();
+    await redis.quit();
+  }
 });

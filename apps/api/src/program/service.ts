@@ -53,8 +53,8 @@ export function createProgramService(pool: Pool, config: ApiConfig) {
       );
       if (publish) assertRecentPassword(actor.passwordVerifiedAt, new Date());
       await db.query(
-        "SELECT set_config('app.actor_id',$1,true),set_config('app.submissions_admin','true',true)",
-        [actor.id],
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.submissions_admin','true',true),set_config('app.program_publish',$2,true)",
+        [actor.id, String(publish)],
       );
       return work(db, actor.id);
     }).catch(translate);
@@ -91,6 +91,13 @@ export function createProgramService(pool: Pool, config: ApiConfig) {
   };
   return {
     public: () => repo.publicProgram(pool),
+    mine: (raw: string | undefined) =>
+      withIdentityTransaction(pool, async (db) => {
+        await lockAccessShared(db);
+        const actor = await sessionActor(db, raw, config, new Date(), true);
+        await db.query("SELECT set_config('app.actor_id',$1,true)", [actor.id]);
+        return repo.personalProgram(db, actor.id);
+      }),
     draft: (raw: string | undefined) =>
       authorized(raw, false, (db) => repo.draft(db), false),
     room: (raw: string | undefined, input: unknown, requestId: string) => {

@@ -15,11 +15,16 @@ test.afterAll(async () => {
     "UPDATE confsys.program_state SET version=$1,active_publication_id=$2",
     [baseline.version, baseline.active_publication_id],
   );
-  if (adminId)
+  if (adminId) {
+    await f.admin.query(
+      "DELETE FROM confsys.program_publication_slots WHERE publication_id IN (SELECT id FROM confsys.program_publications WHERE published_by=$1)",
+      [adminId],
+    );
     await f.admin.query(
       "DELETE FROM confsys.program_publications WHERE published_by=$1",
       [adminId],
     );
+  }
   for (const table of [
     "program_person_bookings",
     "program_slots",

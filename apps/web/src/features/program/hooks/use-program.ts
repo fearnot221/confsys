@@ -179,3 +179,21 @@ export function useProgram() {
       }),
   };
 }
+
+/** Owner-linked published schedule; callers never match identity names or emails. */
+export function useMyProgram(enabled = true) {
+  const query = useQuery({
+    queryKey: ["private", "program", "mine"],
+    queryFn: async ({ signal }) =>
+      programPublicSchema.parse(await client("programMine", null, signal)),
+    enabled,
+    retry: false,
+  });
+  return {
+    program: enabled && !query.error ? (query.data ?? null) : null,
+    loading: enabled && query.isPending,
+    error:
+      enabled && query.error ? "個人議程無法讀取，請重新登入或稍後重試。" : "",
+    onRetry: () => void query.refetch(),
+  };
+}
