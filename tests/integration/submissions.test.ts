@@ -381,3 +381,164 @@ it("outbox failure rolls back revision and state instead of reporting successful
     await f.admin.query("DROP FUNCTION confsys.submissions_test_failure()");
   }
 });
+
+it("HTTP enforces CSRF, strict payloads and no-store private responses", async () => {
+  const { buildApp } = await import("../../apps/api/src/app.js");
+  const { registerAuthRoutes } =
+    await import("../../apps/api/src/auth/routes.js");
+  const { registerSubmissionRoutes } =
+    await import("../../apps/api/src/submissions/routes.js");
+  const { createRateLimiter } =
+    await import("../../apps/api/src/auth/rate-limit.js");
+  const { Redis } = await import("ioredis");
+  const redis = new Redis(f.config.REDIS_URL);
+  const up = async () => {};
+  const server = buildApp({ postgres: up, redis: up, worker: up });
+  await registerAuthRoutes(server, {
+    config: f.config,
+    service: auth,
+    limit: createRateLimiter(
+      redis,
+      f.config.CSRF_SIGNING_KEY,
+      `submission-${rid()}`,
+    ),
+  });
+  registerSubmissionRoutes(server, f.config, service);
+  const host = new URL(f.config.PUBLIC_APP_ORIGIN).host;
+  try {
+    const csrf = await server.inject({
+      url: "/api/auth/csrf",
+      headers: { host },
+    });
+    const cookies = csrf.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+    const headers = {
+      host,
+      cookie: `dev-session=${author.raw}; ${cookies}`,
+      origin: f.config.PUBLIC_APP_ORIGIN,
+      "x-csrf-token": csrf.json().csrfToken,
+    };
+    const payload = { id: rid(), expectedVersion: 0, document: doc() };
+    for (const extra of [
+      { origin: "http://evil.invalid" },
+      { "x-csrf-token": "" },
+    ])
+      expect(
+        (
+          await server.inject({
+            method: "POST",
+            url: "/api/submissions/save",
+            headers: { ...headers, ...extra },
+            payload,
+          })
+        ).statusCode,
+      ).toBe(403);
+    for (const extra of [
+      { ownerId: stranger.id },
+      { state: "submitted" },
+      { currentRevisionId: rid() },
+    ])
+      expect(
+        (
+          await server.inject({
+            method: "POST",
+            url: "/api/submissions/save",
+            headers,
+            payload: { ...payload, ...extra },
+          })
+        ).statusCode,
+      ).toBe(400);
+    expect(
+      (
+        await server.inject({
+          url: "/api/submissions/detail?id=not-a-uuid",
+          headers,
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (await server.inject({ url: "/api/submissions?scope=admin", headers }))
+        .statusCode,
+    ).toBe(403);
+    const created = await server.inject({
+      method: "POST",
+      url: "/api/submissions/save",
+      headers,
+      payload,
+    });
+    expect(created.statusCode).toBe(200);
+    expect(created.headers["cache-control"]).toBe("no-store");
+    expect(created.headers["x-robots-tag"]).toContain("noindex");
+    expect(Object.keys(created.json()).sort()).toEqual(
+      [
+        "id",
+        "ownerId",
+        "state",
+        "version",
+        "submittedVersion",
+        "currentRevisionId",
+        "document",
+        "updatedAt",
+      ].sort(),
+    );
+    const foreign = await server.inject({
+      url: `/api/submissions/detail?id=${payload.id}`,
+      headers: { host, cookie: `dev-session=${stranger.raw}` },
+    });
+    expect(foreign.statusCode).toBe(404);
+    expect(foreign.body).not.toContain(payload.document.title);
+  } finally {
+    await server.close();
+    redis.disconnect();
+  }
+});
+
+it("a queued author mutation revalidates session after a concurrent revocation", async () => {
+  const paper = await draft();
+  const blocker = await f.admin.connect();
+  await blocker.query("BEGIN");
+  await blocker.query(
+    "SELECT singleton FROM confsys.access_control FOR UPDATE",
+  );
+  const revoke = access.mutate(
+    leader.raw,
+    author.id,
+    { action: "revoke_sessions", reason: "Synthetic queued submission race" },
+    rid(),
+  );
+  try {
+    await expect
+      .poll(async () =>
+        Number(
+          (
+            await f.app.query(
+              "SELECT count(*) FROM pg_stat_activity WHERE usename='confsys_app' AND wait_event_type='Lock'",
+            )
+          ).rows[0].count,
+        ),
+      )
+      .toBeGreaterThan(0);
+    const submitting = service.transition(
+      author.raw,
+      { id: paper.id, expectedVersion: paper.version, action: "submit" },
+      rid(),
+    );
+    const rejected = expect(submitting).rejects.toMatchObject({
+      code: "SESSION_EXPIRED",
+    });
+    await blocker.query("COMMIT");
+    await revoke;
+    await rejected;
+  } finally {
+    await blocker.query("ROLLBACK");
+    blocker.release();
+    await Promise.allSettled([revoke]);
+  }
+  expect(
+    (
+      await f.admin.query("SELECT state FROM confsys.submissions WHERE id=$1", [
+        paper.id,
+      ])
+    ).rows[0].state,
+  ).toBe("draft");
+  author.raw = (await auth.login(author.email, password, rid())).raw;
+});
