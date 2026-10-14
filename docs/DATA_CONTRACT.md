@@ -199,3 +199,11 @@ SMTP effects already begun cannot be recalled. Accepted means SMTP acceptance,
 unknown means potentially sent and is never blindly retried. Read receipts are
 independent of delivery state. Subject/body are ordinary announcements, not a channel
 for manuscript contents, secrets or unpublished decisions.
+
+### Focused SPEC acceptance follow-up
+
+Submission configuration now includes `mode: abstract | full_paper` and `presenterMustBeSubmitter`. Legacy JSON projects `abstract`/`false` defaults without rewriting revision snapshots. Full-paper submission requires at least one ready owned PDF manuscript; slides always require detected `application/pdf`, including during draft save. The optional presenter rule compares the selected presenter email to the authenticated account's verified email on final submit, with no account creation or coauthor email linking. Draft preview is explicitly marked unsubmitted; displayed revision IDs support exact agenda/competition references. Changing a presenter creates a new immutable submission revision: already published program and competition records remain pinned to their original accepted revision, and a new revision cannot replace those records until it has its own published acceptance.
+
+`POST /api/competitions/remind` accepts an assignment ID, idempotency key and reason. It requires competition administration, a still-qualified approved entry, an active judge role, an unsubmitted assignment and an open judging deadline. Generic notices are deduplicated by assignment/request key; they contain no manuscript or score details. Final scoring takes the exclusive access fence so eligibility cannot race an author withdrawal or registration cancellation; read-only judging and conflict declarations retain shared access fences. This intentionally favors a single-instance correctness boundary over unmeasured parallel scoring throughput.
+
+Follow-up verification checkpoint (06:53 Asia/Taipei): typecheck and scoped eslint passed; submission/competition policy+SDK unit tests passed 10/10. New presenter/PDF integration, reminder and queued withdrawal-versus-publication/scoring regression tests are authored but have not yet run while the main integration worker holds the shared PostgreSQL test slot. Treat these additions as pending the next real-PG regression gate, not verified completion.

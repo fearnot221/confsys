@@ -1,4 +1,9 @@
-import { assertReadyOwnedFiles, referenceFiles } from "../files/repository.js";
+import {
+  assertReadyOwnedFiles,
+  referenceFiles,
+  findFile,
+} from "../files/repository.js";
+import { AuthError } from "../auth/errors.js";
 import type { SubmissionDependencies } from "./service.js";
 // Registration and file ownership are checked in the same transaction as submission.
 // No actor or registration identifier is accepted from browser content.
@@ -28,20 +33,33 @@ export const submissionDependencies: SubmissionDependencies = {
       )
     ).rowCount;
   },
-  async assertFiles(db, actorId, document) {
+  async assertFiles(db, actorId, document, requireFullPaper = false) {
     await assertReadyOwnedFiles(
       db,
       actorId,
       document.attachmentIds,
       "manuscript",
     );
-    if (document.slidesFileId)
+    if (requireFullPaper) {
+      let hasPdf = false;
+      for (const id of document.attachmentIds)
+        if ((await findFile(db, id)).media_type === "application/pdf")
+          hasPdf = true;
+      if (!hasPdf) throw new AuthError("INVALID_REQUEST");
+    }
+    if (document.slidesFileId) {
       await assertReadyOwnedFiles(
         db,
         actorId,
         [document.slidesFileId],
         "manuscript",
       );
+      if (
+        (await findFile(db, document.slidesFileId)).media_type !==
+        "application/pdf"
+      )
+        throw new AuthError("INVALID_REQUEST");
+    }
   },
   async referenceFiles(db, document, revisionId) {
     await referenceFiles(

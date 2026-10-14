@@ -481,6 +481,22 @@ export function CompetitionsScreen(p: Props) {
                     >
                       撤銷此指派
                     </button>
+                    <button
+                      disabled={
+                        p.busy ||
+                        reason.trim().length < 3 ||
+                        a.state !== "assigned"
+                      }
+                      onClick={() =>
+                        p.onAction("competitionRemind", {
+                          assignmentId: a.id,
+                          idempotencyKey: p.newId(),
+                          reason,
+                        })
+                      }
+                    >
+                      提醒待評分評審
+                    </button>
                   </div>
                 ))}
             </article>

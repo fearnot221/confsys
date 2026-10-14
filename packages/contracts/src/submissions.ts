@@ -45,6 +45,8 @@ export const submissionConfigSchema = z.strictObject({
   closesAt: z.iso.datetime().nullable(),
   requireRegistration: z.boolean(),
   requireAttachment: z.boolean(),
+  mode: z.enum(["abstract", "full_paper"]).default("abstract"),
+  presenterMustBeSubmitter: z.boolean().default(false),
   tracks: z.array(submissionTrackSchema).max(100),
 });
 export type SubmissionConfig = z.infer<typeof submissionConfigSchema>;

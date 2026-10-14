@@ -424,14 +424,57 @@ it("only exact published accepted revision can be scheduled; draft outcomes and 
     [`program:${published.publicationId}:${author.id}`],
   );
   expect(event.rows[0].count).toBe("1");
-  await submissions.transition(
+  await room();
+  const pendingVersion = await version();
+  await f.admin.query(
+    "DELETE FROM confsys.review_publications WHERE submission_id=$1",
+    [paper.id],
+  );
+  await expect(
+    program.publish(leader.raw, { expectedVersion: pendingVersion }, id()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await f.admin.query(
+    "INSERT INTO confsys.review_publications(submission_id,decision_id,published_by) VALUES($1,$2,$3)",
+    [paper.id, decision, leader.id],
+  );
+  const blocker = await f.admin.connect();
+  await blocker.query("BEGIN");
+  await blocker.query("SELECT id FROM confsys.users WHERE id=$1 FOR UPDATE", [
+    author.id,
+  ]);
+  const withdrawal = submissions.transition(
     author.raw,
     { id: paper.id, expectedVersion: paper.version, action: "withdraw" },
     id(),
   );
-  await room();
-  await expect(
-    program.publish(leader.raw, { expectedVersion: await version() }, id()),
-  ).rejects.toMatchObject({ code: "CONFLICT" });
+  let publishing: Promise<unknown> | undefined;
+  try {
+    await expect
+      .poll(async () =>
+        Number(
+          (
+            await f.app.query(
+              "SELECT count(*) FROM pg_stat_activity WHERE usename='confsys_app' AND wait_event_type='Lock'",
+            )
+          ).rows[0].count,
+        ),
+      )
+      .toBeGreaterThan(0);
+    publishing = program.publish(
+      leader.raw,
+      { expectedVersion: pendingVersion },
+      id(),
+    );
+    const rejection = expect(publishing).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    await blocker.query("COMMIT");
+    await withdrawal;
+    await rejection;
+  } finally {
+    await blocker.query("ROLLBACK");
+    blocker.release();
+    await Promise.allSettled([withdrawal, ...(publishing ? [publishing] : [])]);
+  }
   expect(await program.public()).toEqual(published);
 });

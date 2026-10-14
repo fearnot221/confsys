@@ -191,6 +191,12 @@ export const competitionEndpoints = {
     input: z.strictObject({ entryId: id, judgeId: id }),
     output: competitionAdminSchema,
   },
+  competitionRemind: {
+    method: "post",
+    path: "/api/competitions/remind",
+    input: z.strictObject({ assignmentId: id, idempotencyKey: id, reason }),
+    output: competitionAdminSchema,
+  },
   competitionCancel: {
     method: "post",
     path: "/api/competitions/cancel-assignment",

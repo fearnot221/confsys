@@ -18,6 +18,8 @@ const config: SubmissionConfig = {
   closesAt: "2026-10-16T00:00:00Z",
   requireRegistration: false,
   requireAttachment: false,
+  mode: "abstract",
+  presenterMustBeSubmitter: false,
   tracks: [
     {
       id: "science",
@@ -157,4 +159,18 @@ describe("submission server policy", () => {
       }).success,
     ).toBe(false);
   });
+});
+it("legacy config projects abstract mode without changing snapshots and full paper requires manuscript attachment", () => {
+  const legacy = Object.fromEntries(
+    Object.entries(config).filter(
+      ([key]) => !["mode", "presenterMustBeSubmitter"].includes(key),
+    ),
+  );
+  expect(submissionConfigSchema.parse(legacy)).toMatchObject({
+    mode: "abstract",
+    presenterMustBeSubmitter: false,
+  });
+  expect(() =>
+    assertSubmissionDocument(doc, { ...config, mode: "full_paper" }, true),
+  ).toThrow();
 });

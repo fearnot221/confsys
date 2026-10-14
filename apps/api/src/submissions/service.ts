@@ -27,6 +27,7 @@ export type SubmissionDependencies = {
     db: PoolClient,
     actorId: string,
     document: SubmissionDocument,
+    requireFullPaper?: boolean,
   ) => Promise<void>;
   activeRevisionRequest: (
     db: PoolClient,
@@ -51,7 +52,7 @@ export function createSubmissionService(
   const authenticated = <T>(
     raw: string | undefined,
     permission: string | undefined,
-    work: (db: PoolClient, actorId: string) => Promise<T>,
+    work: (db: PoolClient, actorId: string, actorEmail: string) => Promise<T>,
   ) =>
     withIdentityTransaction(pool, async (db) => {
       // Fence authorization changes, then lock the actor before domain rows. No external I/O under locks.
@@ -60,7 +61,7 @@ export function createSubmissionService(
       if (permission)
         requirePermission(await rolesFor(db, actor.id), permission);
       await repo.context(db, actor.id, !!permission);
-      return work(db, actor.id);
+      return work(db, actor.id, actor.email);
     });
   const required = async (
     db: PoolClient,
@@ -158,7 +159,7 @@ export function createSubmissionService(
       requestId: string,
     ) => {
       const data = submissionTransitionInput.parse(input);
-      return authenticated(raw, undefined, async (db, actor) => {
+      return authenticated(raw, undefined, async (db, actor, actorEmail) => {
         const settings = await repo.configuration(db, "share"),
           before = await required(db, data.id, true, actor);
         assertSubmissionVersion(before, data.expectedVersion);
@@ -180,7 +181,19 @@ export function createSubmissionService(
             !(await dependencies.isRegistered(db, actor))
           )
             throw new AuthError("CONFLICT");
-          await dependencies.assertFiles(db, actor, before.document);
+          if (
+            settings.presenterMustBeSubmitter &&
+            before.document.authors[before.document.presenterIndex]?.email
+              .trim()
+              .toLowerCase() !== actorEmail
+          )
+            throw new AuthError("FORBIDDEN");
+          await dependencies.assertFiles(
+            db,
+            actor,
+            before.document,
+            settings.mode === "full_paper",
+          );
           const revisionId = await repo.submit(
             db,
             data.id,

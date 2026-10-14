@@ -250,6 +250,34 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
         return repo.admin(db);
       });
     },
+    remind: (raw: string | undefined, input: unknown, requestId: string) => {
+      const d = competitionEndpoints.competitionRemind.input.parse(input);
+      return authorized(raw, "competitions.manage", true, async (db, actor) => {
+        const a = await repo.assignment(db, d.assignmentId, true);
+        if (a.state !== "assigned") throw new AuthError("CONFLICT");
+        const e = await repo.entry(db, a.entryId);
+        if (e.state !== "approved") throw new AuthError("CONFLICT");
+        await eligible(db, e.revisionId, a.config);
+        beforeDeadline(a.config.judgingClosesAt);
+        requirePermission(await rolesFor(db, a.judgeId), "competitions.score");
+        await notify(
+          db,
+          a.judgeId,
+          `competition-reminder:${a.id}:${d.idempotencyKey}`,
+          "競賽待評分提醒",
+          requestId,
+        );
+        await repo.audit(
+          db,
+          actor,
+          "competition.score_reminder",
+          a.id,
+          requestId,
+          d.reason,
+        );
+        return repo.admin(db);
+      });
+    },
     cancel: (raw: string | undefined, input: unknown, requestId: string) => {
       const d = competitionEndpoints.competitionCancel.input.parse(input);
       return authorized(raw, "competitions.manage", true, async (db, actor) => {
@@ -291,7 +319,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
     },
     score: (raw: string | undefined, input: unknown, requestId: string) => {
       const d = competitionEndpoints.competitionScore.input.parse(input);
-      return authorized(raw, "competitions.score", false, async (db, actor) => {
+      return authorized(raw, "competitions.score", true, async (db, actor) => {
         const a = await ownAssignment(db, d.assignmentId, actor),
           score = scoreDocument(a.config, d.document, d.action === "submit");
         if (

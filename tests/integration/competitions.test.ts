@@ -624,3 +624,151 @@ it("HTTP uses strict contracts, CSRF protection and private no-store projections
     await redis.quit();
   }
 });
+
+it("pending-score reminders are authorized and retry-safe without unpublished details", async () => {
+  const c = await competition(),
+    p = await paper(),
+    e = await approve(await enroll(c, p)),
+    a = await assignment(e.id),
+    input = {
+      assignmentId: a.id,
+      idempotencyKey: id(),
+      reason: "Synthetic missing score reminder",
+    };
+  await expect(svc.remind(author.raw, input, id())).rejects.toMatchObject({
+    code: "FORBIDDEN",
+  });
+  await svc.remind(leader.raw, input, id());
+  await svc.remind(leader.raw, input, id());
+  const rows = (
+    await f.admin.query(
+      "SELECT message_text,message_subject FROM confsys.notifications WHERE event_key=$1",
+      [`competition-reminder:${a.id}:${input.idempotencyKey}`],
+    )
+  ).rows;
+  expect(rows).toHaveLength(1);
+  expect(rows[0].message_subject).toContain("待評分");
+  expect(rows[0].message_text).not.toContain(p.document.title);
+  await submit(a);
+  await expect(
+    svc.remind(leader.raw, { ...input, idempotencyKey: id() }, id()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+});
+
+it("publication fences an in-flight author withdrawal and leaves public snapshot unchanged", async () => {
+  const c = await competition(),
+    p = await paper(),
+    e = await approve(await enroll(c, p));
+  await close(c);
+  const a = await assignment(e.id);
+  await submit(a);
+  await svc.awards(
+    leader.raw,
+    {
+      competitionId: c,
+      expectedVersion: (await current(c)).version,
+      awards: [{ entryId: e.id, label: "Synthetic winner", rank: 1 }],
+      reason: "Synthetic concurrency award",
+    },
+    id(),
+  );
+  const expectedVersion = (await current(c)).version,
+    before = await svc.public();
+  const blocker = await f.admin.connect();
+  await blocker.query("BEGIN");
+  await blocker.query("SELECT id FROM confsys.users WHERE id=$1 FOR UPDATE", [
+    author.id,
+  ]);
+  const withdrawal = submissions.transition(
+    author.raw,
+    { id: p.id, expectedVersion: p.version, action: "withdraw" },
+    id(),
+  );
+  let publishing: Promise<unknown> | undefined;
+  try {
+    await expect
+      .poll(async () =>
+        Number(
+          (
+            await f.app.query(
+              "SELECT count(*) FROM pg_stat_activity WHERE usename='confsys_app' AND wait_event_type='Lock'",
+            )
+          ).rows[0].count,
+        ),
+      )
+      .toBeGreaterThan(0);
+    publishing = svc.publish(
+      leader.raw,
+      { competitionId: c, expectedVersion },
+      id(),
+    );
+    const rejection = expect(publishing).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    await blocker.query("COMMIT");
+    await withdrawal;
+    await rejection;
+  } finally {
+    await blocker.query("ROLLBACK");
+    blocker.release();
+    await Promise.allSettled([withdrawal, ...(publishing ? [publishing] : [])]);
+  }
+  expect(await svc.public()).toEqual(before);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT id FROM confsys.competition_publications WHERE competition_id=$1",
+        [c],
+      )
+    ).rowCount,
+  ).toBe(0);
+});
+it("a queued judge score rechecks qualification after an author withdrawal commits", async () => {
+  const c = await competition(),
+    p = await paper(),
+    e = await approve(await enroll(c, p)),
+    a = await assignment(e.id),
+    blocker = await f.admin.connect();
+  await blocker.query("BEGIN");
+  await blocker.query("SELECT id FROM confsys.users WHERE id=$1 FOR UPDATE", [
+    author.id,
+  ]);
+  const withdrawal = submissions.transition(
+    author.raw,
+    { id: p.id, expectedVersion: p.version, action: "withdraw" },
+    id(),
+  );
+  let scoring: Promise<unknown> | undefined;
+  try {
+    await expect
+      .poll(async () =>
+        Number(
+          (
+            await f.app.query(
+              "SELECT count(*) FROM pg_stat_activity WHERE usename='confsys_app' AND wait_event_type='Lock'",
+            )
+          ).rows[0].count,
+        ),
+      )
+      .toBeGreaterThan(0);
+    scoring = submit(a);
+    const rejection = expect(scoring).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await blocker.query("COMMIT");
+    await withdrawal;
+    await rejection;
+  } finally {
+    await blocker.query("ROLLBACK");
+    blocker.release();
+    await Promise.allSettled([withdrawal, ...(scoring ? [scoring] : [])]);
+  }
+  expect(
+    (
+      await f.admin.query(
+        "SELECT id FROM confsys.competition_scores WHERE assignment_id=$1",
+        [a.id],
+      )
+    ).rowCount,
+  ).toBe(0);
+});

@@ -58,6 +58,8 @@ export function registerCompetitionRoutes(
             return service.entry(raw, input, req.id);
           case "competitionAssign":
             return service.assign(raw, input, req.id);
+          case "competitionRemind":
+            return service.remind(raw, input, req.id);
           case "competitionCancel":
             return service.cancel(raw, input, req.id);
           case "competitionConflict":

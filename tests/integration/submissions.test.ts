@@ -103,6 +103,8 @@ beforeEach(async () => {
   await configure({
     requireRegistration: false,
     requireAttachment: false,
+    mode: "abstract",
+    presenterMustBeSubmitter: false,
     opensAt: new Date(Date.now() - 60000).toISOString(),
     closesAt: new Date(Date.now() + 3600000).toISOString(),
   });
@@ -689,4 +691,76 @@ it("only a current published revision request extends a closed window and it is 
       decisionId,
     ]);
   }
+});
+
+it("configurable presenter identity and full-paper/slide PDF rules are enforced on server", async () => {
+  await configure({ presenterMustBeSubmitter: true });
+  const foreign = await draft();
+  await expect(
+    service.transition(
+      author.raw,
+      { id: foreign.id, expectedVersion: foreign.version, action: "submit" },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  const ownDoc = {
+    ...doc(),
+    authors: [
+      {
+        name: "Verified presenter",
+        email: author.email,
+        affiliation: "Synthetic institute",
+      },
+    ],
+  };
+  const own = await draft(ownDoc);
+  await service.transition(
+    author.raw,
+    { id: own.id, expectedVersion: own.version, action: "submit" },
+    rid(),
+  );
+  const image = rid(),
+    pdf = rid();
+  for (const [fileId, mime] of [
+    [image, "image/png"],
+    [pdf, "application/pdf"],
+  ])
+    await f.admin.query(
+      "INSERT INTO confsys.file_assets(id,owner_id,purpose,original_name,media_type,size_bytes,sha256,storage_key,status) VALUES($1,$2,'manuscript','Synthetic fixture',$3,12,$4,$5,'ready')",
+      [fileId, author.id, mime, "0".repeat(64), rid()],
+    );
+  await expect(draft({ ...ownDoc, slidesFileId: image })).rejects.toMatchObject(
+    { code: "INVALID_REQUEST" },
+  );
+  await configure({ mode: "full_paper" });
+  const incomplete = await draft({ ...ownDoc, attachmentIds: [image] });
+  await expect(
+    service.transition(
+      author.raw,
+      {
+        id: incomplete.id,
+        expectedVersion: incomplete.version,
+        action: "submit",
+      },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+  const complete = await draft({
+    ...ownDoc,
+    attachmentIds: [pdf],
+    slidesFileId: null,
+  });
+  await service.transition(
+    author.raw,
+    { id: complete.id, expectedVersion: complete.version, action: "submit" },
+    rid(),
+  );
+  expect(
+    (
+      await f.admin.query(
+        "SELECT config_snapshot FROM confsys.submission_revisions WHERE submission_id=$1",
+        [complete.id],
+      )
+    ).rows[0].config_snapshot,
+  ).toMatchObject({ mode: "full_paper", presenterMustBeSubmitter: true });
 });

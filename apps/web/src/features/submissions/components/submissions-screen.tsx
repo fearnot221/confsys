@@ -44,7 +44,8 @@ type Props = {
 };
 export function SubmissionsScreen(p: Props) {
   const [confirm, setConfirm] = useState<"submit" | "withdraw" | null>(null),
-    [historical, setHistorical] = useState<string | null>(null);
+    [historical, setHistorical] = useState<string | null>(null),
+    [preview, setPreview] = useState(false);
   const current = p.current,
     d = current?.document,
     config = p.settings;
@@ -130,6 +131,34 @@ export function SubmissionsScreen(p: Props) {
                 }
               />
               至少一份稿件附件
+            </label>
+            <label htmlFor="submission-mode">投稿模式</label>
+            <select
+              id="submission-mode"
+              value={config.mode}
+              onChange={(e) =>
+                p.onSettings({
+                  ...config,
+                  mode:
+                    e.target.value === "full_paper" ? "full_paper" : "abstract",
+                })
+              }
+            >
+              <option value="abstract">摘要</option>
+              <option value="full_paper">完整論文（至少一份 PDF）</option>
+            </select>
+            <label>
+              <input
+                type="checkbox"
+                checked={config.presenterMustBeSubmitter}
+                onChange={(e) =>
+                  p.onSettings({
+                    ...config,
+                    presenterMustBeSubmitter: e.target.checked,
+                  })
+                }
+              />
+              報告者 Email 須為投稿帳號的已驗證信箱
             </label>
             {config.tracks.map((track, i) => (
               <fieldset key={i}>
@@ -330,6 +359,8 @@ export function SubmissionsScreen(p: Props) {
         <section>
           <h2>{p.admin ? "檢視稿件" : "編輯稿件"}</h2>
           <p>
+            已提交修訂 ID：{current.currentRevisionId ?? "無"}
+            <br />
             稿件編號：{current.number || "尚未儲存"} · 識別碼：{current.id} ·{" "}
             {p.dirty ? "有未儲存內容" : "已載入伺服器版本"}
           </p>
@@ -632,6 +663,30 @@ export function SubmissionsScreen(p: Props) {
               </button>
               <button onClick={() => setConfirm(null)}>取消</button>
             </div>
+          )}
+          <button onClick={() => setPreview(!preview)} aria-expanded={preview}>
+            預覽目前草稿
+          </button>
+          {preview && (
+            <article aria-label="草稿預覽">
+              <p>預覽尚未正式提交的目前內容；不代表已錄取。</p>
+              <h3>{d.title || "未命名稿件"}</h3>
+              <p style={{ whiteSpace: "pre-wrap" }}>{d.abstract}</p>
+              <p>關鍵字：{d.keywords.join("、") || "無"}</p>
+              <ol>
+                {d.authors.map((author, i) => (
+                  <li key={i}>
+                    {author.name} — {author.affiliation}
+                    {i === d.presenterIndex ? "（報告者）" : ""}
+                    {i === d.correspondingAuthorIndex ? "（通訊作者）" : ""}
+                  </li>
+                ))}
+              </ol>
+              <p>
+                稿件附件 {d.attachmentIds.length} 件；簡報{" "}
+                {d.slidesFileId ? "已附" : "無"}。
+              </p>
+            </article>
           )}
           <h3>不可變提交歷史</h3>
           <button
