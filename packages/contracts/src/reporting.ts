@@ -76,6 +76,7 @@ export const reportingStats = z.strictObject({
   ),
 });
 export const exportInput = z.strictObject({
+  purpose: z.string().trim().min(3).max(300),
   kind: z.enum(["registrations", "submissions", "emails"]),
   offset: z.coerce.number().int().min(0).max(1000000).default(0),
 });
