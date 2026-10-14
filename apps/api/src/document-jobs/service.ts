@@ -11,6 +11,7 @@ import { AuthError } from "../auth/errors.js";
 import { effectivePublicSite } from "../site/branding.js";
 import * as onsite from "../onsite/repository.js";
 import * as repo from "./repository.js";
+import { current as currentBadgeTemplate } from "../badge-template/repository.js";
 export function createDocumentJobsService(pool: Pool, config: ApiConfig) {
   const authorized = <T>(
     raw: string | undefined,
@@ -76,6 +77,7 @@ export function createDocumentJobsService(pool: Pool, config: ApiConfig) {
         }
         const snapshot = badgeJobSnapshot.parse({
             conferenceName: brand.conferenceName,
+            template: await currentBadgeTemplate(db),
             badges,
           }),
           id = randomUUID(),

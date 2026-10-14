@@ -1,7 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import type { ReceiptSnapshot } from "@confsys/contracts";
+import type {
+  BadgeTemplateDocument,
+  ReceiptSnapshot,
+} from "@confsys/contracts";
 
 let fontBytes: Promise<Buffer> | undefined;
 function font() {
@@ -129,13 +132,20 @@ export type BadgeSnapshot = {
   registrationNumber: string;
   qrPng?: Uint8Array;
 };
-export async function renderBadges(badges: readonly BadgeSnapshot[]) {
+export async function renderBadges(
+  badges: readonly BadgeSnapshot[],
+  template?: BadgeTemplateDocument | null,
+) {
   if (!badges.length || badges.length > 200)
     throw new Error("Badge batch must contain 1 to 200 records");
   const document = await PDFDocument.create();
   document.registerFontkit(fontkit);
   const typeface = await document.embedFont(await font(), { subset: false });
   for (const badge of badges) {
+    if (template) {
+      await drawConfiguredBadge(document, typeface, badge, template);
+      continue;
+    }
     const page = document.addPage([283.46, 425.2]);
     page.drawRectangle({
       x: 0,
@@ -181,6 +191,85 @@ export async function renderBadges(badges: readonly BadgeSnapshot[]) {
     });
   }
   return Buffer.from(await document.save());
+}
+
+async function drawConfiguredBadge(
+  document: PDFDocument,
+  typeface: PDFFont,
+  badge: BadgeSnapshot,
+  template: BadgeTemplateDocument,
+) {
+  const compact = template.size === "credit_card";
+  const width = ((compact ? 86 : 100) * 72) / 25.4;
+  const height = ((compact ? 54 : 140) * 72) / 25.4;
+  const page = document.addPage([width, height]);
+  const margin = compact ? 10 : 20;
+  const qrSize = compact ? 72 : 105;
+  const qrX = compact ? width - margin - qrSize : (width - qrSize) / 2;
+  const qrY = compact ? 38 : 54;
+  const textWidth = compact ? width - 3 * margin - qrSize : width - 2 * margin;
+  const minimumY = compact ? 40 : qrY + qrSize + 12;
+  let y = height - margin - (compact ? 10 : 14);
+  const text = (
+    value: string,
+    initial: number,
+    maxLines: number,
+    availableWidth = textWidth,
+    minimum = minimumY,
+  ) => {
+    let fitted: { lines: string[]; size: number } | undefined;
+    for (let size = initial; size >= 7; size--) {
+      const lines = wrap(value, typeface, size, availableWidth);
+      if (
+        lines.length <= maxLines &&
+        y - (lines.length - 1) * size * 1.35 >= minimum
+      ) {
+        fitted = { lines, size };
+        break;
+      }
+    }
+    if (!fitted)
+      throw new Error(
+        "Badge text exceeds printable area; shorten display text",
+      );
+    for (const line of fitted.lines) {
+      const x =
+        template.layout === "centered"
+          ? margin +
+            (availableWidth - typeface.widthOfTextAtSize(line, fitted.size)) / 2
+          : margin;
+      page.drawText(line, {
+        x,
+        y,
+        font: typeface,
+        size: fitted.size,
+        color: rgb(0.1, 0.15, 0.18),
+      });
+      y -= fitted.size * 1.35;
+    }
+    y -= compact ? 4 : 10;
+  };
+  text(badge.conferenceName, compact ? 10 : 14, 2, width - 2 * margin);
+  text(badge.name, compact ? 17 : 27, compact ? 2 : 3);
+  if (template.showAffiliation && badge.affiliation)
+    text(badge.affiliation, compact ? 9 : 12, compact ? 2 : 3);
+  if (badge.qrPng) {
+    const qr = await document.embedPng(badge.qrPng);
+    page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+  }
+  y = compact ? 26 : 35;
+  if (template.showRegistrationNumber)
+    text(
+      `報名編號 ${badge.registrationNumber}`,
+      compact ? 8 : 9,
+      1,
+      width - 2 * margin,
+      10,
+    );
+  if (template.footer) {
+    y = compact ? 14 : 20;
+    text(template.footer, compact ? 7 : 8, 1, width - 2 * margin, 8);
+  }
 }
 
 export { passToken, passHash } from "./token.js";

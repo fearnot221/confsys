@@ -90,7 +90,7 @@ export async function processDocumentJob(
         }),
       });
     }
-    const pdf = await render(badges);
+    const pdf = await render(badges, snapshot.template?.document);
     if (pdf.byteLength > 16_777_216) throw new Error("OUTPUT_TOO_LARGE");
     await withIdentityTransaction(pool, async (db) => {
       const allowed = await authorized(db, id);

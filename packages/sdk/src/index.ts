@@ -63,3 +63,4 @@ export { createReportingClient } from './reporting.js';
 export { createCompetitionClient } from "./competitions.js";
 export { createNotificationBatchClient } from './notification-batches.js';
 export { createExportJobsClient } from './export-jobs.js';
+export { createBadgeTemplateClient } from "./badge-template.js";
