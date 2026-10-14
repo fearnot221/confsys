@@ -1,0 +1,14 @@
+import {useEffect,useRef,useState} from 'react';
+import {useQuery,useQueryClient} from '@tanstack/react-query';
+import {createAuthClient,createFinanceClient,ApiError} from '@confsys/sdk';
+import {financeDashboard,type financeEndpoints} from '@confsys/contracts';
+const api=createFinanceClient(),auth=createAuthClient();
+export function useFinance(admin=false){
+ const queries=useQueryClient(),[expired,setExpired]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[offset,setOffset]=useState(0),abort=useRef<AbortController|null>(null),epoch=useRef(0);
+ const account=useQuery({queryKey:['private','account'],queryFn:({signal})=>auth.me(signal),retry:false,enabled:!expired});const permissions=account.data?.user.permissions??[];const allowed=!expired&&!account.error&&!!account.data&&(!admin||permissions.includes('finance.read'));
+ const data=useQuery({queryKey:['private','finance',admin,offset],queryFn:async({signal})=>financeDashboard.parse(await api.call('financeDashboard',{scope:admin?'admin':'own',offset},signal)),enabled:allowed,retry:false});
+ const expire=()=>{epoch.current++;abort.current?.abort();setExpired(true);setMessage('');setBusy(false);setError('登入失效或權限不足。');void queries.cancelQueries({queryKey:['private']}).then(()=>queries.removeQueries({queryKey:['private']}));};
+ useEffect(()=>{if([account.error,data.error].some(e=>e instanceof ApiError&&['SESSION_EXPIRED','FORBIDDEN'].includes(e.code)))expire();},[account.error,data.error]);useEffect(()=>()=>{epoch.current++;abort.current?.abort();},[]);
+ const perform=async(work:(s:AbortSignal)=>Promise<unknown>)=>{abort.current?.abort();const c=new AbortController();abort.current=c;const ticket=++epoch.current;setBusy(true);setError('');setMessage('');try{await work(c.signal);if(!c.signal.aborted&&ticket===epoch.current){await data.refetch();setMessage('已記錄成功；請確認最新列表。');}}catch(e){if(!c.signal.aborted&&ticket===epoch.current){if(e instanceof ApiError&&['SESSION_EXPIRED','FORBIDDEN'].includes(e.code))expire();else setError(e instanceof ApiError?`${e.code}：操作未完成，請核對資料、上限與近期密碼驗證。`:'資料或服務錯誤，請重試。');}}finally{if(ticket===epoch.current)setBusy(false);}};
+ return {admin,allowed,expired,busy,error:error||(data.error?'讀取失敗，請重試。':''),message,loading:account.isPending||(allowed&&data.isPending),data:allowed?data.data??null:null,offset,canReconcile:allowed&&permissions.includes('finance.reconcile'),canRefund:allowed&&permissions.includes('finance.refund'),onPage:setOffset,onRetry:()=>{void queries.invalidateQueries({queryKey:['private']});},onAction:(operation:Exclude<keyof typeof financeEndpoints,'financeDashboard'>,input:unknown)=>void perform(signal=>api.call(operation,input,signal)),onReauthenticate:(password:string)=>void perform(signal=>auth.mutate('reauthenticate',{password},signal))};
+}

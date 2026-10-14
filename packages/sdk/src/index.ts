@@ -48,3 +48,5 @@ export { createRegistrationClient } from './registration.js';
 export { createFilesClient } from "./files.js";
 
 export { createSubmissionClient } from "./submissions.js";
+
+export {createFinanceClient} from "./finance.js";

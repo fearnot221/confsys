@@ -14,7 +14,7 @@ export async function saveConfiguration(db:PoolClient,document:RegistrationConfi
 }
 export async function context(db:PoolClient,actor:string,admin:boolean) {await db.query("SELECT set_config('app.actor_id',$1,true),set_config('app.registration_admin',$2,true)",[actor,String(admin)]);}
 const projection=`SELECT r.id,r.number::text,r.state,r.ticket_name AS "ticketName",r.badge_name AS "badgeName",r.affiliation,r.config_version AS "configVersion",r.answers,r.created_at,
- CASE WHEN o.id IS NULL THEN null ELSE jsonb_build_object('id',o.id,'state',o.state,'amount',o.amount::text,'currency',o.currency,'paid','0','refunded','0') END AS "order"
+ CASE WHEN o.id IS NULL THEN null ELSE jsonb_build_object('id',o.id,'state',o.state,'amount',o.amount::text,'currency',o.currency,'paid',coalesce((SELECT sum(a.amount) FROM confsys.payment_allocations a WHERE a.order_id=o.id),0)::text,'refunded',coalesce((SELECT sum(f.amount) FROM confsys.refunds f JOIN confsys.payment_allocations a ON a.id=f.allocation_id WHERE a.order_id=o.id),0)::text) END AS "order"
  FROM confsys.registrations r LEFT JOIN confsys.orders o ON o.registration_id=r.id`;
 function dto(row:Record<string,unknown>) {const {created_at,...rest}=row;return registrationSchema.parse({...rest,createdAt:(created_at as Date).toISOString()});}
 export async function detail(db:Db,id:string) {const row=(await db.query(`${projection} WHERE r.id=$1`,[id])).rows[0];if(!row) throw new AuthError('NOT_FOUND');return dto(row);}

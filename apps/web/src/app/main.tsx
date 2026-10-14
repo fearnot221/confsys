@@ -1,3 +1,5 @@
+import {useFinance} from "../features/finance/hooks/use-finance.js";
+import {FinanceScreen} from "../features/finance/components/finance-screen.js";
 import {useSubmissions} from "../features/submissions/hooks/use-submissions.js";
 import {SubmissionsScreen} from "../features/submissions/components/submissions-screen.js";
 import { useFiles } from "../features/files/hooks/use-files.js";
@@ -114,6 +116,7 @@ function SiteApp() {
   return <SiteScreen {...state} />;
 }
 function SubmissionsApp({admin=false}:{admin?:boolean}) {return <SubmissionsScreen {...useSubmissions(admin)}/>;}
+function FinanceApp({admin=false}:{admin?:boolean}) {return <FinanceScreen {...useFinance(admin)}/>;}
 function FilesApp() {return <FilesScreen {...useFiles()}/>;}
 function RegistrationApp({admin=false}:{admin?:boolean}) { return <RegistrationScreen {...useRegistration(admin)} />; }
 function InvitationsApp() { return <InvitationsScreen {...useInvitations()} />; }
@@ -123,7 +126,7 @@ createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        {window.location.pathname === "/submissions" ? <SubmissionsApp /> : window.location.pathname === "/admin/submissions" ? <SubmissionsApp admin /> : window.location.pathname === "/account/files" ? <FilesApp /> : window.location.pathname === "/registration" ? <RegistrationApp /> : window.location.pathname === "/admin/registration" ? <RegistrationApp admin /> : window.location.pathname === "/admin/invitations" ? <InvitationsApp /> : window.location.pathname === "/auth/invitation" ? <InvitationAcceptApp /> : window.location.pathname === "/admin/site" ? (
+        {window.location.pathname === "/finance" ? <FinanceApp /> : window.location.pathname === "/admin/finance" ? <FinanceApp admin /> : window.location.pathname === "/submissions" ? <SubmissionsApp /> : window.location.pathname === "/admin/submissions" ? <SubmissionsApp admin /> : window.location.pathname === "/account/files" ? <FilesApp /> : window.location.pathname === "/registration" ? <RegistrationApp /> : window.location.pathname === "/admin/registration" ? <RegistrationApp admin /> : window.location.pathname === "/admin/invitations" ? <InvitationsApp /> : window.location.pathname === "/auth/invitation" ? <InvitationAcceptApp /> : window.location.pathname === "/admin/site" ? (
           <SiteApp />
         ) : window.location.pathname.startsWith("/access/") ? (
           <AccessApp />

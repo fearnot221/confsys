@@ -1,3 +1,5 @@
+import {enqueueBusinessNotification} from "@confsys/notifications";
+import {effectivePublicSite} from "../site/branding.js";
 import type { Pool } from "pg";
 import type { ApiConfig } from "@confsys/config";
 import { createHash } from "node:crypto";
@@ -35,7 +37,7 @@ export function createRegistrationService(pool:Pool,config:ApiConfig) {
  const cfg=await repo.configuration(db);if(cfg.version!==data.configVersion || !cfg.document) throw new AuthError('CONFLICT');
  const {ticket,amount}=registrationPrice(cfg.document,data.ticketId,new Date());validateAnswers(cfg.document,data.answers);
  const full=await repo.capacity(db,ticket.id)>=ticket.capacity;if(full&&!ticket.waitlist)throw new AuthError('CONFLICT');
- const result=await repo.create(db,actor,data,cfg.document,ticket,amount,full?'waitlisted':'confirmed',hash);await audit(db,actor,'registration.created',result.id,requestId);return result;
+ const result=await repo.create(db,actor,data,cfg.document,ticket,amount,full?'waitlisted':'confirmed',hash);await audit(db,actor,'registration.created',result.id,requestId);await enqueueBusinessNotification(db,{CONFERENCE_NAME:(await effectivePublicSite(db,config.CONFERENCE_NAME)).conferenceName},{userId:actor,eventKey:`registration:${result.id}`,subject:'報名紀錄已建立 / Registration recorded',text:`請登入查看報名、候補與付款狀態。\n${config.PUBLIC_APP_ORIGIN}/registration`,requestId});return result;
  });},
  cancel:async(raw:string|undefined,input:unknown,requestId:string)=>{const data=registrationCancel.parse(input);return authorized(raw,null,async(db,actor)=>{
  await repo.lockConfiguration(db);const current=await repo.detail(db,data.id);if(current.state==='cancelled')return current;

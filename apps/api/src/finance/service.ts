@@ -1,0 +1,28 @@
+import type {Pool,PoolClient} from 'pg';
+import type {ApiConfig} from '@confsys/config';
+import {createHash} from 'node:crypto';
+import {withIdentityTransaction} from '@confsys/db';
+import {enqueueBusinessNotification} from '@confsys/notifications';
+import {paymentInput,paymentVerifyInput,paymentAllocateInput,refundInput,payerGrantInput,type Permission} from '@confsys/contracts';
+import {sessionActor} from '../auth/session.js';
+import {AuthError} from '../auth/errors.js';
+import {lockAccessShared,rolesFor,recordAccess} from '../access/repository.js';
+import {requirePermission,permissionsFor,assertRecentPassword} from '../access/policy.js';
+import {lockConfiguration} from '../registration/repository.js';
+import {assertReadyOwnedFiles,referenceFiles} from '../files/repository.js';
+import {effectivePublicSite} from '../site/branding.js';
+import * as repo from './repository.js';
+const hash=(input:unknown)=>createHash('sha256').update(JSON.stringify(input)).digest('hex');
+export function createFinanceService(pool:Pool,config:ApiConfig){
+ const authorized=<T>(raw:string|undefined,permission:Permission|null,work:(db:PoolClient,actor:string)=>Promise<T>)=>withIdentityTransaction(pool,async db=>{await lockAccessShared(db);const actor=await sessionActor(db,raw,config,new Date(),true),roles=await rolesFor(db,actor.id);if(permission){requirePermission(roles,permission);if(permission!=='finance.read')assertRecentPassword(actor.passwordVerifiedAt,new Date());}await repo.financeContext(db,actor.id,permissionsFor(roles).includes('finance.read'));await lockConfiguration(db);try{return await work(db,actor.id);}catch(e){if(e&&typeof e==='object'&&'code' in e&&['23505','23514'].includes(String(e.code)))throw new AuthError('CONFLICT');throw e;}});
+ const audit=(db:PoolClient,actor:string,event:string,id:string,reason:string,requestId:string)=>recordAccess(db,{action:event,targetId:actor,actorId:actor,source:'session',reason,before:'',after:id,requestId});
+ const notify=async(db:PoolClient,userId:string,eventKey:string,requestId:string)=>enqueueBusinessNotification(db,{CONFERENCE_NAME:(await effectivePublicSite(db,config.CONFERENCE_NAME)).conferenceName},{userId,eventKey,requestId,subject:'財務紀錄更新 / Finance record updated',text:`請登入本研討會查看付款紀錄。\n${config.PUBLIC_APP_ORIGIN}/finance`});
+ return {
+ dashboard:(raw:string|undefined,scope:'own'|'admin',offset:number)=>authorized(raw,scope==='admin'?'finance.read':null,(db,actor)=>repo.dashboard(db,actor,scope==='admin',offset)),
+ submit:async(raw:string|undefined,input:unknown,requestId:string)=>{const d=paymentInput.parse(input),fingerprint=hash(d);return authorized(raw,null,async(db,actor)=>{const old=await repo.priorPayment(db,actor,d.idempotencyKey);if(old){if(old.request_hash!==fingerprint)throw new AuthError('CONFLICT');return repo.payment(db,old.id);}if(d.evidenceFileId)await assertReadyOwnedFiles(db,actor,[d.evidenceFileId],'payment_evidence');const result=await repo.createPayment(db,actor,d,fingerprint);if(d.evidenceFileId)await referenceFiles(db,[d.evidenceFileId],'payment_evidence',result.id);await audit(db,actor,'payment.submitted',result.id,'Participant submitted transfer reference',requestId);return result;});},
+ verify:async(raw:string|undefined,input:unknown,requestId:string)=>{const d=paymentVerifyInput.parse(input);return authorized(raw,'finance.reconcile',async(db,actor)=>{const current=await repo.payment(db,d.id),state=d.action==='verify'?'verified':'rejected';if(current.state===state)return current;if(current.state!=='submitted')throw new AuthError('CONFLICT');const result=await repo.verify(db,d.id,actor,state);await audit(db,actor,`payment.${state}`,d.id,d.reason,requestId);return result;});},
+ allocate:async(raw:string|undefined,input:unknown,requestId:string)=>{const d=paymentAllocateInput.parse(input),fingerprint=hash(d);return authorized(raw,'finance.reconcile',async(db,actor)=>{const old=await repo.allocationReplay(db,d.idempotencyKey);if(old){if(old.request_hash!==fingerprint)throw new AuthError('CONFLICT');return {id:old.id,changed:false};}if(!await repo.canAllocate(db,d.paymentId,d.orderId))throw new AuthError('FORBIDDEN');const id=await repo.allocate(db,actor,d,fingerprint);await audit(db,actor,'payment.allocated',id,d.reason,requestId);await notify(db,await repo.orderOwner(db,d.orderId),`allocation:${id}`,requestId);return {id,changed:true};});},
+ refund:async(raw:string|undefined,input:unknown,requestId:string)=>{const d=refundInput.parse(input),fingerprint=hash(d);return authorized(raw,'finance.refund',async(db,actor)=>{const old=await repo.refundReplay(db,d.idempotencyKey);if(old){if(old.request_hash!==fingerprint)throw new AuthError('CONFLICT');return {id:old.id,changed:false};}const id=await repo.refund(db,actor,d,fingerprint);await audit(db,actor,'payment.refund_recorded',id,d.reason,requestId);return {id,changed:true};});},
+ payer:async(raw:string|undefined,input:unknown,requestId:string)=>{const d=payerGrantInput.parse(input);return authorized(raw,null,async(db,actor)=>{if(await repo.orderOwner(db,d.orderId)!==actor)throw new AuthError('NOT_FOUND');const changed=await repo.grantPayer(db,actor,d.orderId,d.payerEmail,d.remove);if(changed)await audit(db,actor,d.remove?'order.payer_revoked':'order.payer_granted',d.orderId,'Owner explicitly assigned group payer',requestId);return {id:d.orderId,changed};});},
+ };
+}

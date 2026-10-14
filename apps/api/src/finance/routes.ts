@@ -1,0 +1,8 @@
+import type {FastifyInstance} from 'fastify';
+import type {ApiConfig} from '@confsys/config';
+import {financeEndpoints,financePage} from '@confsys/contracts';
+import {z} from 'zod';
+import {AuthError} from '../auth/errors.js';
+import {cookiePolicy} from '../auth/routes.js';
+import type {createFinanceService} from './service.js';
+export function registerFinanceRoutes(app:FastifyInstance,config:ApiConfig,service:ReturnType<typeof createFinanceService>){for(const [name,spec]of Object.entries(financeEndpoints))app.route({method:spec.method.toUpperCase() as 'GET'|'POST',url:spec.path,onRequest:spec.method==='post'?[async req=>{if(req.headers.origin!==config.PUBLIC_APP_ORIGIN)throw new AuthError('CSRF_REJECTED');},app.csrfProtection]:[],schema:{response:{200:z.toJSONSchema(spec.output)}},handler:async req=>{const raw=req.cookies[cookiePolicy(config).name];if(!spec.input.safeParse(spec.method==='post'?req.body:req.query).success)throw new AuthError('INVALID_REQUEST');switch(name){case 'financeDashboard':{const q=financePage.parse(req.query);return service.dashboard(raw,q.scope,q.offset);}case 'paymentSubmit':return service.submit(raw,req.body,req.id);case 'paymentVerify':return service.verify(raw,req.body,req.id);case 'paymentAllocate':return service.allocate(raw,req.body,req.id);case 'paymentRefund':return service.refund(raw,req.body,req.id);case 'payerGrant':return service.payer(raw,req.body,req.id);}}});}

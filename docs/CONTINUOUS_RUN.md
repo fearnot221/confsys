@@ -27,3 +27,11 @@ Reviewed existing session/access locks, site service/repository, runtime role/tr
 
 ## Checkpoint
 Latest implementation commit: baseline 9642a62. Next: install frozen dependencies, create unique synthetic environment, implement private storage vertical slice.
+
+## 06:22 checkpoint
+- Latest main checkpoint 9b0e1e2 (central schemas/contracts WIP); app migrations 0001–0013 applied. New finance/review services still integrating; Phase2/3/4 are not complete.
+- Main integrates invitation e626270, file125d4e8/media44dc43d, review download d68ff55, invitation/business tests1b3eb00, submissions0a68989, registration7da1479, wiringbe540ad. Subagent commits are cherry-picked only into this new branch.
+- Tests: main registration unit4 pass; main typecheck passed through latest source; invitation agent real PG/Redis/Mailpit7 pass; business mail2 pass; submission agent scoped integration8 pass after fixing test observer/finally cleanup, unit6 pass. These are scoped evidence, not a full suite result.
+- Failures: outbox ON CONFLICT lacked SELECT(event_key), fixed forward0011 + real rerun. Historical migration test expected5 and must be updated to exact current filenames/checksums. Original admin permission-count assertion updated to explicit list but next role additions need review. Clamd OOM at1536MiB and3GiB on existing Docker VM total3.828GiB; all old containers remain untouched. Files remain quarantined. Do not claim scanner integration pass; pursuing safe local option while independent work continues.
+- Coordination slots: no agents running shared PG tests now; main can test registration. Files agent building real receipt PDFs+immutable metadata, review agent Phase4, submission agent revision requests+Phase5. Main finance+registration+integration.
+- Dependencies verified/pinned sharp0.35.5, pdf-lib1.17.1; @pdf-lib/fontkit1.1.1 installing. New ClamAV image pinned sha256:9a96980b265cb2b51a20bdcca921dc80aa55ed0e56cdfb076198ee27a9171927 (daemon1.5.4). Local file env and per-project private/clamav volumes added; no production provider.
