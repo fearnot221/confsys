@@ -1,10 +1,11 @@
 import { afterEach, expect, it } from "vitest";
-import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { chmod, mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:net";
 import {
+  assertPrivateStorage,
   digest,
   prepareContent,
   privatePath,
@@ -128,4 +129,16 @@ it("PDF parser rejects malformed and zero-page documents while accepting a bound
   await expect(
     prepareContent(active.toString("base64"), "manuscript"),
   ).rejects.toMatchObject({ code: "UNSUPPORTED_MEDIA_TYPE" });
+});
+
+it("startup refuses shared or symlink private roots instead of accepting an unusable deployment",async()=>{
+ const root=await mkdtemp(join(tmpdir(),'confsys-storage-startup-'));dirs.push(root);
+ await expect(assertPrivateStorage(root)).resolves.toBeUndefined();
+ await chmod(root,0o755);
+ await expect(assertPrivateStorage(root)).rejects.toThrow('owner-only');
+ await chmod(root,0o700);
+ const alias=join(root,'alias');await symlink(root,alias);
+ await expect(assertPrivateStorage(alias)).rejects.toThrow('owner-only');
+ await expect(assertPrivateStorage('relative')).rejects.toThrow('absolute');
+ const nested=join(root,'new');await expect(assertPrivateStorage(nested)).resolves.toBeUndefined();
 });

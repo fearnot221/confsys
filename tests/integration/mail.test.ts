@@ -49,7 +49,8 @@ it("durable pending survives queue delay and real independent BullMQ consumer se
   await dispatchNotifications(f.worker, queue);
   const job = await queue.getJob(notification.id);
   expect(job?.data).toEqual({ eventId: notification.id });
-  const worker = startMailWorker(f.worker, f.workerConfig, name);
+  const captureIdentity={...f.workerConfig,MAIL_FROM_ADDRESS:"event@conference.invalid",MAIL_REPLY_TO_ADDRESS:"help@conference.invalid",MAIL_ENVELOPE_FROM:"returns@conference.invalid"};
+  const worker = startMailWorker(f.worker, captureIdentity, name);
   try {
     await worker.worker.waitUntilReady();
     expect((await status(notification.id)).status).toBe("pending");
@@ -65,6 +66,9 @@ it("durable pending survives queue delay and real independent BullMQ consumer se
       `${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/api/v1/message/${result.messages[0].ID}`,
     ).then((r) => r.json());
     expect(detail.Text).toContain(notification.link);
+    expect(detail.From.Address).toBe(captureIdentity.MAIL_FROM_ADDRESS);
+    expect(detail.ReplyTo).toEqual([{Name:"",Address:captureIdentity.MAIL_REPLY_TO_ADDRESS}]);
+    expect(detail.ReturnPath).toBe(captureIdentity.MAIL_ENVELOPE_FROM);
     expect(
       (
         await f.admin.query(

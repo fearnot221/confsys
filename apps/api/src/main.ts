@@ -1,3 +1,4 @@
+import {assertPrivateStorage} from "./files/storage.js";
 import { createBadgeTemplateService } from "./badge-template/service.js";
 import { registerBadgeTemplateRoutes } from "./badge-template/routes.js";
 import { createExportJobsService } from "./export-jobs/service.js";
@@ -47,6 +48,7 @@ import { createSiteService } from "./site/service.js";
 import { registerSiteRoutes } from "./site/routes.js";
 import { registerPublicRoutes } from "./site/public-routes.js";
 const config = loadApiConfig();
+await assertPrivateStorage(config.PRIVATE_STORAGE_ROOT);
 const pool = createPool(config.DATABASE_URL);
 const redis = new Redis(config.REDIS_URL, {
   maxRetriesPerRequest: 1,

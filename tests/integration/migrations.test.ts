@@ -65,7 +65,7 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
         const snapshot = async () =>
           (
             await pool.query(
-              `SELECT jsonb_build_object('users',(SELECT jsonb_agg(u) FROM confsys.users u),'tokens',(SELECT jsonb_agg(t) FROM confsys.auth_tokens t),'outbox',(SELECT jsonb_agg(to_jsonb(n)-'conference_name'-'invitation_id'-'event_key'-'message_subject'-'message_text'-'batch_id') FROM confsys.notifications n),'secrets',(SELECT jsonb_agg(s) FROM confsys.notification_secrets s),'audit',(SELECT jsonb_agg(jsonb_build_object('id',a.id,'event',a.event,'user_id',a.user_id,'request_id',a.request_id,'created_at',a.created_at)) FROM confsys.auth_audit a)) AS data`,
+              `SELECT jsonb_build_object('users',(SELECT jsonb_agg(u) FROM confsys.users u),'tokens',(SELECT jsonb_agg(t) FROM confsys.auth_tokens t),'outbox',(SELECT jsonb_agg(to_jsonb(n)-'conference_name'-'invitation_id'-'event_key'-'message_subject'-'message_text'-'batch_id'-'available_at') FROM confsys.notifications n),'secrets',(SELECT jsonb_agg(s) FROM confsys.notification_secrets s),'audit',(SELECT jsonb_agg(jsonb_build_object('id',a.id,'event',a.event,'user_id',a.user_id,'request_id',a.request_id,'created_at',a.created_at)) FROM confsys.auth_audit a)) AS data`,
             )
           ).rows[0].data;
         if (kind === "phase11b" || (kind === "phase12" || kind === "phase13")) {
@@ -182,6 +182,7 @@ it("migrates a blank isolated database and upgrades isolated Phase 0 / 520607e d
           ).toBe(kind === "phase11b" || (kind === "phase12" || kind === "phase13") ? "1" : "0");
           if (kind === "phase11b" || (kind === "phase12" || kind === "phase13")) {
             expect(await snapshot()).toEqual(saved);
+            expect((await pool.query("SELECT available_at=created_at AS preserved FROM confsys.notifications WHERE id=$1",[notificationId])).rows[0]).toEqual({preserved:true});
             expect((await pool.query("SELECT invitation_id,event_key,message_subject,message_text,batch_id FROM confsys.notifications WHERE id=$1",[notificationId])).rows[0]).toEqual({invitation_id:null,event_key:null,message_subject:null,message_text:null,batch_id:null});
             if(kind === "phase13") expect((await pool.query("SELECT jsonb_build_object('state',(SELECT to_jsonb(s) FROM confsys.site_state s),'history',(SELECT jsonb_agg(p) FROM confsys.site_publications p)) AS data")).rows[0].data).toEqual(siteSaved);
             if ((kind === "phase12" || kind === "phase13"))

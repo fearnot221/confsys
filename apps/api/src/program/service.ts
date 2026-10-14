@@ -53,7 +53,7 @@ export function createProgramService(pool: Pool, config: ApiConfig) {
       );
       if (publish) assertRecentPassword(actor.passwordVerifiedAt, new Date());
       await db.query(
-        "SELECT set_config('app.actor_id',$1,true),set_config('app.submissions_admin','true',true),set_config('app.program_publish',$2,true)",
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.submissions_admin','true',true),set_config('app.program_publish',$2,true),set_config('app.program_manage','true',true)",
         [actor.id, String(publish)],
       );
       return work(db, actor.id);

@@ -1,4 +1,4 @@
-import { mkdir, open, unlink } from "node:fs/promises";
+import { access, lstat, mkdir, open, unlink } from "node:fs/promises";
 import { constants } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { createHash } from "node:crypto";
@@ -20,6 +20,14 @@ export function privatePath(root: string, key: string) {
   )
     throw new Error("Invalid private storage configuration/key");
   return join(resolve(root), key);
+}
+export async function assertPrivateStorage(root:string){
+  if(!isAbsolute(root))throw new Error("Private storage must be absolute");
+  await mkdir(root,{recursive:true,mode:0o700});
+  const metadata=await lstat(root);
+  if(!metadata.isDirectory() || metadata.isSymbolicLink() || (metadata.mode & 0o077)!==0)
+    throw new Error("Private storage must be an owner-only directory");
+  await access(root,constants.R_OK|constants.W_OK|constants.X_OK);
 }
 export async function writePrivate(root: string, key: string, bytes: Buffer) {
   await mkdir(root, { recursive: true, mode: 0o700 });

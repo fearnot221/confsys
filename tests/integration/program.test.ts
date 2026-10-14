@@ -1,3 +1,4 @@
+import {withIdentityTransaction} from "@confsys/db";
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
 import { authFixture, password } from "../helpers/auth.js";
@@ -298,10 +299,10 @@ it("concurrent edits cannot overwrite; direct app-role exclusion blocks overlapp
     reason: { code: "CONFLICT" },
   });
   await expect(
-    f.app.query(
-      "INSERT INTO confsys.program_room_bookings(id,room_id,kind,starts_at,ends_at) VALUES($1,$2,'blocked',$3,$4)",
-      [id(), r.id, first.startsAt, first.endsAt],
-    ),
+    withIdentityTransaction(f.app,async db=>{
+      await db.query("SELECT set_config('app.program_manage','true',true)");
+      return db.query("INSERT INTO confsys.program_room_bookings(id,room_id,kind,starts_at,ends_at) VALUES($1,$2,'blocked',$3,$4)",[id(),r.id,first.startsAt,first.endsAt]);
+    }),
   ).rejects.toMatchObject({ code: "23P01" });
 });
 it("public snapshots omit private emails and remain unchanged after draft edits; repeat publish is stable", async () => {
@@ -579,4 +580,20 @@ it("personal schedule HTTP requires authentication and keeps the filtered respon
     await server.close();
     await redis.quit();
   }
+});
+
+it("draft RLS denies context-free reads/writes while active public projection remains available",async()=>{
+ const draftRoom=await room();
+ for(const table of ['program_rooms','program_sessions','program_slots','program_room_bookings','program_person_bookings'])
+  expect((await f.app.query(`SELECT * FROM confsys.${table}`)).rows).toEqual([]);
+ expect((await f.app.query("UPDATE confsys.program_rooms SET name='forged' WHERE id=$1",[draftRoom.id])).rowCount).toBe(0);
+ expect((await f.app.query("DELETE FROM confsys.program_rooms WHERE id=$1",[draftRoom.id])).rowCount).toBe(0);
+ await expect(f.app.query("INSERT INTO confsys.program_rooms(id,name,venue,buffer_minutes) VALUES($1,'forged','forged',0)",[id()])).rejects.toMatchObject({code:'42501'});
+ expect((await f.app.query("UPDATE confsys.program_state SET version=version+1")).rowCount).toBe(0);
+ const hidden=id();
+ await f.admin.query("INSERT INTO confsys.program_publications(id,source_version,document,published_by) VALUES($1,2147483647,'[]',$2)",[hidden,leader.id]);
+ expect((await f.app.query("SELECT id FROM confsys.program_publications WHERE id=$1",[hidden])).rows).toEqual([]);
+ const visible=await program.public();
+ expect((await f.app.query("SELECT id FROM confsys.program_publications")).rows.map(r=>r.id)).toEqual(visible.publicationId?[visible.publicationId]:[]);
+ expect((await program.draft(leader.raw)).rooms.some(r=>r.id===draftRoom.id)).toBe(true);
 });
