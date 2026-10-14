@@ -193,6 +193,7 @@ export function ProgramScreen(p: Props) {
                 <label>
                   不可排會場
                   <select
+                    aria-label="不可排會場"
                     value={block.roomId}
                     onChange={(e) =>
                       setBlock({ ...block, roomId: e.target.value })
@@ -268,6 +269,7 @@ export function ProgramScreen(p: Props) {
                 <label>
                   Session 會場
                   <select
+                    aria-label="Session 會場"
                     value={session.roomId}
                     onChange={(e) =>
                       setSession({ ...session, roomId: e.target.value })
@@ -368,6 +370,7 @@ export function ProgramScreen(p: Props) {
                 <label>
                   所屬 Session
                   <select
+                    aria-label="所屬 Session"
                     value={slot.sessionId}
                     onChange={(e) =>
                       setSlot({ ...slot, sessionId: e.target.value })
@@ -383,6 +386,7 @@ export function ProgramScreen(p: Props) {
                 <label>
                   發表類型
                   <select
+                    aria-label="發表類型"
                     value={slot.kind}
                     onChange={(e) =>
                       setSlot({
