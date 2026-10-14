@@ -42,3 +42,5 @@ export function createClient(baseUrl = "", transport: typeof fetch = fetch) {
   };
 }
 export { createAuthClient } from "./auth.js";
+
+export { createInvitationClient } from "./invitations.js";

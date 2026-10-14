@@ -14,6 +14,8 @@ type Notification = {
   attempts: number;
   claim_id: string;
   conference_name: string | null;
+  message_subject: string | null;
+  message_text: string | null;
 };
 type Mail = { to: string; subject: string; text: string; messageId: string };
 export type SendMail = (mail: Mail) => Promise<{ messageId: string }>;
@@ -100,16 +102,21 @@ export async function processNotification(
     await finish(pool, row, "cancelled", "INELIGIBLE");
     return;
   }
-  let link: string;
+  let link = "";
   try {
-    if (!entry.ciphertext || entry.key_version !== config.MAIL_KEY_VERSION)
-      throw new Error("Key unavailable");
-    link = unseal(
-      entry.ciphertext,
-      id,
-      config.MAIL_ENCRYPTION_KEY,
-      config.MAIL_KEY_VERSION,
-    );
+    if (row.kind === "business") {
+      if (!row.message_subject || !row.message_text)
+        throw new Error("Message unavailable");
+    } else {
+      if (!entry.ciphertext || entry.key_version !== config.MAIL_KEY_VERSION)
+        throw new Error("Key unavailable");
+      link = unseal(
+        entry.ciphertext,
+        id,
+        config.MAIL_ENCRYPTION_KEY,
+        config.MAIL_KEY_VERSION,
+      );
+    }
   } catch {
     await finish(pool, row, "failed", "SECRET_UNAVAILABLE");
     return;
@@ -128,13 +135,20 @@ export async function processNotification(
     receipt = await send({
       to: entry.email,
       subject:
-        `[${row.conference_name ?? config.CONFERENCE_NAME}] ` +
-        (row.kind === "verify"
-          ? "確認信箱 / Verify email"
-          : row.kind === "reset"
-            ? "重設密碼 / Reset password"
-            : "密碼已變更 / Password changed"),
-      text: `${row.conference_name ?? config.CONFERENCE_NAME} — 本研討會帳號 / Conference account\n\n${row.kind === "password_changed" ? "Your password changed. Existing sessions were revoked." : "Open the link and explicitly submit the form. Opening it does not change your account."}\n\n${link}\n\nRequest: ${row.request_id}`,
+        row.kind === "business"
+          ? `[${row.conference_name ?? config.CONFERENCE_NAME}] ${row.message_subject}`
+          : `[${row.conference_name ?? config.CONFERENCE_NAME}] ` +
+            (row.kind === "verify"
+              ? "確認信箱 / Verify email"
+              : row.kind === "reset"
+                ? "重設密碼 / Reset password"
+                : row.kind === "role_invitation"
+                  ? "本研討會角色邀請 / Conference role invitation"
+                  : "密碼已變更 / Password changed"),
+      text:
+        row.kind === "business"
+          ? `${row.conference_name ?? config.CONFERENCE_NAME}\n\n${row.message_text}\n\nRequest: ${row.request_id}`
+          : `${row.conference_name ?? config.CONFERENCE_NAME} — 本研討會帳號 / Conference account\n\n${row.kind === "password_changed" ? "Your password changed. Existing sessions were revoked." : "Open the link and explicitly submit the form. Opening it does not change your account."}\n\n${link}\n\nRequest: ${row.request_id}`,
       messageId: `<${id}@confsys.invalid>`,
     });
   } catch (error) {
