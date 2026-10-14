@@ -26,7 +26,7 @@ Phase 0's test-only `phase0_rls` schema, `withTenant` helper and tenant input un
 | Old check | Current protection and executable evidence |
 |---|---|
 | Two orgs / three conferences SELECT/INSERT/UPDATE/DELETE and scope-reassignment denial | Independent PostgreSQL databases and runtime credentials; `test:instances` proves A-only account absent in B, foreign Session/token rejected, resets preserve B state, and independent DB/network/volumes |
-| Missing/partial tenant context; invalid tenant IDs | No tenant parameter/resolver or DB selector exists. `contract/instance` checks canonical Host; auth regressions deny absent/invalid sessions/CSRF. Local account permissions are now verified by integration/access; future business resource permissions remain unimplemented |
+| Missing/partial tenant context; invalid tenant IDs | No tenant parameter/resolver or DB selector exists. `contract/instance` checks canonical Host; auth regressions deny absent/invalid sessions/CSRF. Local account permissions are now verified by integration/access; private files, submissions, finance, review, program, onsite and export resource permissions are verified in their domain integration suites |
 | Non-owner/non-superuser/non-bypass; SET ROLE/ALTER/TRUNCATE denied | `integration/database.test.ts` exercises both actual roles; `integration/auth.test.ts` retains sensitive-table/column-grant denials |
 | Commit/rollback/pool reuse/concurrent callbacks | `integration/database.test.ts` uses one-connection pools and real transactions; auth integration retains atomic outbox rollback and concurrency/race cases |
 | Composite tenant FK rejects cross-tenant parent | No production tenant FK existed. Ordinary FK/check/unique constraints remain enforced in database/auth integration; separate-instance DBs cannot reference another instance's rows |
@@ -38,7 +38,7 @@ Redis integration uses a unique queue in local test DB 1; it executes a real wor
 
 ## Coverage limits
 
-Account/login/CSRF/session/outbox and capture-mail regression exists. Bounded Phase 1.3 site settings/publication is implemented; no payment/submission/upload/private-download or external provider is implemented. Network-error E2E deliberately aborts requests while healthy flows use real services. TLS, full browser/WCAG, load/penetration, backup restore and cloud CI are unverified. Historical counts in PHASE0/PHASE1_1 delivery files are not current evidence; see PHASE1_3_DELIVERY.
+Account/login/CSRF/session/outbox and capture-mail regression exists. Phase1–6 core flows now include real private uploads, registration/manual payment, submissions/reviews/program, onsite and document/export workers. External payment/mail delivery providers remain unconfigured. Network-error E2E deliberately aborts requests while healthy flows use real services. TLS, full browser/WCAG, load/penetration, backup restore and cloud CI are unverified. Historical counts in PHASE0/PHASE1_1 delivery files are not current evidence; see CONTINUOUS_RUN for current run evidence.
 
 ## Test and documentation maintenance
 

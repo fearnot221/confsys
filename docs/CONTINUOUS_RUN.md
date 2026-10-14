@@ -6,27 +6,32 @@ Baseline: 9642a62, verified descendant of d4c0788. Branch: codex/phase-1-4-to-6-
 ## Plan and ownership
 Main: private files/media then registration/finance and dependent workflow; owns migrations/contracts/permissions/lockfile. Separate invitation agent owns invitation-specific source/tests, proposing central changes for main review. Existing stack and access fences retained. No provider credentials required: local storage and Mailpit only.
 
-## Scope status
-| Requirement | Status | Evidence / next step |
+## Current scope status — 07:28 Taipei
+
+All rows describe implemented source plus actual verification; none imply production readiness or completion of every SPEC requirement.
+
+| Requirement | Current state | Evidence / remaining work |
 |---|---|---|
-| Phase 1 private uploads/downloads, media publication | In progress | Implement local private storage, actual validation, resource authorization |
-| Phase 1 local invitations | In progress | Separate invitation branch, main integration pending |
-| Phase 2 registration/forms/rates/capacity/orders/reconciliation/group allocation/refunds/meals/receipts | Not implemented | After file foundation |
-| Phase 3 submission/authors/presenter/tracks/draft/revisions/attachments/withdrawal/workbenches | Not implemented | After file foundation |
-| Phase 4 assignments/conflicts/forms/comments/revisions/decisions/publication/notifications | Not implemented | After submissions |
-| Phase 5 schedule/conflicts/public versions/competition/scores/awards | Not implemented | After decisions |
-| Phase 6 check-in/redemption/badges/PDF/notifications/stats/email/export/receipts/site/author preview | Not implemented | After business foundation |
+| Phase1 files/media/local invitations | Implemented, integration verified | Real scanner clean/EICAR/limit rejection, private authorization, invitation acceptance; isolated deployment rehearsal next |
+| Phase2 registration/forms/prices/capacity/finance/activities/receipts | Core implemented and browser verified; repairs integrating | Conditional forms/history, group allocation/refunds, immutable receipt PDF; safety migration0036 scoped4/4, receipt reissue and allocation pagination in progress |
+| Phase3 submissions/authors/revisions/files/withdrawal | Implemented and verified | Author/admin browser flow, postacceptance deadline pinned; dedicated presenter-change approval beyond verified revision workflow remains to assess |
+| Phase4 reviews/conflicts/screening/decisions/publication | Implemented and verified | Blind review browser flow, track permissions, conflict gates, screening/reminders; bulk result operations remain to assess |
+| Phase5 program/competitions/awards | Implemented and verified | Program publication and competition browser flows, immutable snapshots/personal schedule; deadline gates scoped tests passed |
+| Phase6 onsite/PDF/notifications/stats/exports/site/preview | Core implemented; further capabilities in progress | Onsite real QR/PDF, real background CSV, notification retries, controlled preview, optional site pages; template scheduling/audience and reissue pending integration |
 
 ## Environment and verification
-Use pinned Node 24.21.0/pnpm 10.34.7 from /tmp/confsys-tools/node_modules/.bin. New project planned: confsys-continuous-20261015; ports Web 56179, API 54000, worker 54001, PG 56442, Redis 57392, Mailpit 59032, SMTP 52032; unique hostname continuous-20261015.localhost. Existing Docker containers inspected read-only, never changed.
 
-Actual checks: git ancestry d4c0788→9642a62 pass, clean original status, worktree inventory. Managed worktree tool failed ref validation; explicit local git worktree add succeeded. No application tests yet; historical delivery counts are not fresh evidence.
+Pinned Node24.21.0/pnpm10.34.7 at /tmp/confsys-tools/node_modules/.bin. Own project confsys-continuous-20261015; Web56179 API54000 worker54001 PG56442 Redis57392 Mailpit59032 SMTP52032; hostname continuous-20261015.localhost. Native scanner127.0.0.1:53310; own failed container scanner stopped, old containers untouched. Synthetic test database confsys_test and Redis/1 only.
+
+Latest full `pnpm check` at07:13–15 passed lint/typecheck/unit48/integration128/contract15/build/E2E19. Later `pnpm build && pnpm test:e2e` passed22 browser flows at07:24; current scoped unit55, contract16 and lint/typecheck passed. Newer feature changes require the next full regression; do not combine these into a claimed full current-suite pass.
+
+Latest central checkpoint:6ce0928 (07:27); branch history retains all independent feature commits. New migrations0033–0036 committed;0037 receipt reissue proposed, not yet feature-complete. Agent branches are independent; only reviewed commits are cherry-picked into this integration tree.
 
 ## Focused baseline review
 Reviewed existing session/access locks, site service/repository, runtime role/transaction helper, contract registry, scripts/migrations and CI. Preserve post-lock actor checks and explicit permissions. No evidenced inherited blocker so far. Existing MFA/TLS/retention/backup/provider debt remains in ROADMAP. New file safety must fail closed and cannot claim a stub scanner is verified.
 
-## Checkpoint
-Latest implementation commit: baseline 9642a62. Next: install frozen dependencies, create unique synthetic environment, implement private storage vertical slice.
+## Historical checkpoints
+The entries below are chronological evidence; the current state is summarized above.
 
 ## 06:22 checkpoint
 - Latest main checkpoint 9b0e1e2 (central schemas/contracts WIP); app migrations 0001–0013 applied. New finance/review services still integrating; Phase2/3/4 are not complete.

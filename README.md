@@ -56,7 +56,7 @@ pnpm infra:down
 | 投稿與版本、私有附件 | `/submissions`、`/admin/submissions`、`/account/files` |
 | 初檢、審查、決議與已發布結果 | `/reviews`（依角色／分組／指派顯示） |
 | 議程與競賽 | `/program`、`/admin/program`、`/competitions`、`/admin/competitions`、`/judging`、`/competition-awards` |
-| 報到、核銷、名牌 | 報名紀錄內的 QR 入口、`/admin/onsite`、`/admin/documents` |
+| 報到、核銷、名牌 | 報名紀錄內的 QR 入口、`/admin/onsite`、`/admin/documents`、`/admin/badge-template` |
 | 收據 | `/receipts`、`/admin/receipts` |
 | 通知、統計、受控作者預覽、完整匯出 | `/notifications`、`/admin/notifications`、`/admin/exports` |
 
@@ -70,11 +70,11 @@ pnpm check
 pnpm test:instances
 ```
 
-`check` 依序執行 lint、typecheck、unit、真實 PostgreSQL／Redis／Mailpit integration、contract、clean build、Playwright E2E。E2E 不重用已佔用服務，host E2E 與選定容器 Web 不能同時使用相同 port。雙實例入口使用 55180–55181、55440–55441、56390–56391、58030–58031、51030–51031，需先確認空閒。精確步驟、測試替換對照與安全清理見 [TESTING](docs/TESTING.md)；本輪證據見 [PHASE1_3_DELIVERY](docs/PHASE1_3_DELIVERY.md)。
+`check` 依序執行 lint、typecheck、unit、真實 PostgreSQL／Redis／Mailpit integration、contract、clean build、Playwright E2E。E2E 不重用已佔用服務，host E2E 與選定容器 Web 不能同時使用相同 port。雙實例演練會預留空閒 loopback ports 並產生唯一 project／hostname／volume；可使用 `pnpm test:instances --native-scanner --scanner-port 53310` 搭配已啟動的本地掃描器。精確步驟、測試替換對照與安全清理見 [TESTING](docs/TESTING.md)；本輪證據見 [CONTINUOUS_RUN](docs/CONTINUOUS_RUN.md)。
 
 API/DB/policy/contracts/SDK/hooks/CI 由 Codex 負責；後期 Claude 改善純呈現元件、layout、tokens 與 accessibility。`presentation → hooks → SDK → contracts/API`，元件不讀 token、不 fetch、不定義業務授權。[ARCHITECTURE](docs/ARCHITECTURE.md)、[PERMISSIONS](docs/PERMISSIONS.md)、[UI_CONTRACT](docs/UI_CONTRACT.md)、[DATA_CONTRACT](docs/DATA_CONTRACT.md) 提供入口與責任邊界。
 
-只使用合成資料與 Mailpit；沒有 production seeds／真信／金流。完成本輪本地提交後停止，不 push、merge 或開始下一階段。
+只使用合成資料與 Mailpit；沒有 production seeds／真信／金流。本輪依 AGENTS.md 的期限例外連續推進至 Phase6；不 push、merge 或操作 production。
 
 ## 本研討會管理員初始化與管理
 
