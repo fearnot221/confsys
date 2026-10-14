@@ -30,3 +30,17 @@ Artifacts live in ignored `.restore-drills/<run>/`: private `backup/database.dum
 No worker, mail service, API or external provider starts in the restored project. Source containers/volumes/data are never modified. On failure, inspect the new private evidence and retain the new resources for diagnosis; do not reuse/overwrite a partial target or delete original volumes. Cleanup is an operator action scoped to the exact recorded restore project and private volume, never a global prune.
 
 After the source is ready to resume, the operator uses its original exact env/project and existing native scanner override if applicable. Do not start the restored clone as a second active instance or a new conference.
+
+## Non-empty recovery samples
+
+For the next fresh two-instance run, add `--restore-fixtures` to the existing command, for example:
+
+```sh
+pnpm test:instances --image confsys:<new-tested-tag> --native-scanner --scanner-port 53310 --restore-fixtures
+```
+
+The flag retains every original isolation check. After those pass, the harness verifies this run's `.instances/<run>/a.env`, exact A project, origin, immutable API/worker image and running state. Through actual authenticated APIs it configures a free synthetic ticket, registers the existing synthetic administrator, creates a private QR pass, requests a badge PDF and a CSV export, waits for the real worker, downloads the results and compares their hashes with persisted bytes. It then stops **only this A worker** and calls the real registration-mail API for a fresh synthetic address, leaving a pending encrypted notification. SQL is read-only verification; it does not manufacture generated files or queue payloads.
+
+The evidence includes nonzero sample counts, artifact IDs, byte lengths and hashes; it never includes QR tokens, passwords or encrypted envelopes. A failed enrichment records `restoreFixtures.status=failed` while preserving the completed original isolation checks, and the harness exits unsuccessfully. It does not turn an enrichment failure into a successful restore claim. `--prepare-only` only records the selected option and never creates samples.
+
+After successful enrichment, A's API remains active and its worker remains intentionally stopped. Before running `backup-drill.ts`, stop A's API with that exact run's environment file, leaving PostgreSQL available. Do not restart A's worker until the backup is captured, or the pending encrypted-mail sample may be consumed. The backup script independently verifies stopped writers. Use the same run's A source for this drill; B is unchanged and does not receive enrichment samples. This remains recovery of the same conference and keys, never bootstrap of a different conference.
