@@ -17,11 +17,11 @@ import {activityEndpoints} from './activities.js';
 export * from './activities.js';
 export * from "./documents.js";
 export * from "./program.js";
-import {receiptEndpoints} from "./documents.js";
-import {programEndpoints} from "./program.js";
-import {reviewEndpoints} from "./reviews.js";
+import { receiptEndpoints } from "./documents.js";
+import { programEndpoints } from "./program.js";
+import { reviewEndpoints } from "./reviews.js";
 export * from "./reviews.js";
-import {financeEndpoints} from "./finance.js";
+import { financeEndpoints } from "./finance.js";
 export * from "./finance.js";
 import { invitationEndpoints } from "./invitations.js";
 export * from "./invitations.js";
@@ -371,11 +371,87 @@ function sitePaths() {
   return paths;
 }
 
-function modulePaths(endpoints:Record<string,{method:string;path:string;input?:z.ZodType;output:z.ZodType}>) {
- const paths:Record<string,Record<string,unknown>>={};
- for(const [operationId,spec] of Object.entries(endpoints)) {
-  const path=spec.path.replace(/:([a-zA-Z]+)/g,'{$1}');
-  paths[path]={...paths[path],[spec.method]:{operationId,parameters:[...(spec.path.includes(':id')?[{in:'path',name:'id',required:true,schema:{type:'string',format:'uuid'}}]:[]),...(spec.method==='post'?[{in:'header',name:'Origin',required:true,schema:{type:'string'}},{in:'header',name:'x-csrf-token',required:true,schema:{type:'string'}}]:spec.input?[{in:'query',name:'query',style:'form',explode:true,schema:z.toJSONSchema(spec.input)}]:[])],...(spec.method==='post'&&spec.input?{requestBody:{required:true,content:{'application/json':{schema:z.toJSONSchema(spec.input)}}}}:{}),responses:Object.fromEntries([200,400,401,403,404,409,413,415,500,503].map(code=>[code,{description:code===200?'Authorized projection':'Safe error',content:{'application/json':{schema:z.toJSONSchema(code===200?spec.output:errorSchema)}}}]))}};
- }
- return paths;
+function modulePaths(
+  endpoints: Record<
+    string,
+    { method: string; path: string; input?: z.ZodType; output: z.ZodType }
+  >,
+) {
+  const paths: Record<string, Record<string, unknown>> = {};
+  for (const [operationId, spec] of Object.entries(endpoints)) {
+    const path = spec.path.replace(/:([a-zA-Z]+)/g, "{$1}");
+    paths[path] = {
+      ...paths[path],
+      [spec.method]: {
+        operationId,
+        parameters: [
+          ...(spec.path.includes(":id")
+            ? [
+                {
+                  in: "path",
+                  name: "id",
+                  required: true,
+                  schema: { type: "string", format: "uuid" },
+                },
+              ]
+            : []),
+          ...(spec.method === "post"
+            ? [
+                {
+                  in: "header",
+                  name: "Origin",
+                  required: true,
+                  schema: { type: "string" },
+                },
+                {
+                  in: "header",
+                  name: "x-csrf-token",
+                  required: true,
+                  schema: { type: "string" },
+                },
+              ]
+            : spec.input
+              ? [
+                  {
+                    in: "query",
+                    name: "query",
+                    style: "form",
+                    explode: true,
+                    schema: z.toJSONSchema(spec.input),
+                  },
+                ]
+              : []),
+        ],
+        ...(spec.method === "post" && spec.input
+          ? {
+              requestBody: {
+                required: true,
+                content: {
+                  "application/json": { schema: z.toJSONSchema(spec.input) },
+                },
+              },
+            }
+          : {}),
+        responses: Object.fromEntries(
+          [200, 400, 401, 403, 404, 409, 413, 415, 500, 503].map((code) => [
+            code,
+            {
+              description:
+                code === 200 ? "Authorized projection" : "Safe error",
+              content: {
+                "application/json": {
+                  schema: z.toJSONSchema(
+                    code === 200 ? spec.output : errorSchema,
+                  ),
+                },
+              },
+            },
+          ]),
+        ),
+      },
+    };
+  }
+  return paths;
 }
+
+export * from "./presenter-change.js";

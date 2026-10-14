@@ -188,6 +188,11 @@ export function createSubmissionService(
         } else {
           assertSubmissionVersion(before, data.expectedVersion);
           if (before.state === "withdrawn") throw new AuthError("CONFLICT");
+          await repo.assertPresenterUnchanged(
+            db,
+            before.currentRevisionId,
+            data.document,
+          );
           await dependencies.assertFiles(db, actor, data.document);
           await repo.save(db, data.id, data.document);
         }
@@ -226,6 +231,11 @@ export function createSubmissionService(
           const request = await dependencies.activeRevisionRequest(db, before);
           if (!request) assertSubmissionWindow(settings, new Date());
           assertSubmissionDocument(before.document, settings, true);
+          await repo.assertPresenterUnchanged(
+            db,
+            before.currentRevisionId,
+            before.document,
+          );
           if (
             settings.requireRegistration &&
             !(await dependencies.isRegistered(db, actor))

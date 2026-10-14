@@ -205,3 +205,23 @@ export async function registrationRequirement(
             : "overdue",
   };
 }
+
+// Submitted presenter identity changes require explicit target consent and administrative approval.
+export async function assertPresenterUnchanged(
+  db: PoolClient,
+  revisionId: string | null,
+  document: SubmissionDocument,
+) {
+  if (!revisionId) return;
+  const row = (
+    await db.query<{ document: unknown }>(
+      "SELECT document FROM confsys.submission_revisions WHERE id=$1",
+      [revisionId],
+    )
+  ).rows[0];
+  if (!row) throw new AuthError("CONFLICT");
+  const source = submissionDocumentSchema.parse(row.document);
+  const email = (d: SubmissionDocument) =>
+    d.authors[d.presenterIndex]?.email.trim().toLowerCase();
+  if (email(source) !== email(document)) throw new AuthError("CONFLICT");
+}
