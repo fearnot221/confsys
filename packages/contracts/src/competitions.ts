@@ -42,6 +42,8 @@ export const competitionEntrySchema = z.strictObject({
   ]),
   title: z.string(),
   presenterName: z.string(),
+  predecessorId: id.nullable(),
+  replacementReason: z.string(),
   reason: z.string(),
 });
 export const competitionScoreSchema = z.strictObject({
@@ -173,6 +175,12 @@ export const competitionEndpoints = {
     path: "/api/competitions/enroll",
     input: z.strictObject({ competitionId: id, revisionId: id }),
     output: competitionCatalogSchema,
+  },
+  competitionReplaceEntry: {
+    method: "post",
+    path: "/api/competitions/replace-entry",
+    input: z.strictObject({ predecessorId: id, expectedVersion: version, revisionId: id, reason }),
+    output: competitionEntrySchema,
   },
   competitionEntry: {
     method: "post",
