@@ -16,3 +16,5 @@ Maintainability: same finance permission, lock, balance helper, snapshot schema,
 Forward terminal regression authored after0039 proposal: actual nonprivileged app-role finance context attempts old VOID→issued after its successor is also VOID, expecting23514. Pending shared PG slot for this additional assertion.
 
 Actual reissue PDF `output/pdf/receipt-reissued.pdf` rendered with Poppler and visually inspected; Traditional Chinese source-number line is visible and `pdftotext` confirms `重開來源（已作廢）：R-00000001`.
+
+Follow-up terminal regression was executed at 07:31:24 Taipei: `PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/documents.test.ts` — 4/4 PASS (1.96s), including app-role rejection of restoring a void source after its replacement is void.

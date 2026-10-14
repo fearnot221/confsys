@@ -180,7 +180,7 @@ export function createPresenterChangesService(
     respond(raw: string | undefined, input: unknown, requestId: string) {
       const data = presenterChangeRespond.parse(input);
       return transaction(raw, false, async (db, actor) => {
-        const row = await repo.one(db, data.id, true);
+        const row = await repo.one(db, data.id);
         if (row.targetUserId !== actor) throw new AuthError("NOT_FOUND");
         const state = data.action === "accept" ? "accepted" : "declined";
         if (
@@ -203,7 +203,7 @@ export function createPresenterChangesService(
     cancel(raw: string | undefined, input: unknown, requestId: string) {
       const data = presenterChangeCancel.parse(input);
       return transaction(raw, false, async (db, actor) => {
-        const row = await repo.one(db, data.id, true);
+        const row = await repo.one(db, data.id);
         if (row.requesterId !== actor) throw new AuthError("NOT_FOUND");
         if (
           row.state === "cancelled" &&
@@ -228,10 +228,11 @@ export function createPresenterChangesService(
     decide(raw: string | undefined, input: unknown, requestId: string) {
       const data = presenterChangeDecide.parse(input);
       return transaction(raw, true, async (db, actor) => {
+        // Exclusive access fence serializes domain writes; FOR UPDATE would apply owner-only UPDATE RLS to admin reads.
         const settings = await submissions.configuration(db, "share"),
           initial = await repo.one(db, data.id),
-          submission = await submissions.one(db, initial.submissionId, true),
-          row = await repo.one(db, data.id, true);
+          submission = await submissions.one(db, initial.submissionId),
+          row = await repo.one(db, data.id);
         const state = data.action === "approve" ? "approved" : "rejected";
         if (
           row.state === state &&

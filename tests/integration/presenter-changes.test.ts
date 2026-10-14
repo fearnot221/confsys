@@ -35,6 +35,7 @@ let owner: Awaited<ReturnType<typeof account>>,
   stranger: Awaited<ReturnType<typeof account>>,
   baseline: Record<string, unknown>;
 const documents: string[] = [];
+const fileId = rid();
 const doc = (): SubmissionDocument => ({
   title: "Synthetic presenter replacement",
   abstract: "Synthetic abstract",
@@ -49,7 +50,7 @@ const doc = (): SubmissionDocument => ({
   presenterIndex: 0,
   presentationPreference: "either",
   competition: true,
-  attachmentIds: [],
+  attachmentIds: [fileId],
   slidesFileId: null,
   videoUrl: "",
 });
@@ -101,6 +102,10 @@ beforeAll(async () => {
   owner = await account();
   target = await account();
   stranger = await account();
+  await f.admin.query(
+    "INSERT INTO confsys.file_assets(id,owner_id,purpose,original_name,media_type,size_bytes,sha256,storage_key,status) VALUES($1,$2,'manuscript','synthetic.pdf','application/pdf',100,$3,$4,'ready')",
+    [fileId, owner.id, "0".repeat(64), rid()],
+  );
   admin = await account();
   await bootstrapAdministrator(
     f.admin,
@@ -169,6 +174,7 @@ afterAll(async () => {
       "UPDATE confsys.submission_config SET version=$1,document=$2",
       [baseline.version, baseline.document],
     );
+  await f.admin.query("DELETE FROM confsys.file_assets WHERE id=$1", [fileId]);
   await f.cleanup();
 });
 it("requires target consent, scopes private projection and preserves immutable revision with administrative audit", async () => {
@@ -233,9 +239,17 @@ it("requires target consent, scopes private projection and preserves immutable r
   expect(detail.submission.document.presenterIndex).toBe(1);
   expect(detail.revisions).toHaveLength(2);
   expect(detail.revisions[1]?.document.presenterIndex).toBe(0);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT count(*)::int AS count FROM confsys.file_references WHERE file_id=$1 AND resource_type='submission_revision' AND resource_id IN(SELECT id FROM confsys.submission_revisions WHERE submission_id=$2)",
+        [fileId, row.submissionId],
+      )
+    ).rows[0].count,
+  ).toBe(2);
   const audit = (
     await f.admin.query(
-      "SELECT actor_id FROM confsys.auth_audit WHERE event='presenter_change.approved' AND after_value->>'resourceId'=$1",
+      "SELECT actor_id FROM confsys.auth_audit WHERE event='presenter_change.approved' AND after_value::jsonb->>'resourceId'=$1",
       [row.id],
     )
   ).rows;
@@ -379,6 +393,23 @@ it("honors presenter policy and expiration and rolls back revision on notificati
         expectedVersion: row.version,
         action: "accept",
         reason: "Expired response",
+      },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const expiredId = rid();
+  await f.admin.query(
+    "INSERT INTO confsys.presenter_change_requests(id,submission_id,source_revision_id,expected_submission_version,config_version,requester_id,target_user_id,target_author_index,target_email,projection,reason,created_at,expires_at) SELECT $2,submission_id,source_revision_id,expected_submission_version,config_version,requester_id,target_user_id,target_author_index,target_email,projection,reason,clock_timestamp()-interval '2 days',clock_timestamp()-interval '1 day' FROM confsys.presenter_change_requests WHERE id=$1",
+    [row.id, expiredId],
+  );
+  await expect(
+    service.respond(
+      target.raw,
+      {
+        id: expiredId,
+        expectedVersion: 1,
+        action: "accept",
+        reason: "Expired pending consent",
       },
       rid(),
     ),
