@@ -323,6 +323,17 @@ it("abandoned uploads become rejected, private bytes removed and quotas remain d
       )
     ).rows[0].status,
   ).toBe("uploading");
+  await expect(
+    cleanupIncompleteUploads(f.app, privatePath(root, key)),
+  ).rejects.toThrow();
+  expect(
+    (
+      await f.admin.query(
+        "SELECT status FROM confsys.file_assets WHERE id=$1",
+        [id],
+      )
+    ).rows[0].status,
+  ).toBe("uploading");
   expect(await cleanupIncompleteUploads(f.app, root)).toBeGreaterThanOrEqual(1);
   expect(
     (
