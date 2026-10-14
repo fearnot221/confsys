@@ -12,9 +12,9 @@ import {
 import { sessionActor } from "../auth/session.js";
 import { AuthError } from "../auth/errors.js";
 import { lockAccess, rolesFor } from "../access/repository.js";
-import { requirePermission, assertRecentPassword } from "../access/policy.js";
+import { requirePermission, assertRecentPassword, permissionsFor } from "../access/policy.js";
 import * as repo from "./repository.js";
-import { validateMediaReferences, referenceMedia } from "../files/repository.js";
+import { validateMediaReferences, referenceMedia, fileContext } from "../files/repository.js";
 import type { SiteDocument } from "@confsys/contracts";
 const mediaIds = (document: SiteDocument) => [...new Set([document.media?.logoId, document.media?.heroId].filter((id): id is string => !!id))];
 async function validateMediaChange(db: PoolClient, actor: string, before: SiteDocument, after: SiteDocument) {
@@ -35,7 +35,9 @@ export function createSiteService(pool: Pool, config: ApiConfig) {
       // Private reads take the same fence so late authority changes cannot reveal a draft.
       await lockAccess(db);
       const actor = await sessionActor(db, raw, config, new Date(), true);
-      requirePermission(await rolesFor(db, actor.id), permission);
+      const roles=await rolesFor(db,actor.id);
+      requirePermission(roles, permission);
+      await fileContext(db,actor.id,permissionsFor(roles).includes("files.media.manage"));
       if (permission === "site.publish")
         assertRecentPassword(actor.passwordVerifiedAt, new Date());
       return work(db, actor.id);

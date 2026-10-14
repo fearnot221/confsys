@@ -14,8 +14,9 @@ export function createFilesService(pool: Pool, config: ApiConfig, storage: FileS
   const authorized = <T>(raw: string | undefined, work: (db: PoolClient, actor: string, mediaManager: boolean) => Promise<T>) => withIdentityTransaction(pool, async db => {
     await lockAccessShared(db);
     const actor = await sessionActor(db,raw,config,new Date(),true);
-    const roles = await rolesFor(db,actor.id);
-    return work(db,actor.id,permissionsFor(roles).some(p => p === "files.media.manage"));
+    const roles = await rolesFor(db,actor.id),manager=permissionsFor(roles).some(p => p === "files.media.manage");
+    await repo.fileContext(db,actor.id,manager);
+    return work(db,actor.id,manager);
   });
   const owned = async (db: PoolClient,id: string,actor: string,mediaManager: boolean) => {
     const row = await repo.findFile(db,id);
@@ -53,10 +54,10 @@ export function createFilesService(pool: Pool, config: ApiConfig, storage: FileS
       catch(error) {
         // A failed write is never exposed. Cleanup only the generated key for this attempt.
         await removeIncomplete(storage.root,key);
-        await withIdentityTransaction(pool,db=>repo.setStatus(db,id,"rejected"));
+        await withIdentityTransaction(pool,db=>repo.finishTransfer(db,id,key,"rejected"));
         throw error;
       }
-      await withIdentityTransaction(pool,db=>repo.setStatus(db,id,"quarantined"));
+      await withIdentityTransaction(pool,db=>repo.finishTransfer(db,id,key,"quarantined"));
       return finishScan(raw,id,prepared.bytes,requestId);
     },
     async retry(raw: string | undefined,id: string,requestId: string) {
@@ -82,12 +83,14 @@ export function createFilesService(pool: Pool, config: ApiConfig, storage: FileS
     },
     async publicMedia(id: string) {
       const row = await withIdentityTransaction(pool,async db=>{
+        await repo.publicMediaContext(db,id);
         const file=await repo.findFile(db,id);
         if(file.purpose !== "site_media" || file.status !== "ready" || !(await repo.isPublishedMedia(db,id))) throw new AuthError("NOT_FOUND");
         return file;
       });
       const bytes = await readPrivate(storage.root,row.storage_key,row.size_bytes,row.sha256);
       await withIdentityTransaction(pool,async db=>{
+        await repo.publicMediaContext(db,id);
         if(!(await repo.isPublishedMedia(db,id))) throw new AuthError("NOT_FOUND");
       });
       return {bytes,mediaType:row.media_type};

@@ -15,7 +15,7 @@ import { createAuthService } from "../../apps/api/src/auth/service.js";
 import { createAccessService } from "../../apps/api/src/access/service.js";
 import { bootstrapAdministrator } from "../../apps/api/src/access/bootstrap.js";
 import { createFilesService } from "../../apps/api/src/files/service.js";
-import { assertReadyOwnedFiles, referenceMedia } from "../../apps/api/src/files/repository.js";
+import { assertReadyOwnedFiles, referenceMedia, fileContext, finishTransfer } from "../../apps/api/src/files/repository.js";
 import { cleanupIncompleteUploads } from "../../apps/api/src/files/cleanup.js";
 import { scanContent, privatePath } from "../../apps/api/src/files/storage.js";
 import { withIdentityTransaction } from "@confsys/db";
@@ -45,6 +45,11 @@ it("real local ClamAV detects EICAR; unavailable scanner quarantines files, retr
   expect(await scanContent(eicar,{root,...scanner})).toBe("infected");
   const upload=await pending.upload(owner.raw,{purpose:"manuscript",name:"paper.png",content:png},rid());
   expect(upload.status).toBe("quarantined");
+  expect((await f.app.query("SELECT * FROM confsys.file_assets WHERE id=$1",[upload.id])).rowCount).toBe(0);
+  expect((await f.app.query("SELECT * FROM confsys.file_references WHERE file_id=$1",[upload.id])).rowCount).toBe(0);
+  await expect(f.worker.query("SELECT * FROM confsys.file_assets")).rejects.toMatchObject({code:"42501"});
+  await withIdentityTransaction(f.app,async db=>{await fileContext(db,other.id);expect((await db.query("SELECT id FROM confsys.file_assets WHERE id=$1",[upload.id])).rowCount).toBe(0);});
+  await withIdentityTransaction(f.app,async db=>{await fileContext(db,owner.id);expect((await db.query("SELECT id FROM confsys.file_assets WHERE id=$1",[upload.id])).rowCount).toBe(1);});
   await expect(pending.download(owner.raw,upload.id,rid())).rejects.toMatchObject({code:"CONFLICT"});
   await expect(withIdentityTransaction(f.app,db=>assertReadyOwnedFiles(db,owner.id,[upload.id]))).rejects.toMatchObject({code:"CONFLICT"});
   expect((await files.retry(owner.raw,upload.id,rid())).status).toBe("ready");
@@ -60,7 +65,7 @@ it("ordinary accounts cannot upload public media; admin media remains private un
   const media=await files.upload(admin.raw,{purpose:"site_media",name:"hero.png",content:png},rid());expect(media.status).toBe("ready");
   await expect(files.publicMedia(media.id)).rejects.toMatchObject({code:"NOT_FOUND"});
   // A reference to an inactive publication is not public; current pointer is required.
-  await withIdentityTransaction(f.app,db=>referenceMedia(db,[media.id],rid()));
+  await withIdentityTransaction(f.app,async db=>{await fileContext(db,admin.id,true);await referenceMedia(db,[media.id],rid());});
   await expect(files.publicMedia(media.id)).rejects.toMatchObject({code:"NOT_FOUND"});
   const site=createSiteService(f.app,f.config),draft=await site.draft(admin.raw),document=completeSite("Media test");
   document.media={logoId:media.id,heroId:media.id};
@@ -92,6 +97,8 @@ it("abandoned uploads become rejected, private bytes removed and quotas remain d
   const id=rid(),key=rid();
   await f.admin.query("INSERT INTO confsys.file_assets(id,owner_id,purpose,original_name,media_type,size_bytes,sha256,storage_key,status,created_at) VALUES($1,$2,'manuscript','abandoned.pdf','application/pdf',1,$3,$4,'uploading',now()-interval '2 hours')",[id,owner.id,"0".repeat(64),key]);
   await writeFile(privatePath(root,key),Buffer.from("x"));
+  await withIdentityTransaction(f.app,db=>finishTransfer(db,id,rid(),"rejected"));
+  expect((await f.admin.query("SELECT status FROM confsys.file_assets WHERE id=$1",[id])).rows[0].status).toBe("uploading");
   expect(await cleanupIncompleteUploads(f.app,root)).toBeGreaterThanOrEqual(1);
   expect((await f.admin.query("SELECT status FROM confsys.file_assets WHERE id=$1",[id])).rows[0].status).toBe("rejected");
   await expect(files.download(owner.raw,id,rid())).rejects.toMatchObject({code:"CONFLICT"});

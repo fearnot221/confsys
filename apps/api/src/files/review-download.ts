@@ -4,7 +4,7 @@ import { withIdentityTransaction } from "@confsys/db";
 import { lockAccessShared } from "../access/repository.js";
 import { sessionActor } from "../auth/session.js";
 import { AuthError } from "../auth/errors.js";
-import { auditFile, findFile } from "./repository.js";
+import { auditFile, findFile, authorizedFileContext } from "./repository.js";
 import { readPrivate, type FileStorageConfig } from "./storage.js";
 
 export type ReviewFilePolicy = (
@@ -33,6 +33,7 @@ export function createReviewFileDownload(
         await lockAccessShared(db);
         const actor = await sessionActor(db, raw, config, new Date(), true);
         await authorizeReviewFile(db, actor.id, assignmentId, fileId);
+        await authorizedFileContext(db,fileId);
         return work(db, actor.id);
       });
     const file = await authorized(async (db) => {

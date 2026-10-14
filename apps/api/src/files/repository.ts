@@ -28,6 +28,7 @@ export async function auditFile(db: PoolClient, actorId: string, id: string, eve
 }
 export async function assertReadyOwnedFiles(db: PoolClient, actorId: string, ids: readonly string[], purpose: FilePurpose = "manuscript") {
   if (ids.length > 10 || new Set(ids).size !== ids.length) throw new AuthError("INVALID_REQUEST");
+  await db.query("SELECT set_config('app.actor_id',$1,true)",[actorId]);
   for (const id of ids) {
     const file = await findFile(db,id);
     if (file.owner_id !== actorId || file.purpose !== purpose) throw new AuthError("NOT_FOUND");
@@ -50,3 +51,8 @@ export async function referenceMedia(db: PoolClient, ids: readonly string[], pub
 export async function isPublishedMedia(db: PoolClient,id: string) {
   return !!(await db.query("SELECT 1 FROM confsys.file_references r JOIN confsys.site_state s ON r.resource_id=s.active_publication_id WHERE r.file_id=$1 AND r.resource_type='site_publication'",[id])).rowCount;
 }
+
+export async function fileContext(db:PoolClient,actorId:string,mediaManager=false){await db.query("SELECT set_config('app.actor_id',$1,true),set_config('app.files_media_manager',$2,true)",[actorId,String(mediaManager)]);}
+export async function authorizedFileContext(db:PoolClient,id:string){await db.query("SELECT set_config('app.authorized_file_id',$1,true)",[id]);}
+export async function publicMediaContext(db:PoolClient,id:string){await db.query("SELECT set_config('app.public_media_file_id',$1,true)",[id]);}
+export async function finishTransfer(db:PoolClient,id:string,key:string,status:"quarantined"|"rejected") {await db.query("SELECT set_config('app.upload_file_id',$1,true),set_config('app.upload_storage_key',$2,true)",[id,key]);await setStatus(db,id,status);}
