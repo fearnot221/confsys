@@ -137,7 +137,7 @@ test("author applies; administrator qualifies and assigns; judge submits locked 
     [paperId, authorId, document],
   );
   await f.admin.query(
-    "INSERT INTO confsys.submission_revisions(id,submission_id,owner_id,version,document) VALUES($1,$2,$3,1,$4)",
+    "INSERT INTO confsys.submission_revisions(id,submission_id,owner_id,version,document,config_snapshot) SELECT $1,$2,$3,1,$4,document || jsonb_build_object('version',version) FROM confsys.submission_config",
     [revisionId, paperId, authorId, document],
   );
   await f.admin.query(
