@@ -1,0 +1,17 @@
+import {useEffect,useRef,useState} from 'react';
+import {useQuery,useQueryClient} from '@tanstack/react-query';
+import {createAuthClient,createRegistrationClient,ApiError} from '@confsys/sdk';
+import {registrationConfigResult,registrationList,type RegistrationConfig,type RegistrationInput} from '@confsys/contracts';
+const client=createRegistrationClient(),auth=createAuthClient();
+export function useRegistration(admin=false) {
+ const queries=useQueryClient(),[expired,setExpired]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[offset,setOffset]=useState(0),abort=useRef<AbortController|null>(null),epoch=useRef(0);
+ const account=useQuery({queryKey:['private','account'],queryFn:({signal})=>auth.me(signal),retry:false,enabled:!expired});
+ const allowed=!!account.data&&!account.error&&!expired&&(!admin||account.data.user.permissions.includes('registration.manage'));
+ const config=useQuery({queryKey:['public','registration-config'],queryFn:async({signal})=>registrationConfigResult.parse(await client.call('registrationConfig',null,signal)),retry:false});
+ const records=useQuery({queryKey:['private','registration',admin,offset],queryFn:async({signal})=>registrationList.parse(await client.call(admin?'registrationAdmin':'registrationMine',{offset},signal)),enabled:allowed,retry:false});
+ const expire=()=>{epoch.current++;abort.current?.abort();setExpired(true);setMessage('');setBusy(false);setError('登入已失效或權限不足，請重新登入。');void queries.cancelQueries({queryKey:['private']}).then(()=>queries.removeQueries({queryKey:['private']}));};
+ useEffect(()=>{if([account.error,records.error].some(e=>e instanceof ApiError&&['SESSION_EXPIRED','FORBIDDEN'].includes(e.code)))expire();},[account.error,records.error]);
+ useEffect(()=>()=>{epoch.current++;abort.current?.abort();},[]);
+ const perform=async(work:(signal:AbortSignal)=>Promise<void>)=>{abort.current?.abort();const c=new AbortController();abort.current=c;const stamp=++epoch.current;setBusy(true);setError('');setMessage('');try{await work(c.signal);if(!c.signal.aborted&&stamp===epoch.current){setMessage('操作已完成。');await queries.invalidateQueries({queryKey:['private','registration']});await config.refetch();}}catch(e){if(!c.signal.aborted&&stamp===epoch.current){if(e instanceof ApiError&&['SESSION_EXPIRED','FORBIDDEN'].includes(e.code))expire();else setError(e instanceof ApiError?`${e.code}：操作未完成；請檢查期限、版本、名額或重新驗證。`:'操作失敗，請重試。');}}finally{if(stamp===epoch.current)setBusy(false);}};
+ return {admin,allowed,expired,loading:account.isPending||config.isPending||(allowed&&records.isPending),busy,error:error||(config.error||records.error?'載入失敗，請重試。':''),message,config:config.data??null,items:allowed?records.data?.items??[]:[],offset,nextOffset:records.data?.nextOffset??null,canConfigure:allowed&&!!account.data?.user.permissions.includes('registration.configure'),onPage:setOffset,onRetry:()=>{void queries.invalidateQueries();},onRegister:(data:Omit<RegistrationInput,'idempotencyKey'>,key:string)=>void perform(async signal=>{await client.call('registrationCreate',{...data,idempotencyKey:key},signal);}),onCancel:(id:string,reason:string)=>void perform(async signal=>{await client.call('registrationCancel',{id,reason},signal);}),onConfigure:(document:RegistrationConfig)=>void perform(async signal=>{await client.call('registrationConfigure',{expectedVersion:config.data?.version??0,document},signal);}),onReauthenticate:(password:string)=>void perform(async signal=>{await auth.mutate('reauthenticate',{password},signal);})};
+}

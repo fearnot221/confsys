@@ -1,3 +1,9 @@
+import { useRegistration } from "../features/registration/hooks/use-registration.js";
+import { RegistrationScreen } from "../features/registration/components/registration-screen.js";
+import { useInvitations } from "../features/invitations/hooks/use-invitations.js";
+import { useInvitationAcceptance } from "../features/invitations/hooks/use-invitation-acceptance.js";
+import { InvitationsScreen } from "../features/invitations/components/invitations-screen.js";
+import { InvitationAcceptanceScreen } from "../features/invitations/components/invitation-acceptance-screen.js";
 import { useSite } from "../features/site/hooks/use-site.js";
 import { SiteScreen } from "../features/site/components/site-screen.js";
 import { useAccess } from "../features/access/hooks/use-access.js";
@@ -103,12 +109,15 @@ function SiteApp() {
   const state = useSite();
   return <SiteScreen {...state} />;
 }
+function RegistrationApp({admin=false}:{admin?:boolean}) { return <RegistrationScreen {...useRegistration(admin)} />; }
+function InvitationsApp() { return <InvitationsScreen {...useInvitations()} />; }
+function InvitationAcceptApp() { return <InvitationAcceptanceScreen {...useInvitationAcceptance()} />; }
 const queryClient = new QueryClient();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        {window.location.pathname === "/admin/site" ? (
+        {window.location.pathname === "/registration" ? <RegistrationApp /> : window.location.pathname === "/admin/registration" ? <RegistrationApp admin /> : window.location.pathname === "/admin/invitations" ? <InvitationsApp /> : window.location.pathname === "/auth/invitation" ? <InvitationAcceptApp /> : window.location.pathname === "/admin/site" ? (
           <SiteApp />
         ) : window.location.pathname.startsWith("/access/") ? (
           <AccessApp />

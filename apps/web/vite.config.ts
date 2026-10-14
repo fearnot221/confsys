@@ -7,7 +7,7 @@ export default defineConfig({
     port: Number(process.env.WEB_PORT ?? 25173),
     strictPort: true,
     proxy: {
-      "^/(?!auth/(?:login|register|waiting|verify|forgot|reset|account)(?:[?]|$)|access/accounts(?:[?]|$)|admin/site(?:[?]|$)|system/status(?:[?]|$)|src/|@|node_modules/|assets/).*":
+      "^/(?!auth/(?:login|register|waiting|verify|forgot|reset|account|invitation)(?:[?]|$)|access/accounts(?:[?]|$)|admin/(?:site|invitations|registration|submissions)(?:[?]|$)|account/files(?:[?]|$)|registration(?:[?]|$)|submissions(?:[?]|$)|system/status(?:[?]|$)|src/|@|node_modules/|assets/).*":
         {
           target: `http://127.0.0.1:${process.env.API_PORT ?? 23000}`,
           changeOrigin: false,

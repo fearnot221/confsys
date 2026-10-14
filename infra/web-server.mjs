@@ -20,10 +20,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const spa =
-    /^\/auth\/(login|register|waiting|verify|forgot|reset|account)$/.test(
+    /^\/auth\/(login|register|waiting|verify|forgot|reset|account|invitation)$/.test(
       pathname,
     ) ||
-    ["/access/accounts", "/admin/site", "/system/status"].includes(pathname);
+    ["/access/accounts", "/admin/site", "/admin/invitations", "/account/files", "/registration", "/admin/registration", "/submissions", "/admin/submissions", "/system/status"].includes(pathname);
   if (!spa && !pathname.startsWith("/assets/")) {
     const upstream = http.request(
       {
@@ -52,7 +52,7 @@ const server = http.createServer(async (req, res) => {
         response.pipe(res);
       },
     );
-    upstream.setTimeout(5000, () => upstream.destroy());
+    upstream.setTimeout(30000, () => upstream.destroy());
     upstream.on("error", () => {
       if (!res.headersSent)
         res.writeHead(502, { "content-type": "application/json" });

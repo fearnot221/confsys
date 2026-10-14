@@ -1,3 +1,7 @@
+import { registerInvitationRoutes } from "./invitations/routes.js";
+import { createInvitationService } from "./invitations/service.js";
+import { registerRegistrationRoutes } from "./registration/routes.js";
+import { createRegistrationService } from "./registration/service.js";
 import { registerAccessRoutes } from "./access/routes.js";
 import { createAccessService } from "./access/service.js";
 import { registerInstanceRoute } from "./instance.js";
@@ -46,6 +50,8 @@ await registerAuthRoutes(app, {
 });
 registerAccessRoutes(app, config, createAccessService(pool, config));
 registerSiteRoutes(app, config, site);
+registerInvitationRoutes(app, config, createInvitationService(pool,config));
+registerRegistrationRoutes(app, config, createRegistrationService(pool,config));
 await registerPublicRoutes(app, config, site);
 app.addHook("onClose", async () => {
   redis.disconnect();
