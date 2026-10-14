@@ -16,6 +16,6 @@ After primary integration gates approve the current image, run from the primary 
 pnpm exec tsx --conditions=development scripts/test-instances.ts --native-scanner --scanner-port 53310 --image <approved-versioned-image>
 ```
 
-Use the repository's usual Node `--conditions=development --import tsx` invocation if the installed tsx CLI does not forward the condition. Full container execution and new assertions remain **unverified** until that run. Synthetic resources are retained for inspection; no automatic global cleanup. Failure checkpoints retain only test assertion messages, run metadata and completed checks; environment files remain private.
+Use the repository's usual Node `--conditions=development --import tsx` invocation if the installed tsx CLI does not forward the condition. Full container execution and new assertions remain **unverified** until that run. Synthetic resources are retained for inspection; no automatic global cleanup. Failure checkpoints retain only error type, run metadata and completed checks (assertion payloads are excluded to avoid copying credentials); environment files remain private.
 
 Own central setup snapshot commit `34583d0` is NOT a feature commit and must not be cherry-picked back; it only consumes the primary checkout's QR setup addition for prepare-only verification.

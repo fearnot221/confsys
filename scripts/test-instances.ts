@@ -45,7 +45,8 @@ async function reservePort() {
   };
 }
 const directory = `.instances/${run}`;
-mkdirSync(directory, { recursive: true });
+mkdirSync(".instances", { recursive: true });
+mkdirSync(directory, { mode: 0o700 });
 const evidence: Record<string, unknown> = { run, image, checks: [] };
 const checks: string[] = [];
 const record = (value: string) => {
@@ -1145,7 +1146,7 @@ try {
         run,
         image,
         checks,
-        error: error instanceof Error ? error.message : "Unknown failure",
+        errorType: error instanceof Error ? error.name : "Unknown failure",
       },
       null,
       2,
