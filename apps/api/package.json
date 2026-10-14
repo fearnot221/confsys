@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "name": "@confsys/api",
+  "dependencies": {
+    "@confsys/contracts": "workspace:*",
+    "@confsys/config": "workspace:*",
+    "@confsys/db": "workspace:*",
+    "fastify": "5.12.7",
+    "ioredis": "5.11.1"
+  }
+}

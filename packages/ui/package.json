@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "name": "@confsys/ui",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "react": "19.3.1"
+  }
+}

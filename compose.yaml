@@ -1,0 +1,110 @@
+name: confsys-phase0
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run pnpm env:setup}
+      MIGRATOR_PASSWORD: ${MIGRATOR_PASSWORD:?Run pnpm env:setup}
+      APP_PASSWORD: ${APP_PASSWORD:?Run pnpm env:setup}
+      WORKER_PASSWORD: ${WORKER_PASSWORD:?Run pnpm env:setup}
+    ports: ["127.0.0.1:25432:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/init-db.sh:/docker-entrypoint-initdb.d/01-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d confsys"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+  redis:
+    image: redis:7.4.7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports: ["127.0.0.1:26379:6379"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+  mailpit:
+    image: axllent/mailpit:v1.29.4
+    ports: ["127.0.0.1:28025:8025", "127.0.0.1:21025:1025"]
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: 200
+    volumes: ["mailpit-data:/data"]
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+  migrate:
+    profiles: ["app"]
+    build: .
+    command: ["node", "packages/db/dist/migrate.js"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://confsys_migrator:${MIGRATOR_PASSWORD}@postgres:5432/confsys
+    depends_on:
+      postgres: { condition: service_healthy }
+    mem_limit: 256m
+  api:
+    profiles: ["app"]
+    build: .
+    environment: &app-env
+      DATABASE_URL: postgresql://confsys_app:${APP_PASSWORD}@postgres:5432/confsys
+      WORKER_DATABASE_URL: postgresql://confsys_worker:${WORKER_PASSWORD}@postgres:5432/confsys
+      REDIS_URL: redis://redis:6379/0
+      WORKER_HEALTH_URL: http://worker:23001
+      API_HOST: 0.0.0.0
+      WORKER_HOST: 0.0.0.0
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      worker: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:23000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    stop_grace_period: 15s
+    mem_limit: 384m
+    init: true
+  worker:
+    profiles: ["app"]
+    build: .
+    command: ["node", "apps/worker/dist/main.js"]
+    environment: *app-env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:23001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    stop_grace_period: 15s
+    mem_limit: 384m
+    init: true
+  web:
+    profiles: ["app"]
+    build: .
+    command: ["node", "infra/web-server.mjs"]
+    ports: ["127.0.0.1:25173:25173"]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:25173/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    stop_grace_period: 15s
+    mem_limit: 256m
+    init: true
+volumes:
+  postgres-data:
+  redis-data:
+  mailpit-data:

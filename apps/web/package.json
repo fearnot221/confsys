@@ -1,0 +1,22 @@
+{
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "name": "@confsys/web",
+  "dependencies": {
+    "@confsys/sdk": "workspace:*",
+    "@confsys/contracts": "workspace:*",
+    "@confsys/ui": "workspace:*",
+    "@tanstack/react-query": "5.104.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "vite": "8.3.4",
+    "@vitejs/plugin-react": "6.1.2"
+  }
+}

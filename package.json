@@ -1,0 +1,53 @@
+{
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "name": "confsys",
+  "packageManager": "pnpm@10.34.7",
+  "engines": {
+    "node": ">=24.21.0 <25",
+    "pnpm": ">=10.34.7 <11"
+  },
+  "scripts": {
+    "infra:up": "docker compose up -d --wait postgres redis mailpit",
+    "infra:down": "docker compose down",
+    "dev": "concurrently -k -n api,worker,web \"pnpm dev:api\" \"pnpm dev:worker\" \"pnpm dev:web\"",
+    "dev:api": "node --env-file=.env --watch --conditions=development --import tsx apps/api/src/main.ts",
+    "dev:worker": "node --env-file=.env --watch --conditions=development --import tsx apps/worker/src/main.ts",
+    "dev:web": "pnpm --filter @confsys/web dev",
+    "db:migrate": "node --conditions=development --env-file=.env --import tsx packages/db/src/migrate.ts",
+    "lint": "eslint . && node scripts/check-boundaries.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "node --env-file=.env node_modules/vitest/vitest.mjs run tests/integration",
+    "test:contract": "vitest run tests/contract",
+    "contract:generate": "tsx --conditions=development scripts/openapi.ts",
+    "test:e2e": "node --env-file=.env node_modules/@playwright/test/cli.js test",
+    "build": "tsc -p tsconfig.build.json && node scripts/distribute-build.mjs && pnpm --filter @confsys/web build",
+    "check": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:integration && pnpm test:contract && pnpm build && pnpm test:e2e",
+    "env:setup": "node scripts/setup.mjs",
+    "smoke:stack": "node --conditions=development --env-file=.env --import tsx scripts/smoke-stack.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.1",
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "concurrently": "10.0.6",
+    "eslint": "10.12.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "5.0.4",
+    "bullmq": "6.3.15",
+    "drizzle-orm": "0.45.4"
+  },
+  "dependencies": {
+    "@confsys/contracts": "workspace:*",
+    "@confsys/sdk": "workspace:*",
+    "@confsys/db": "workspace:*",
+    "@confsys/config": "workspace:*"
+  }
+}
