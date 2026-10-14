@@ -198,3 +198,9 @@ attempts, then Mailpit for the explicit retry child. It covers same/different-ke
 concurrency, immutable source statuses, unknown/accepted/in-progress exclusions,
 seven-day expiry, cancellation, recipient/issuer revocation, recent proof and
 transaction rollback when auditing fails. No uncertain SMTP result is resent.
+
+`tests/integration/finance-activity-boundaries.test.ts` covers real `confsys_app`
+RLS without actor context and across owners, forged booking foreign keys, disabled
+payer revocation/reactivation, and HTTP cancellation deadline equivalence between
+activity and registration endpoints. It creates only synthetic records and
+restores the previous registration configuration pointer after cleanup.

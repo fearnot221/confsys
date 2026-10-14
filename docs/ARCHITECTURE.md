@@ -114,3 +114,21 @@ and authority. Child queueing and reasoned audit commit together. The worker
 rechecks child issuer and recipient eligibility before each send. Each generation
 retains its own bounded seven-day delivery window and must be explicitly retried.
 Cancellation stops unfinished work; it cannot recall a message already in SMTP.
+
+### Finance and activity ownership boundary hardening
+
+`order_payers` RLS uses direct payer/grantor columns for SELECT to avoid a policy
+cycle with delegated order visibility. Only the order owner creates or removes a
+payer grant; disabling a payer does not prevent its owner from revoking the grant.
+`order_items` follows visible orders and restricts insertion to the owner or
+registration administrator. Activity bookings bind both the registration owner
+and the complete order/registration/owner tuple with database foreign keys.
+Forward migration validation retains all rows and deliberately fails if prior
+invalid links exist; it does not silently rewrite financial history.
+
+Registration cancellation and standalone activity cancellation invoke the same
+activity deadline guard while holding the shared registration configuration lock.
+The current activity version and database clock determine the cutoff. An ordinary
+owner cannot bypass a closed activity deadline by cancelling its registration;
+an administrative cancellation requires the existing reason/audit flow. Redemption
+constraints still apply to administrators, and refunds remain separate operations.
