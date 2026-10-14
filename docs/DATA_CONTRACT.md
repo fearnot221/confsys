@@ -135,3 +135,13 @@ The central registry grants reviewer/assignment, chair/decision and administrato
 Double-blind assignments require explicit human confirmation that content and metadata are anonymous. Reviewer DTOs omit owner identity, email, presenter/corresponding-author metadata and original filenames. Single-blind DTOs include only author name and affiliation. Review file downloads require an accepted/submitted matching assignment, pass the review policy before and after disk I/O, and use generated filenames. This is not automatic anonymization of document contents.
 
 Chair decisions are immutable versions. Draft decisions remain private; explicit publication changes the publication pointer, writes an immutable author-comment snapshot and queues a generic authenticated-navigation notification in one transaction. Author results use a dedicated owner-scoped view and include only published outcome/message/deadline and the snapshot of author-facing comments; scores, reviewer identity and internal comments stay private. Published revision requests pin the original revision and are fulfilled by a new submission revision through the submission service.
+
+## 議程（Phase 5）
+
+`program` 模組保持 routes → service/policy → repository；SDK/hook 與 presentation 分離。`/admin/program` 配置會場、前後緩衝、不可排時段、Session、主持人、已錄取發表／邀請講者；`/program` 僅呈現已發布 projection。所有時刻以明確 UTC ISO 輸入／顯示，禁止無時區的時間字串。
+
+PostgreSQL `btree_gist` exclusion 約束保護會場 booking、主持人／報告者及同 Session 非壁報 slot 的時間不重疊（半開區間）。Session booking 包含前後各一段設定緩衝；不可排時段使用同一會場 booking 約束。不同會場也不能排同一 presenter/chair Email 的重疊時段；Email 僅作私有衝突識別，從不因相同 Email 自動授權帳號。Session 範圍縮小不能截斷已排 slot；壁報編號及每稿一次排程由 unique constraints 保護。
+
+排程寫入／發布短交易使用既有 access exclusive fence，與作者 withdrawal、review publication 串行化 eligibility 檢查；一般草稿讀取使用 shared fence。沒有外部 I/O 在鎖內。行政草稿以單一版本做 optimistic concurrency，限制會場100、不可排1000、Session500、slot5000；此界限是 v1 aggregate 保護，超過規模需分頁／分區演進。
+
+安排稿件時只讀 `published_acceptances` 與指定 immutable revision，發表類型必須相符，撤稿不得新安排／發布。發布重新檢查每篇稿件，保存不可改寫 JSON snapshot 與稽核、outbox；重送同版本回傳同一 publication。公開 projection 只有時段、題目、姓名／單位、會場、主持人及壁報編號，不包含 Email、摘要、附件、owner id 或審查資料。已發布版本不因新草稿／後續撤稿自行改寫；行政須移除已撤稿 slot 並重新發布，舊公開快照保留原發布歷史。
