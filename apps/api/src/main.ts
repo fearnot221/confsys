@@ -1,3 +1,4 @@
+import {createPaymentEvidenceDownload} from './finance/evidence.js';
 import {createActivitiesService} from './activities/service.js';
 import {registerActivityRoutes} from './activities/routes.js';
 import {createReceiptsService} from './documents/service.js';
@@ -70,7 +71,7 @@ registerInvitationRoutes(app, config, createInvitationService(pool,config));
 registerRegistrationRoutes(app, config, createRegistrationService(pool,config));
 registerFilesRoutes(app,config,createFilesService(pool,config,{root:config.PRIVATE_STORAGE_ROOT,scannerHost:config.CLAMAV_HOST,scannerPort:config.CLAMAV_PORT}));
 registerSubmissionRoutes(app,config,createSubmissionService(pool,config,submissionDependencies));
-registerFinanceRoutes(app,config,createFinanceService(pool,config));
+registerFinanceRoutes(app,config,createFinanceService(pool,config),createPaymentEvidenceDownload(pool,config,{root:config.PRIVATE_STORAGE_ROOT,scannerHost:config.CLAMAV_HOST,scannerPort:config.CLAMAV_PORT}));
 registerActivityRoutes(app,config,createActivitiesService(pool,config));
 registerReceiptRoutes(app,config,createReceiptsService(pool,config));
 registerReviewRoutes(app,config,createReviewService(pool,config),createReviewFileDownload(pool,config,{root:config.PRIVATE_STORAGE_ROOT,scannerHost:config.CLAMAV_HOST,scannerPort:config.CLAMAV_PORT},authorizeReviewFile));

@@ -2,7 +2,7 @@ import {z} from 'zod';
 import {minorAmount} from './registration.js';
 const reason=z.string().trim().min(3).max(300);
 export const paymentInput=z.strictObject({idempotencyKey:z.uuid(),amount:minorAmount.refine(v=>BigInt(v)>0n),currency:z.string().regex(/^[A-Z]{3}$/),reference:z.string().trim().min(3).max(100),evidenceFileId:z.uuid().nullable()});
-export const paymentSchema=z.strictObject({id:z.uuid(),state:z.enum(['submitted','verified','rejected']),amount:minorAmount,currency:z.string(),reference:z.string(),createdAt:z.iso.datetime(),allocated:minorAmount,refunded:minorAmount});
+export const paymentSchema=z.strictObject({id:z.uuid(),state:z.enum(['submitted','verified','rejected']),amount:minorAmount,currency:z.string(),reference:z.string(),evidenceFileId:z.uuid().nullable(),createdAt:z.iso.datetime(),allocated:minorAmount,refunded:minorAmount});
 export type Payment=z.infer<typeof paymentSchema>;
 export const allocationSchema=z.strictObject({id:z.uuid(),paymentId:z.uuid(),orderId:z.uuid(),amount:minorAmount,refunded:minorAmount});
 export const financeOrderSchema=z.strictObject({id:z.uuid(),registrationNumber:z.string(),badgeName:z.string(),state:z.enum(['open','cancelled']),amount:minorAmount,currency:z.string(),paid:minorAmount,refunded:minorAmount});

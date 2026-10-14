@@ -51,7 +51,6 @@ let form: Awaited<ReturnType<typeof reviews.configure>>,
   files: ReturnType<typeof createFilesService>,
   download: ReturnType<typeof createReviewFileDownload>;
 const document = (): SubmissionDocument => ({
-  keywords: [], correspondingAuthorIndex: 0,
   title: `Synthetic paper ${rid()}`,
   abstract: "An anonymized synthetic abstract.",
   trackId: "science",

@@ -53,3 +53,5 @@ export {createFinanceClient} from "./finance.js";
 export { createReceiptsClient } from "./documents.js";
 export { createReviewClient } from "./reviews.js";
 export { createProgramClient } from "./program.js";
+
+export {createActivitiesClient} from './activities.js';

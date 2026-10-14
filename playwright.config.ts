@@ -46,7 +46,7 @@ export default defineConfig({
       timeout: 30000,
     },
     {
-      command: "pnpm dev:web",
+      command: `node apps/web/node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${process.env.WEB_PORT ?? 25173} --strictPort --config apps/web/vite.config.ts apps/web`,
       url: process.env.PUBLIC_APP_ORIGIN!,
       reuseExistingServer: false,
       timeout: 30000,
