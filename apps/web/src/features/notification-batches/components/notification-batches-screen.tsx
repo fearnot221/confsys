@@ -12,6 +12,7 @@ type Props = {
   refresh: () => void;
   reauthenticate: (password: string) => Promise<void>;
   create: (recipients: string, subject: string, text: string) => Promise<void>;
+  retry: (id: string, reason: string) => Promise<void>;
   cancel: (id: string) => Promise<void>;
 };
 const labels = {
@@ -26,6 +27,7 @@ export function NotificationBatchesScreen(p: Props) {
   const [recipients, setRecipients] = useState(""),
     [subject, setSubject] = useState(""),
     [text, setText] = useState(""),
+    [retryReasons, setRetryReasons] = useState<Record<string, string>>({}),
     [password, setPassword] = useState("");
   return (
     <main className="layout access-panel">
@@ -128,6 +130,40 @@ export function NotificationBatchesScreen(p: Props) {
                     </li>
                   ))}
                 </ul>
+                {b.retryOf && <p>原批次：{b.retryOf}</p>}
+                {b.retriedAs && (
+                  <p>重試批次：{b.retriedAs}（保留此批次原始狀態）</p>
+                )}
+                {b.retryableCount > 0 && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void p.retry(b.id, retryReasons[b.id] ?? "");
+                    }}
+                  >
+                    <p>
+                      可人工重試 {b.retryableCount}{" "}
+                      位：僅限七日內、連線尚未開始便明確失敗的收件人。結果不確定者不會重寄。
+                    </p>
+                    <label htmlFor={`retry-reason-${b.id}`}>
+                      重試理由：{b.subject}
+                    </label>
+                    <input
+                      id={`retry-reason-${b.id}`}
+                      required
+                      minLength={3}
+                      maxLength={300}
+                      value={retryReasons[b.id] ?? ""}
+                      onChange={(e) =>
+                        setRetryReasons({
+                          ...retryReasons,
+                          [b.id]: e.target.value,
+                        })
+                      }
+                    />
+                    <button disabled={p.busy}>重試明確失敗：{b.subject}</button>
+                  </form>
+                )}
                 {!b.cancelledAt && (
                   <button disabled={p.busy} onClick={() => void p.cancel(b.id)}>
                     取消待寄送：{b.subject}

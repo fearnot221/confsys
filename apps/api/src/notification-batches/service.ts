@@ -11,7 +11,11 @@ import {
   rolesFor,
   recordAccess,
 } from "../access/repository.js";
-import { requirePermission, assertRecentPassword } from "../access/policy.js";
+import {
+  requirePermission,
+  assertRecentPassword,
+  permissionsFor,
+} from "../access/policy.js";
 import { effectivePublicSite } from "../site/branding.js";
 import * as repo from "./repository.js";
 export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
@@ -96,6 +100,91 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
             },
           );
         await audit(db, actorId, "notification_batch.create", id, requestId);
+        return (await repo.detail(db, id))!;
+      }),
+    retry: (raw: string | undefined, input: unknown, requestId: string) =>
+      transaction(raw, true, async (db, actorId) => {
+        const data =
+          notificationBatchEndpoints.notificationBatchRetry.input.parse(input);
+        const hash = createHash("sha256")
+          .update(JSON.stringify({ retryOf: data.id, reason: data.reason }))
+          .digest("hex");
+        await repo.lockKey(db, data.idempotencyKey);
+        const source = await repo.retrySource(db, data.id);
+        if (!source) throw new AuthError("NOT_FOUND");
+        if (
+          !source.row.issuer_active ||
+          !permissionsFor(await rolesFor(db, source.row.created_by)).includes(
+            "notifications.manage",
+          )
+        )
+          throw new AuthError("CONFLICT");
+        if (source.row.cancelled_at || !source.row.in_window)
+          throw new AuthError("CONFLICT");
+        if (source.child) {
+          if (
+            source.child.idempotency_key !== data.idempotencyKey ||
+            source.child.request_hash !== hash
+          )
+            throw new AuthError("CONFLICT");
+          return (await repo.detail(db, source.child.id))!;
+        }
+        if (await repo.prior(db, data.idempotencyKey))
+          throw new AuthError("CONFLICT");
+        if (
+          source.deliveries.some(
+            (n) => n.status === "pending" || n.status === "processing",
+          )
+        )
+          throw new AuthError("CONFLICT");
+        const recipients = source.deliveries
+          .filter(
+            (n) =>
+              n.status === "failed" &&
+              n.result_code === "CONNECT_FAILED" &&
+              n.recipient_eligible,
+          )
+          .map((n) => n.user_id);
+        if (!recipients.length) throw new AuthError("CONFLICT");
+        const id = await repo.create(
+          db,
+          actorId,
+          {
+            idempotencyKey: data.idempotencyKey,
+            recipientIds: recipients,
+            subject: source.row.subject,
+            text: source.row.message_text,
+          },
+          hash,
+          data.id,
+        );
+        const brand = await effectivePublicSite(db, config.CONFERENCE_NAME);
+        for (const userId of recipients)
+          await enqueueBusinessNotification(
+            db,
+            { CONFERENCE_NAME: brand.conferenceName },
+            {
+              userId,
+              eventKey: `batch:${id}:${userId}`,
+              subject: source.row.subject,
+              text: source.row.message_text,
+              requestId,
+              batchId: id,
+            },
+          );
+        await recordAccess(db, {
+          actorId,
+          targetId: actorId,
+          action: "notification_batch.retry",
+          requestId,
+          source: "session",
+          reason: data.reason,
+          before: JSON.stringify({ batchId: data.id }),
+          after: JSON.stringify({
+            batchId: id,
+            recipientCount: recipients.length,
+          }),
+        });
         return (await repo.detail(db, id))!;
       }),
     cancel: (raw: string | undefined, input: unknown, requestId: string) =>

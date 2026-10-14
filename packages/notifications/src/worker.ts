@@ -181,8 +181,16 @@ export async function processNotification(
       error && typeof error === "object" && "command" in error
         ? error.command
         : undefined;
+    const originalCode =
+      error && typeof error === "object" && "originalCode" in error
+        ? error.originalCode
+        : undefined;
+    // Nodemailer also labels a server 421 during an in-flight message ECONNECTION/
+    // CONN. Only DNS failure or an explicitly refused socket proves no SMTP send.
     const safeRetry =
-      (code === "ECONNECTION" || code === "EDNS") && command === "CONN";
+      command === "CONN" &&
+      (code === "EDNS" ||
+        (code === "ESOCKET" && originalCode === "ECONNREFUSED"));
     await finish(
       pool,
       row,

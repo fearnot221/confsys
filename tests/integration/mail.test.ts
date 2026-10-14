@@ -129,7 +129,8 @@ it("leases recover pre-send crashes, retain uncertain sends, and retry known con
   expect((await status(sending.id)).status).toBe("unknown");
   await processNotification(f.worker, f.workerConfig, claimed.id, async () => {
     throw Object.assign(new Error("do not log smtp secrets"), {
-      code: "ECONNECTION",
+      code: "ESOCKET",
+      originalCode: "ECONNREFUSED",
       command: "CONN",
     });
   });
@@ -221,3 +222,27 @@ it("real worker process crash after Mailpit acceptance becomes unknown and is ne
     if (child.exitCode === null) child.kill("SIGKILL");
   }
 }, 20000);
+it("never retries generic connection errors that may represent a server close during SMTP", async () => {
+  for (const failure of [
+    { code: "ECONNECTION", command: "CONN", responseCode: 421 },
+    { code: "ESOCKET", originalCode: "ECONNRESET", command: "CONN" },
+  ]) {
+    const item = await pending();
+    let calls = 0;
+    await processNotification(f.worker, f.workerConfig, item.id, async () => {
+      calls++;
+      throw Object.assign(
+        new Error("Synthetic ambiguous transport state"),
+        failure,
+      );
+    });
+    expect((await status(item.id)).status).toBe("unknown");
+    await recoverNotifications(f.worker);
+    await processNotification(f.worker, f.workerConfig, item.id, async () => {
+      calls++;
+      return { messageId: "unexpected" };
+    });
+    expect(calls).toBe(1);
+    expect((await status(item.id)).status).toBe("unknown");
+  }
+});

@@ -191,3 +191,10 @@ The integration test is over 1,000 rows; no throughput benchmark or maximum-size
 performance claim is made. `tests/e2e/export-jobs.spec.ts` exercises request, real
 worker completion and the downloaded browser file (browser verification tracked
 in the integration run report).
+
+Notification retry regression (`tests/integration/notification-batches.test.ts`) uses
+an actual closed ephemeral loopback SMTP port for three exhausted connection
+attempts, then Mailpit for the explicit retry child. It covers same/different-key
+concurrency, immutable source statuses, unknown/accepted/in-progress exclusions,
+seven-day expiry, cancellation, recipient/issuer revocation, recent proof and
+transaction rollback when auditing fails. No uncertain SMTP result is resent.

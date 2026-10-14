@@ -236,7 +236,8 @@ it("mail captures only effective published branding; retry preserves snapshot an
   await processNotification(f.worker, f.workerConfig, n.id, async (mail) => {
     captured = mail.subject;
     throw Object.assign(new Error("synthetic"), {
-      code: "ECONNECTION",
+      code: "ESOCKET",
+      originalCode: "ECONNREFUSED",
       command: "CONN",
     });
   });

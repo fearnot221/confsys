@@ -98,3 +98,19 @@ Browser flow: contracts/access → SDK (`createAuthClient` retains the single cr
 `site/public-routes.ts` loads official data → `apps/web/dist/server/entry-server.js` → pure `PublicSiteContent`; `/admin/site` hook loads protected saved version → the same component. No renderer DB/network/config/authorization. `packages/contracts/site` owns finite document/DTO schemas and semantic checks; SDK owns all browser requests, site hook owns query/mutation/cancellation/form state, components accept values/callbacks. AST permits only type-only DTO imports in presentation and narrowly allowlists the server entry. API build loads an absolute workspace artifact path; production image includes it.
 
 Ingress order: known SPA auth/access/admin/system routes → static `/assets/*` → public/API proxy to Fastify (unknown public paths return 404). Vite dev proxy uses equivalent exclusions. `/system/status` preserves the former root diagnostics; `/` is the actual public site. No service worker. Dynamic responses are no-store; hash assets immutable. Readiness requires migration 0005. See ADR 0005 and TESTING for lock/version/failure evidence.
+
+### Operator notification retries
+
+Notification batch retries create a new immutable child batch, never reset old
+notification rows or reuse their status. A source may have one child (`retry_of`
+unique), and repeated requests must match the original key and reason hash. Only
+terminal batches younger than seven days are considered. Only still-unexpired,
+verified-active recipients whose delivery failed with `CONNECT_FAILED` are copied.
+That code is emitted only for `EDNS` at SMTP `CONN`, or `ESOCKET`/`CONN` with original
+`ECONNREFUSED` (generic `ECONNECTION` is uncertain); uncertain SMTP
+outcomes are never copied. Operators need current notification authority and recent
+password proof, and the original issuer must retain its active credential epoch
+and authority. Child queueing and reasoned audit commit together. The worker
+rechecks child issuer and recipient eligibility before each send. Each generation
+retains its own bounded seven-day delivery window and must be explicitly retried.
+Cancellation stops unfinished work; it cannot recall a message already in SMTP.

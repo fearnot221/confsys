@@ -11,6 +11,7 @@ export function useNotificationBatches() {
   const queries = useQueryClient(),
     request = useRef<AbortController | null>(null),
     epoch = useRef(0),
+    retryAttempts = useRef(new Map<string, { reason: string; key: string }>()),
     attempt = useRef<{ payload: string; key: string } | null>(null);
   const [offset, setOffset] = useState(0),
     [busy, setBusy] = useState(false),
@@ -132,6 +133,18 @@ export function useNotificationBatches() {
           signal,
         );
       }, "通知批次已保存並排入佇列；不代表已送達。"),
+    retry: (id: string, reason: string) =>
+      run((signal) => {
+        let attempt = retryAttempts.current.get(id);
+        if (!attempt || attempt.reason !== reason) {
+          attempt = { reason, key: crypto.randomUUID() };
+          retryAttempts.current.set(id, attempt);
+        }
+        return client.retry(
+          { id, reason, idempotencyKey: attempt.key },
+          signal,
+        );
+      }, "已建立明確失敗收件人的重試批次；原寄送紀錄保留，不代表已送達。"),
     cancel: (id: string) =>
       run(
         (signal) => client.cancel(id, signal),

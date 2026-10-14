@@ -69,6 +69,8 @@ export function createNotificationBatchClient(
       ),
     create: (input: unknown, signal: AbortSignal) =>
       call(notificationBatchEndpoints.notificationBatchCreate, input, signal),
+    retry: (input: unknown, signal: AbortSignal) =>
+      call(notificationBatchEndpoints.notificationBatchRetry, input, signal),
     cancel: (id: string, signal: AbortSignal) =>
       call(notificationBatchEndpoints.notificationBatchCancel, { id }, signal),
   };

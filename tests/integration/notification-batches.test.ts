@@ -1,3 +1,4 @@
+import { createServer } from "node:net";
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
 import { authFixture, password } from "../helpers/auth.js";
@@ -182,4 +183,260 @@ it("cancels queued work after explicit cancellation, issuer permission removal, 
     expect(rows.find((b) => b.id === batch.id)?.statuses).toEqual([
       { status: "cancelled", count: 1 },
     ]);
+});
+async function connectionFailure(batchId: string) {
+  // Bind then close a fresh loopback port: a real pre-SMTP connection refusal.
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing loopback port");
+  const port = address.port;
+  await new Promise<void>((resolve, reject) =>
+    server.close((error) => (error ? reject(error) : resolve())),
+  );
+  const sender = createMailSender({
+    ...f.workerConfig,
+    SMTP_HOST: "localhost",
+    SMTP_PORT: port,
+  });
+  try {
+    for (let i = 0; i < 3; i++) {
+      await f.admin.query(
+        "UPDATE confsys.notifications SET next_attempt_at=now()-interval '1 second' WHERE batch_id=$1",
+        [batchId],
+      );
+      await processNotification(
+        f.worker,
+        f.workerConfig,
+        await mailId(batchId),
+        sender.send,
+      );
+    }
+  } finally {
+    sender.close();
+  }
+  expect(
+    (
+      await f.admin.query(
+        "SELECT status,result_code FROM confsys.notifications WHERE batch_id=$1",
+        [batchId],
+      )
+    ).rows,
+  ).toEqual([{ status: "failed", result_code: "CONNECT_FAILED" }]);
+}
+it("retries only known pre-SMTP failures as one immutable child under concurrent idempotent requests, then sends through real Mailpit", async () => {
+  const batch = await service.create(admin.raw, input(), rid());
+  await connectionFailure(batch.id);
+  expect(
+    (await service.list(admin.raw, {})).items.find((b) => b.id === batch.id)
+      ?.retryableCount,
+  ).toBe(1);
+  const request = {
+    id: batch.id,
+    idempotencyKey: rid(),
+    reason: "Loopback SMTP restored after known connection failure",
+  };
+  const [one, two] = await Promise.all([
+    service.retry(admin.raw, request, rid()),
+    service.retry(admin.raw, request, rid()),
+  ]);
+  expect(one.id).toBe(two.id);
+  expect(one.retryOf).toBe(batch.id);
+  expect(one.statuses).toEqual([{ status: "pending", count: 1 }]);
+  await expect(
+    service.retry(admin.raw, { ...request, idempotencyKey: rid() }, rid()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    service.retry(
+      admin.raw,
+      { ...request, reason: "Changed reason payload" },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const original = (await service.list(admin.raw, {})).items.find(
+    (b) => b.id === batch.id,
+  )!;
+  expect(original).toMatchObject({
+    retriedAs: one.id,
+    retryableCount: 0,
+    statuses: [{ status: "failed", count: 1 }],
+  });
+  await send(one.id);
+  expect(
+    (await service.list(admin.raw, {})).items.find((b) => b.id === one.id)
+      ?.statuses,
+  ).toEqual([{ status: "accepted", count: 1 }]);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT count(*)::integer AS n FROM confsys.auth_audit WHERE event='notification_batch.retry' AND actor_id=$1",
+        [admin.id],
+      )
+    ).rows[0].n,
+  ).toBe(1);
+});
+it("never retries unknown, accepted, pending, cancelled, expired or revoked authority, and audit failures roll back child and outbox", async () => {
+  for (const state of ["unknown", "accepted", "pending", "cancelled"]) {
+    const batch = await service.create(admin.raw, input(), rid());
+    if (state !== "pending")
+      await f.admin.query(
+        "UPDATE confsys.notifications SET status=$2,result_code=$3 WHERE batch_id=$1",
+        [
+          batch.id,
+          state,
+          state === "unknown" ? "SMTP_UNCERTAIN" : "CONNECT_FAILED",
+        ],
+      );
+    await expect(
+      service.retry(
+        admin.raw,
+        {
+          id: batch.id,
+          idempotencyKey: rid(),
+          reason: "Must not resend uncertain or ineligible delivery",
+        },
+        rid(),
+      ),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  }
+  const batch = await service.create(admin.raw, input(), rid());
+  await connectionFailure(batch.id);
+  const request = {
+    id: batch.id,
+    idempotencyKey: rid(),
+    reason: "Explicit operator retry after connection recovery",
+  };
+  await expect(
+    service.retry(recipient.raw, request, rid()),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await f.admin.query("UPDATE confsys.users SET state='disabled' WHERE id=$1", [
+    recipient.id,
+  ]);
+  await expect(service.retry(admin.raw, request, rid())).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  await f.admin.query("UPDATE confsys.users SET state='active' WHERE id=$1", [
+    recipient.id,
+  ]);
+  await f.admin.query(
+    "UPDATE confsys.notifications SET expires_at=now()-interval '1 second' WHERE batch_id=$1",
+    [batch.id],
+  );
+  await expect(service.retry(admin.raw, request, rid())).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  await f.admin.query(
+    "UPDATE confsys.notifications SET expires_at=now()+interval '1 hour' WHERE batch_id=$1",
+    [batch.id],
+  );
+  await f.admin.query(
+    "UPDATE confsys.sessions SET password_verified_at=now()-interval '5 minutes' WHERE token_hash=$1",
+    [tokenHash(admin.raw)],
+  );
+  await expect(service.retry(admin.raw, request, rid())).rejects.toMatchObject({
+    code: "REAUTH_REQUIRED",
+  });
+  await auth.reauthenticate(admin.raw, password, rid());
+  const requestId = rid();
+  await f.admin.query(
+    `CREATE FUNCTION confsys.notification_retry_test_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.request_id='${requestId}'::uuid THEN RAISE EXCEPTION 'synthetic audit unavailable'; END IF; RETURN NEW; END $$`,
+  );
+  await f.admin.query(
+    "CREATE TRIGGER notification_retry_test_failure BEFORE INSERT ON confsys.auth_audit FOR EACH ROW EXECUTE FUNCTION confsys.notification_retry_test_failure()",
+  );
+  try {
+    await expect(
+      service.retry(admin.raw, request, requestId),
+    ).rejects.toThrow();
+    expect(
+      (
+        await f.admin.query(
+          "SELECT id FROM confsys.notification_batches WHERE retry_of=$1",
+          [batch.id],
+        )
+      ).rows,
+    ).toHaveLength(0);
+    expect(
+      (
+        await f.admin.query(
+          "SELECT id FROM confsys.notifications WHERE request_id=$1",
+          [requestId],
+        )
+      ).rows,
+    ).toHaveLength(0);
+  } finally {
+    await f.admin.query(
+      "DROP TRIGGER notification_retry_test_failure ON confsys.auth_audit",
+    );
+    await f.admin.query(
+      "DROP FUNCTION confsys.notification_retry_test_failure()",
+    );
+  }
+  const operator = await active(true);
+  await f.admin.query(
+    "UPDATE confsys.users SET credential_version=credential_version+1 WHERE id=$1",
+    [admin.id],
+  );
+  await expect(
+    service.retry(operator.raw, request, rid()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  admin.raw = (await auth.login(admin.email, password, rid())).raw;
+});
+it("serializes different retry keys against the same source and refuses cancelled or older-than-seven-day batches", async () => {
+  const batch = await service.create(admin.raw, input(), rid());
+  await connectionFailure(batch.id);
+  const outcomes = await Promise.allSettled([
+    service.retry(
+      admin.raw,
+      {
+        id: batch.id,
+        idempotencyKey: rid(),
+        reason: "Concurrent operator first request",
+      },
+      rid(),
+    ),
+    service.retry(
+      admin.raw,
+      {
+        id: batch.id,
+        idempotencyKey: rid(),
+        reason: "Concurrent operator second request",
+      },
+      rid(),
+    ),
+  ]);
+  expect(outcomes.filter((v) => v.status === "fulfilled")).toHaveLength(1);
+  expect(outcomes.filter((v) => v.status === "rejected")).toHaveLength(1);
+  const cancelled = await service.create(admin.raw, input(), rid());
+  await connectionFailure(cancelled.id);
+  await service.cancel(admin.raw, { id: cancelled.id }, rid());
+  await expect(
+    service.retry(
+      admin.raw,
+      {
+        id: cancelled.id,
+        idempotencyKey: rid(),
+        reason: "Cancelled source must stay cancelled",
+      },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const old = await service.create(admin.raw, input(), rid());
+  await connectionFailure(old.id);
+  await f.admin.query(
+    "UPDATE confsys.notification_batches SET created_at=now()-interval '8 days' WHERE id=$1",
+    [old.id],
+  );
+  await expect(
+    service.retry(
+      admin.raw,
+      {
+        id: old.id,
+        idempotencyKey: rid(),
+        reason: "Source outside explicit age window",
+      },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
 });

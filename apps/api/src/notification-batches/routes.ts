@@ -36,6 +36,8 @@ export function registerNotificationBatchRoutes(
             return service.list(raw, input.data);
           case "notificationBatchCreate":
             return service.create(raw, input.data, req.id);
+          case "notificationBatchRetry":
+            return service.retry(raw, input.data, req.id);
           case "notificationBatchCancel":
             return service.cancel(raw, input.data, req.id);
         }
