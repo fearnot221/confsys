@@ -785,7 +785,8 @@ it("pinned post-acceptance registration deadline gates competition actions indep
   );
   const another = await competition({ requireRegistration: false });
   await expect(enroll(another, p)).rejects.toMatchObject({ code: "CONFLICT" });
-  await expect(submit(a)).rejects.toMatchObject({ code: "CONFLICT" });
+  // Assigned judging eligibility failures use the established FORBIDDEN response.
+  await expect(submit(a)).rejects.toMatchObject({ code: "FORBIDDEN" });
   await withIdentityTransaction(f.app, async (db) => {
     await db.query("SELECT set_config('app.actor_id',$1,true)", [judge.id]);
     expect(
