@@ -1,3 +1,8 @@
+import { Redis } from "ioredis";
+import { buildApp } from "../../apps/api/src/app.js";
+import { registerAuthRoutes } from "../../apps/api/src/auth/routes.js";
+import { createRateLimiter } from "../../apps/api/src/auth/rate-limit.js";
+import { registerFilesRoutes } from "../../apps/api/src/files/routes.js";
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -90,4 +95,22 @@ it("abandoned uploads become rejected, private bytes removed and quotas remain d
   expect(await cleanupIncompleteUploads(f.app,root)).toBeGreaterThanOrEqual(1);
   expect((await f.admin.query("SELECT status FROM confsys.file_assets WHERE id=$1",[id])).rows[0].status).toBe("rejected");
   await expect(files.download(owner.raw,id,rid())).rejects.toMatchObject({code:"CONFLICT"});
+});
+it("HTTP upload enforces CSRF/origin/body bounds and private download headers without leaking storage keys",async()=>{
+  const up=async()=>{},server=buildApp({postgres:up,redis:up,worker:up}),redis=new Redis(f.config.REDIS_URL);
+  await registerAuthRoutes(server,{config:f.config,service:auth,limit:createRateLimiter(redis,f.config.CSRF_SIGNING_KEY,`files-${rid()}`)});
+  registerFilesRoutes(server,f.config,files);
+  const host=new URL(f.config.PUBLIC_APP_ORIGIN).host;
+  try {
+    const csrf=await server.inject({url:"/api/auth/csrf",headers:{host}}),cookie=csrf.cookies.map(c=>`${c.name}=${c.value}`).join("; ");
+    const headers={host,cookie:`dev-session=${owner.raw}; ${cookie}`,origin:f.config.PUBLIC_APP_ORIGIN,"x-csrf-token":csrf.json().csrfToken};
+    const payload={purpose:"payment_evidence",name:"payment.png",content:png};
+    for(const extra of [{origin:"https://evil.invalid"},{"x-csrf-token":""}]) expect((await server.inject({method:"POST",url:"/api/files",payload,headers:{...headers,...extra}})).statusCode).toBe(403);
+    expect((await server.inject({method:"POST",url:"/api/files",payload:{...payload,ownerId:other.id},headers})).statusCode).toBe(400);
+    expect((await server.inject({method:"POST",url:"/api/files",payload:{...payload,content:"A".repeat(11_200_000)},headers})).statusCode).toBe(413);
+    const upload=await server.inject({method:"POST",url:"/api/files",payload,headers});expect(upload.statusCode).toBe(200);expect(upload.json().status).toBe("ready");expect(upload.body).not.toMatch(/storage_key|owner_id/);
+    const download=await server.inject({url:`/api/files/${upload.json().id}/download`,headers});expect(download.statusCode).toBe(200);expect(download.headers["cache-control"]).toBe("no-store");expect(download.headers["x-content-type-options"]).toBe("nosniff");expect(download.headers["content-disposition"]).toContain("attachment");
+    expect((await server.inject({url:`/api/files/${upload.json().id}/download`,headers:{host}})).statusCode).toBe(401);
+    expect((await server.inject({url:`/api/media/${upload.json().id}`,headers:{host}})).statusCode).toBe(404);
+  }finally{redis.disconnect();await server.close();}
 });
