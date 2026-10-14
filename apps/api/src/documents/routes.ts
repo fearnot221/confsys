@@ -32,6 +32,13 @@ export function registerReceiptRoutes(
         if (!parsed.success) throw new AuthError("INVALID_REQUEST");
         const raw = req.cookies[cookiePolicy(config).name];
         switch (name) {
+          case "receiptDetail":
+            return service.detail(
+              raw,
+              receiptEndpoints.receiptDetail.input.parse(req.query).id,
+            );
+          case "receiptReissue":
+            return service.reissue(raw, parsed.data, req.id);
           case "receiptMine":
             return service.list(
               raw,

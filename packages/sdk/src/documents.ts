@@ -38,7 +38,7 @@ export function createReceiptsClient(
         return spec.output.parse(
           await (
             await request(
-              `${spec.path}?offset=${"offset" in data ? data.offset : 0}`,
+              `${spec.path}?${"id" in data ? `id=${encodeURIComponent(data.id)}` : `offset=${"offset" in data ? data.offset : 0}`}`,
               { signal },
             )
           ).json(),

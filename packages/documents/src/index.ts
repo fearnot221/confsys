@@ -91,6 +91,8 @@ export async function renderReceipt(
   write(state === "void" ? "收據 - 已作廢 / VOID" : "收據 / RECEIPT", 17, 18);
   write(`收據號碼：${snapshot.number}    版本：${snapshot.revision}`);
   write(`發行時間：${snapshot.issuedAt}`);
+  if (snapshot.reissuedFromNumber)
+    write(`重開來源（已作廢）：${snapshot.reissuedFromNumber}`);
   write(`抬頭：${snapshot.buyerName}`);
   if (snapshot.buyerTaxId) write(`統一編號／識別號：${snapshot.buyerTaxId}`);
   if (snapshot.buyerAddress) write(`地址：${snapshot.buyerAddress}`);

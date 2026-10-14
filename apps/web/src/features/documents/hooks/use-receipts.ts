@@ -19,6 +19,7 @@ export function useReceipts(administrative = false) {
     epoch = useRef(0),
     active = useRef<AbortController | null>(null);
   const [offset, setOffset] = useState(0),
+    [focused, setFocused] = useState<Receipt | null>(null),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
@@ -54,6 +55,7 @@ export function useReceipts(administrative = false) {
     ++epoch.current;
     active.current?.abort();
     setExpired(true);
+    setFocused(null);
     setBusy(false);
     setMessage("");
     setError("登入已失效或權限已變更，請重新登入。");
@@ -104,7 +106,8 @@ export function useReceipts(administrative = false) {
     }
   };
   const mutate = (
-    operation: "receiptIssue" | "receiptCorrect" | "receiptVoid",
+    operation:
+      "receiptIssue" | "receiptCorrect" | "receiptVoid" | "receiptReissue",
     input: unknown,
   ) =>
     void perform(async (signal) => {
@@ -112,6 +115,7 @@ export function useReceipts(administrative = false) {
         await client.operation(operation, input, signal),
       );
       if (signal.aborted) return;
+      setFocused(null);
       setMessage(`收據 ${receipt.snapshot.number} 已更新。`);
       await queries.invalidateQueries({ queryKey: ["private", "receipts"] });
     });
@@ -128,7 +132,15 @@ export function useReceipts(administrative = false) {
           : ""),
     message,
     items: canRead
-      ? (list.data?.items ?? []).map((receipt) => ({
+      ? (focused
+          ? [
+              focused,
+              ...(list.data?.items ?? []).filter(
+                (item) => item.id !== focused.id,
+              ),
+            ]
+          : (list.data?.items ?? [])
+        ).map((receipt) => ({
           ...receipt,
           amountLabel: amountLabel(receipt),
         }))
@@ -137,11 +149,23 @@ export function useReceipts(administrative = false) {
     canManage,
     offset,
     nextOffset: list.data?.nextOffset ?? null,
-    onPage: setOffset,
+    onPage: (next: number) => {
+      setFocused(null);
+      setOffset(next);
+    },
+    onInspect: (id: string) =>
+      void perform(async (signal) => {
+        const receipt = receiptSchema.parse(
+          await client.operation("receiptDetail", { id }, signal),
+        );
+        if (!signal.aborted) setFocused(receipt);
+      }),
     onRefresh: () => {
+      setFocused(null);
       void queries.invalidateQueries({ queryKey: ["private", "receipts"] });
     },
     onIssue: (input: unknown) => mutate("receiptIssue", input),
+    onReissue: (input: unknown) => mutate("receiptReissue", input),
     onCorrect: (input: unknown) => mutate("receiptCorrect", input),
     onVoid: (input: unknown) => mutate("receiptVoid", input),
     onDownload: (receipt: Receipt, revision = receipt.currentRevision) =>

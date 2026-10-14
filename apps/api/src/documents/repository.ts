@@ -14,9 +14,14 @@ type ReceiptRow = {
   current_revision: number;
   snapshot: unknown;
   void_reason: string | null;
+  reissue_of: string | null;
+  reissue_reason: string | null;
+  source_number: string | null;
+  successor_id: string | null;
+  successor_number: string | null;
 };
-const projection = `r.id,r.order_id,r.state,r.current_revision,v.snapshot,x.reason AS void_reason`;
-const joins = `FROM confsys.receipts r JOIN confsys.receipt_revisions v ON v.receipt_id=r.id AND v.revision=r.current_revision LEFT JOIN confsys.receipt_voids x ON x.receipt_id=r.id`;
+const projection = `r.id,r.order_id,r.state,r.current_revision,v.snapshot,x.reason AS void_reason,r.reissue_of,r.reissue_reason,source.number::text AS source_number,successor.id AS successor_id,successor.number::text AS successor_number`;
+const joins = `FROM confsys.receipts r JOIN confsys.receipt_revisions v ON v.receipt_id=r.id AND v.revision=r.current_revision LEFT JOIN confsys.receipt_voids x ON x.receipt_id=r.id LEFT JOIN confsys.receipts source ON source.id=r.reissue_of LEFT JOIN confsys.receipts successor ON successor.reissue_of=r.id`;
 function project(row: ReceiptRow) {
   return receiptSchema.parse({
     id: row.id,
@@ -25,6 +30,19 @@ function project(row: ReceiptRow) {
     currentRevision: row.current_revision,
     snapshot: row.snapshot,
     voidReason: row.void_reason,
+    reissuedFrom: row.reissue_of
+      ? {
+          id: row.reissue_of,
+          number: `R-${row.source_number!.padStart(8, "0")}`,
+        }
+      : null,
+    replacedBy: row.successor_id
+      ? {
+          id: row.successor_id,
+          number: `R-${row.successor_number!.padStart(8, "0")}`,
+        }
+      : null,
+    reissueReason: row.reissue_reason,
   });
 }
 export async function findReceipt(db: PoolClient, id: string) {
@@ -39,7 +57,7 @@ export async function findReceipt(db: PoolClient, id: string) {
 export async function receiptForOrder(db: PoolClient, orderId: string) {
   const row = (
     await db.query<ReceiptRow>(
-      `SELECT ${projection} ${joins} WHERE r.order_id=$1`,
+      `SELECT ${projection} ${joins} WHERE r.order_id=$1 ORDER BY r.number DESC LIMIT 1`,
       [orderId],
     )
   ).rows[0];
@@ -97,12 +115,16 @@ export async function orderItems(db: PoolClient, orderId: string) {
     )
   ).rows;
 }
-export async function createReceipt(db: PoolClient, orderId: string) {
+export async function createReceipt(
+  db: PoolClient,
+  orderId: string,
+  reissue?: { sourceId: string; reason: string },
+) {
   const id = randomUUID();
   const row = (
     await db.query<{ number: string }>(
-      "INSERT INTO confsys.receipts(id,order_id,state,current_revision) VALUES($1,$2,'issued',1) RETURNING number::text",
-      [id, orderId],
+      "INSERT INTO confsys.receipts(id,order_id,state,current_revision,reissue_of,reissue_reason) VALUES($1,$2,'issued',1,$3,$4) RETURNING number::text",
+      [id, orderId, reissue?.sourceId ?? null, reissue?.reason ?? null],
     )
   ).rows[0]!;
   return { id, number: `R-${row.number.padStart(8, "0")}` };

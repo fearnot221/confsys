@@ -15,6 +15,8 @@ type Props = {
   onRefresh: () => void;
   onIssue: (input: unknown) => void;
   onCorrect: (input: unknown) => void;
+  onReissue: (input: unknown) => void;
+  onInspect: (id: string) => void;
   onVoid: (input: unknown) => void;
   onDownload: (receipt: Receipt, revision?: number) => void;
 };
@@ -24,9 +26,10 @@ export function ReceiptsScreen(p: Props) {
     [buyerTaxId, setBuyerTaxId] = useState(""),
     [buyerAddress, setBuyerAddress] = useState(""),
     [reason, setReason] = useState(""),
-    [selected, setSelected] = useState<Receipt | null>(null);
+    [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = p.items.find((item) => item.id === selectedId) ?? null;
   const select = (receipt: Receipt) => {
-    setSelected(receipt);
+    setSelectedId(receipt.id);
     setBuyerName(receipt.snapshot.buyerName);
     setBuyerTaxId(receipt.snapshot.buyerTaxId);
     setBuyerAddress(receipt.snapshot.buyerAddress);
@@ -62,7 +65,11 @@ export function ReceiptsScreen(p: Props) {
             else p.onIssue({ ...buyer, orderId });
           }}
         >
-          <h2>{selected ? `更正 ${selected.snapshot.number}` : "發行收據"}</h2>
+          <h2>
+            {selected
+              ? `${selected.state === "void" ? "重開" : "更正"} ${selected.snapshot.number}`
+              : "發行收據"}
+          </h2>
           {!selected && (
             <label>
               已全額核帳的訂單 ID
@@ -113,6 +120,26 @@ export function ReceiptsScreen(p: Props) {
           </button>
           {selected && (
             <>
+              {selected.state === "void" && !selected.replacedBy && (
+                <button
+                  type="button"
+                  disabled={
+                    p.busy || reason.trim().length < 3 || !buyerName.trim()
+                  }
+                  onClick={() =>
+                    p.onReissue({
+                      receiptId: selected.id,
+                      expectedRevision: selected.currentRevision,
+                      buyerName,
+                      buyerTaxId,
+                      buyerAddress,
+                      reason,
+                    })
+                  }
+                >
+                  以新號碼重開已作廢收據
+                </button>
+              )}
               <button
                 type="button"
                 disabled={
@@ -130,7 +157,7 @@ export function ReceiptsScreen(p: Props) {
               >
                 確認作廢此收據
               </button>
-              <button type="button" onClick={() => setSelected(null)}>
+              <button type="button" onClick={() => setSelectedId(null)}>
                 返回發行
               </button>
             </>
@@ -154,6 +181,29 @@ export function ReceiptsScreen(p: Props) {
                 {receipt.currentRevision} 版
               </p>
               {receipt.voidReason && <p>作廢理由：{receipt.voidReason}</p>}
+              {receipt.reissuedFrom && (
+                <p>
+                  重開來源：
+                  <button
+                    disabled={p.busy}
+                    onClick={() => p.onInspect(receipt.reissuedFrom!.id)}
+                  >
+                    {receipt.reissuedFrom.number}
+                  </button>
+                  ；理由：{receipt.reissueReason}
+                </p>
+              )}
+              {receipt.replacedBy && (
+                <p>
+                  已重開為：
+                  <button
+                    disabled={p.busy}
+                    onClick={() => p.onInspect(receipt.replacedBy!.id)}
+                  >
+                    {receipt.replacedBy.number}
+                  </button>
+                </p>
+              )}
               <button disabled={p.busy} onClick={() => p.onDownload(receipt)}>
                 下載／重印 PDF
               </button>
@@ -178,7 +228,7 @@ export function ReceiptsScreen(p: Props) {
               )}
               {p.administrative && p.canManage && (
                 <button disabled={p.busy} onClick={() => select(receipt)}>
-                  更正／作廢
+                  {receipt.state === "void" ? "檢視／重開" : "更正／作廢"}
                 </button>
               )}
             </li>

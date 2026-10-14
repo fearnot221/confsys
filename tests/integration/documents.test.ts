@@ -261,3 +261,105 @@ it("audit failure rolls back correction; void is explicit and idempotent, revoke
     service.download(owner.raw, receipt.id, 1, rid()),
   ).rejects.toMatchObject({ code: "SESSION_EXPIRED" });
 });
+it("reissue uses a new linked number exactly once; rejects unauthorized, changed retry, unpaid and nonvoid sources", async () => {
+  owner.raw = (await auth.login(owner.email, password, rid())).raw;
+  const source = (await service.list(owner.raw, 0)).items[0]!,
+    input = {
+      ...buyer,
+      receiptId: source.id,
+      expectedRevision: source.currentRevision,
+      reason: "Synthetic linked reissue",
+    };
+  await expect(service.reissue(owner.raw, input, rid())).rejects.toMatchObject({
+    code: "FORBIDDEN",
+  });
+  const results = await Promise.all([
+    service.reissue(finance.raw, input, rid()),
+    service.reissue(finance.raw, input, rid()),
+  ]);
+  expect(results[0]).toEqual(results[1]);
+  const replacement = results[0]!;
+  expect(replacement.snapshot.number).not.toBe(source.snapshot.number);
+  expect(replacement.currentRevision).toBe(1);
+  expect(replacement.reissuedFrom).toEqual({
+    id: source.id,
+    number: source.snapshot.number,
+  });
+  expect(replacement.snapshot.reissuedFromNumber).toBe(source.snapshot.number);
+  expect(replacement.snapshot.amount).toBe(source.snapshot.amount);
+  expect((await service.detail(owner.raw, source.id)).replacedBy).toEqual({
+    id: replacement.id,
+    number: replacement.snapshot.number,
+  });
+  await expect(service.detail(other.raw, replacement.id)).rejects.toMatchObject(
+    { code: "NOT_FOUND" },
+  );
+  await expect(
+    service.reissue(
+      finance.raw,
+      { ...input, buyerName: "Changed retry" },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    service.reissue(
+      finance.raw,
+      { ...input, receiptId: replacement.id, expectedRevision: 1 },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(
+    (
+      await f.admin.query(
+        "SELECT count(*) FROM confsys.notifications WHERE event_key=$1",
+        [`receipt:${replacement.id}:reissued`],
+      )
+    ).rows[0].count,
+  ).toBe("1");
+  await expect(
+    f.admin.query(
+      "INSERT INTO confsys.receipts(id,order_id,state,current_revision,reissue_of,reissue_reason) VALUES($1,$2,'issued',1,$3,'Synthetic invalid issued source')",
+      [rid(), orderId, replacement.id],
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
+  await expect(
+    f.admin.query(
+      "UPDATE confsys.receipts SET reissue_reason='Changed lineage' WHERE id=$1",
+      [replacement.id],
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
+  await service.void(
+    finance.raw,
+    {
+      receiptId: replacement.id,
+      expectedRevision: 1,
+      reason: "Synthetic next void",
+    },
+    rid(),
+  );
+  const allocation = (
+    await f.admin.query(
+      "SELECT id FROM confsys.payment_allocations WHERE order_id=$1",
+      [orderId],
+    )
+  ).rows[0].id;
+  const refund = rid();
+  await f.admin.query(
+    "INSERT INTO confsys.refunds(id,allocation_id,amount,reference,reason,created_by,idempotency_key,request_hash) VALUES($1,$2,1,$3,'Synthetic reduced settlement',$4,$5,'synthetic')",
+    [refund, allocation, rid(), admin.id, rid()],
+  );
+  try {
+    await expect(
+      service.reissue(
+        finance.raw,
+        { ...input, receiptId: replacement.id, expectedRevision: 1 },
+        rid(),
+      ),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  } finally {
+    await f.admin.query("DELETE FROM confsys.refunds WHERE id=$1", [refund]);
+  }
+  expect((await service.history(owner.raw, source.id)).items).toHaveLength(2);
+  const pdf = await service.download(owner.raw, replacement.id, 1, rid());
+  expect(pdf.bytes.subarray(0, 5).toString()).toBe("%PDF-");
+});

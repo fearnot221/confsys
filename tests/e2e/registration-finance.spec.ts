@@ -231,11 +231,9 @@ test("conditional registration and price snapshots -> group reconciliation -> re
     );
     expect(payment.state).toBe("submitted");
     await admin.goto("/admin/finance");
-    const paymentArticle = admin
-      .locator("article")
-      .filter({
-        has: admin.getByRole("heading", { name: reference, exact: true }),
-      });
+    const paymentArticle = admin.locator("article").filter({
+      has: admin.getByRole("heading", { name: reference, exact: true }),
+    });
     await paymentArticle
       .getByLabel("核帳理由", { exact: true })
       .fill("合成銀行對帳紀錄確認");
@@ -244,14 +242,12 @@ test("conditional registration and price snapshots -> group reconciliation -> re
       .click();
     await recorded(admin);
     await expect(paymentArticle).toContainText("verified");
-    const allocationForm = admin
-      .locator("form")
-      .filter({
-        has: admin.getByRole("heading", {
-          name: "分配已核帳款項",
-          exact: true,
-        }),
-      });
+    const allocationForm = admin.locator("form").filter({
+      has: admin.getByRole("heading", {
+        name: "分配已核帳款項",
+        exact: true,
+      }),
+    });
     for (const [index, order] of [first.order, other.order].entries()) {
       if (index)
         await allocationForm
@@ -296,6 +292,68 @@ test("conditional registration and price snapshots -> group reconciliation -> re
     expect(path).not.toBeNull();
     expect((await readFile(path!)).subarray(0, 5).toString()).toBe("%PDF-");
     expect(download.suggestedFilename()).toMatch(/^receipt-.*-v1\.pdf$/);
+    const originalReceipt = (
+      await (await page.request.get("/api/receipts/mine?offset=0")).json()
+    ).items[0];
+    await admin
+      .getByRole("button", { name: "更正／作廢", exact: true })
+      .click();
+    await admin
+      .getByLabel("操作理由", { exact: true })
+      .fill("合成流程先作廢再重開");
+    await admin
+      .getByRole("button", { name: "確認作廢此收據", exact: true })
+      .click();
+    await expect(
+      admin.getByRole("button", {
+        name: "以新號碼重開已作廢收據",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await admin.getByLabel("收據抬頭", { exact: true }).fill("合成重開研究所");
+    await admin
+      .getByLabel("操作理由", { exact: true })
+      .fill("合成收據關聯重開理由");
+    await admin
+      .getByRole("button", { name: "以新號碼重開已作廢收據", exact: true })
+      .click();
+    await expect
+      .poll(
+        async () =>
+          (await (await page.request.get("/api/receipts/mine?offset=0")).json())
+            .items.length,
+      )
+      .toBe(2);
+    await page.reload();
+    const replacementReceipt = (
+      await (await page.request.get("/api/receipts/mine?offset=0")).json()
+    ).items.find((item: { state: string }) => item.state === "issued");
+    expect(replacementReceipt.reissuedFrom.id).toBe(originalReceipt.id);
+    const sourceDetail = page.waitForResponse((response) =>
+      response.url().includes(`/api/receipts/detail?id=${originalReceipt.id}`),
+    );
+    await page
+      .getByRole("button", {
+        name: originalReceipt.snapshot.number,
+        exact: true,
+      })
+      .click();
+    expect((await sourceDetail).status()).toBe(200);
+    await expect(
+      page.getByText("合成收據關聯重開理由", { exact: false }),
+    ).toBeVisible();
+    const successorDetail = page.waitForResponse((response) =>
+      response
+        .url()
+        .includes(`/api/receipts/detail?id=${replacementReceipt.id}`),
+    );
+    await page
+      .getByRole("button", {
+        name: replacementReceipt.snapshot.number,
+        exact: true,
+      })
+      .click();
+    expect((await successorDetail).status()).toBe(200);
     await admin.goto("/admin/activities");
     const editor = admin.getByRole("group", { name: "新增活動", exact: true });
     for (const [label, value] of [
@@ -319,28 +377,24 @@ test("conditional registration and price snapshots -> group reconciliation -> re
       admin.getByRole("heading", { name: "合成午餐瀏覽器流程", exact: true }),
     ).toBeVisible();
     await page.goto("/activities");
-    const meal = page
-      .locator("article")
-      .filter({
-        has: page.getByRole("heading", {
-          level: 2,
-          name: "合成午餐瀏覽器流程",
-          exact: true,
-        }),
-      });
+    const meal = page.locator("article").filter({
+      has: page.getByRole("heading", {
+        level: 2,
+        name: "合成午餐瀏覽器流程",
+        exact: true,
+      }),
+    });
     await meal.locator("select[name=mealType]").selectOption("素食");
     await meal
       .getByRole("button", { name: "確認預訂並建立訂單", exact: true })
       .click();
-    const booking = page
-      .locator("article")
-      .filter({
-        has: page.getByRole("heading", {
-          level: 3,
-          name: "合成午餐瀏覽器流程",
-          exact: true,
-        }),
-      });
+    const booking = page.locator("article").filter({
+      has: page.getByRole("heading", {
+        level: 3,
+        name: "合成午餐瀏覽器流程",
+        exact: true,
+      }),
+    });
     await expect(booking).toContainText("1 份 · 素食 · reserved");
     await page.getByLabel("取消理由", { exact: true }).fill("合成測試取消餐飲");
     await booking
@@ -358,14 +412,12 @@ test("conditional registration and price snapshots -> group reconciliation -> re
       (a: { orderId: string }) => a.orderId === first.order.id,
     );
     await admin.goto("/admin/finance");
-    const refundForm = admin
-      .locator("form")
-      .filter({
-        has: admin.getByRole("heading", {
-          name: "記錄已執行退款",
-          exact: true,
-        }),
-      });
+    const refundForm = admin.locator("form").filter({
+      has: admin.getByRole("heading", {
+        name: "記錄已執行退款",
+        exact: true,
+      }),
+    });
     await refundForm
       .locator("select[name=allocationId]")
       .selectOption(allocation.id);

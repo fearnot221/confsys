@@ -5,6 +5,7 @@ import { withIdentityTransaction } from "@confsys/db";
 import {
   receiptIssueInput,
   receiptCorrectInput,
+  receiptReissueInput,
   receiptVoidInput,
   receiptSnapshotSchema,
   type ReceiptSnapshot,
@@ -98,6 +99,73 @@ export function createReceiptsService(pool: Pool, config: ApiConfig) {
             eventKey: `receipt:${created.id}:issued`,
             subject: "收據已發行",
             text: `收據 ${created.number} 已發行。請登入 ${config.PUBLIC_APP_ORIGIN}/receipts 查看。`,
+            requestId,
+          },
+        );
+        return repo.findReceipt(db, created.id);
+      });
+    },
+    detail(raw: string | undefined, id: string) {
+      return authorized(raw, false, (db) => repo.findReceipt(db, id));
+    },
+    reissue(raw: string | undefined, input: unknown, requestId: string) {
+      const data = receiptReissueInput.parse(input);
+      return authorized(raw, true, async (db, actor) => {
+        await financeLock(db);
+        const source = await repo.findReceipt(db, data.receiptId);
+        if (
+          source.state !== "void" ||
+          source.currentRevision !== data.expectedRevision
+        )
+          throw new AuthError("CONFLICT");
+        if (source.replacedBy) {
+          const previous = await repo.findReceipt(db, source.replacedBy.id);
+          if (
+            previous.snapshot.buyerName !== data.buyerName ||
+            previous.snapshot.buyerTaxId !== data.buyerTaxId ||
+            previous.snapshot.buyerAddress !== data.buyerAddress ||
+            previous.reissueReason !== data.reason
+          )
+            throw new AuthError("CONFLICT");
+          return previous;
+        }
+        const order = await repo.receiptOrder(db, source.orderId);
+        if (
+          order.state !== "open" ||
+          (await repo.paidBalance(db, order.id)) < BigInt(order.amount)
+        )
+          throw new AuthError("CONFLICT");
+        const created = await repo.createReceipt(db, order.id, {
+          sourceId: source.id,
+          reason: data.reason,
+        });
+        const snapshot: ReceiptSnapshot = receiptSnapshotSchema.parse({
+          ...source.snapshot,
+          number: created.number,
+          revision: 1,
+          issuedAt: new Date().toISOString(),
+          buyerName: data.buyerName,
+          buyerTaxId: data.buyerTaxId,
+          buyerAddress: data.buyerAddress,
+          reissuedFromNumber: source.snapshot.number,
+        });
+        await repo.appendRevision(db, created.id, snapshot, data.reason, actor);
+        await repo.auditReceipt(
+          db,
+          actor,
+          created.id,
+          "receipt.reissued",
+          data.reason,
+          requestId,
+        );
+        await enqueueBusinessNotification(
+          db,
+          { CONFERENCE_NAME: snapshot.conferenceName },
+          {
+            userId: order.user_id,
+            eventKey: `receipt:${created.id}:reissued`,
+            subject: "收據已重開",
+            text: `收據 ${source.snapshot.number} 已作廢，重開為 ${created.number}。請登入 ${config.PUBLIC_APP_ORIGIN}/receipts 查看。`,
             requestId,
           },
         );
