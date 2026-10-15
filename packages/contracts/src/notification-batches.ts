@@ -26,7 +26,10 @@ export const notificationAudienceInput = z.strictObject({
   publishedOutcome: z.enum(["any", "accepted", "reject", "revision_requested"]),
 });
 export type NotificationAudience = z.infer<typeof notificationAudienceInput>;
+export const notificationAudiencePreviewInput=notificationAudienceInput.extend({offset:z.coerce.number().int().min(0).max(1000000).default(0)});
 export const notificationAudiencePreview = z.strictObject({
+  offset:count,
+  nextOffset:count.nullable(),
   items: z.array(z.strictObject({ id: z.uuid(), email: z.email() })).max(100),
   total: count,
   truncated: z.boolean(),
@@ -102,7 +105,7 @@ export const notificationBatchEndpoints = {
   notificationAudiencePreview: {
     method: "post",
     path: "/api/notifications/audience-preview",
-    input: notificationAudienceInput,
+    input: notificationAudiencePreviewInput,
     output: notificationAudiencePreview,
   },
   notificationTemplateList: {
