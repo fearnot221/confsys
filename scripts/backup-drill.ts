@@ -14,7 +14,7 @@ import { createServer } from "node:net";
 import { randomUUID, createHash } from "node:crypto";
 import { createPool, withIdentityTransaction } from "@confsys/db";
 import { seal, unseal } from "@confsys/notifications";
-import { passHash, passToken } from "../packages/documents/src/token.js";
+import { verifyRestoredQrTokens } from "./restore-qr-check.js";
 const { values } = parseArgs({
   options: {
     "source-env": { type: "string" },
@@ -39,7 +39,15 @@ if (sourceEnv.COMPOSE_PROJECT_NAME !== sourceProject)
   throw new Error("Source project identity differs");
 const evidence = JSON.parse(
   readFileSync(resolve(dirname(sourceFile), "evidence.json"), "utf8"),
-) as { run: string; imageId: string; checks: string[] };
+) as {
+  run: string;
+  imageId: string;
+  checks: string[];
+  restoreFixtures?: {
+    status: string;
+    artifacts: { qr: { tokenHash: string } };
+  };
+};
 if (
   evidence.run !== sourceRun ||
   !evidence.checks.some((value) =>
@@ -147,7 +155,8 @@ if (
 const sourceDb = createPool(databaseUrl.toString(), 1);
 const dump = resolve(backup, "database.dump");
 let destinationDb: ReturnType<typeof createPool> | undefined,
-  appDb: ReturnType<typeof createPool> | undefined;
+  appDb: ReturnType<typeof createPool> | undefined,
+  workerDb: ReturnType<typeof createPool> | undefined;
 const report: Record<string, unknown> = {
   run,
   sourceProject,
@@ -499,16 +508,26 @@ try {
       destinationEnv.MAIL_ENCRYPTION_KEY!,
       envelope.key_version,
     );
-  for (const token of tokens)
-    if (
-      passHash(passToken(token.token_id, destinationEnv.QR_SIGNING_KEY!)) !==
-      token.token_hash
+  const sourceTokens = (
+    await sourceDb.query<{ token_id: string; token_hash: string }>(
+      "SELECT token_id,token_hash FROM confsys.onsite_tokens LIMIT 1001",
     )
-      throw new Error("Recovered QR key does not match stored token");
+  ).rows;
+  const qr = verifyRestoredQrTokens(
+    sourceTokens,
+    tokens,
+    sourceEnv.QR_SIGNING_KEY!,
+    destinationEnv.QR_SIGNING_KEY!,
+    letter === "a" && evidence.restoreFixtures?.status === "complete"
+      ? evidence.restoreFixtures.artifacts.qr.tokenHash
+      : undefined,
+  );
   report.restoredEncryptedEnvelopeCount = envelopes.length;
   report.restoredQrTokenCount = tokens.length;
+  report.restoredQrValidCount = qr.valid;
+  report.restoredQrStaleCount = qr.stale;
   record(
-    `Recovered keys decrypt source envelope probe and ${envelopes.length} stored envelopes; ${tokens.length} stored QR token hashes match (zero means no fixture sample)`,
+    `Recovered keys decrypt source envelope probe and ${envelopes.length} stored envelopes; QR source/restore classifications match: ${qr.valid} valid, ${qr.stale} stale (zero means no fixture sample)`,
   );
 
   appDb = createPool(destinationEnv.DATABASE_URL!, 1);
@@ -584,6 +603,75 @@ try {
   record(
     "Actual app login denies missing/foreign context, allows owner, and clears context; app/worker remain NOSUPERUSER NOBYPASSRLS",
   );
+  workerDb = createPool(destinationEnv.WORKER_DATABASE_URL!, 1);
+  const workerIdentity = (
+    await workerDb.query(
+      "SELECT current_user AS role,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user",
+    )
+  ).rows[0];
+  if (
+    workerIdentity?.role !== "confsys_worker" ||
+    workerIdentity.rolsuper ||
+    workerIdentity.rolbypassrls
+  )
+    throw new Error("Restored worker login is not an RLS-bound worker");
+  for (const view of [
+    "export_registrations",
+    "export_submissions",
+    "export_emails",
+  ] as const) {
+    if (
+      (await workerDb.query(`SELECT id FROM confsys.${view} LIMIT 1`)).rowCount
+    )
+      throw new Error("Unclaimed worker sees restored export source");
+    await withIdentityTransaction(workerDb, async (db) => {
+      await db.query(
+        "SELECT set_config('app.export_job_id',$1,true),set_config('app.export_claim_id',$2,true)",
+        [randomUUID(), randomUUID()],
+      );
+      if ((await db.query(`SELECT id FROM confsys.${view} LIMIT 1`)).rowCount)
+        throw new Error("Forged worker claim sees restored export source");
+    });
+  }
+  for (const [table, context] of [
+    ["document_jobs", "app.onsite_admin"],
+    ["export_jobs", "app.reporting_admin"],
+  ] as const) {
+    const jobs = (
+      await destinationDb.query<{ id: string; requester_id: string }>(
+        `SELECT id,requester_id FROM confsys.${table} ORDER BY id LIMIT 1001`,
+      )
+    ).rows;
+    if (jobs.length > 1000)
+      throw new Error("Generated job RLS verification exceeds bound");
+    const deny = async () => {
+      if (
+        (await appDb!.query(`SELECT id FROM confsys.${table} LIMIT 1`)).rowCount
+      )
+        throw new Error("Contextless app sees restored generated job");
+    };
+    await deny();
+    for (const job of jobs) {
+      for (const owner of [false, true])
+        await withIdentityTransaction(appDb, async (db) => {
+          await db.query(
+            "SELECT set_config('app.actor_id',$1,true),set_config($2,'true',true)",
+            [owner ? job.requester_id : randomUUID(), context],
+          );
+          const rows = await db.query(
+            `SELECT id FROM confsys.${table} WHERE id=$1`,
+            [job.id],
+          );
+          if (rows.rowCount !== (owner ? 1 : 0))
+            throw new Error("Restored generated job owner isolation differs");
+        });
+    }
+    await deny();
+    report[`${table}RlsVerifiedCount`] = jobs.length;
+  }
+  record(
+    "Actual restored worker login is NOSUPERUSER NOBYPASSRLS and denies missing/forged export claims; app generated jobs deny missing/foreign context, allow each owner, and clear pooled context",
+  );
   report.status = "passed";
   report.fileCount = manifest.length;
   report.referenceCount = before.refs.length;
@@ -598,7 +686,12 @@ try {
 } finally {
   if (portServer.listening)
     await new Promise<void>((done) => portServer.close(() => done()));
-  await Promise.all([sourceDb.end(), destinationDb?.end(), appDb?.end()]);
+  await Promise.all([
+    sourceDb.end(),
+    destinationDb?.end(),
+    appDb?.end(),
+    workerDb?.end(),
+  ]);
   report.completedAt = new Date().toISOString();
   report.checks = checks;
   writeFileSync(
