@@ -1138,6 +1138,12 @@ try {
         JSON.stringify(evidence, null, 2),
       );
       try {
+        // Finish B's own submission mail before comparing unrelated A writes.
+        // Preserve the exact audit snapshot assertion; asynchronous B work is
+        // legitimate and must not be mistaken for cross-instance mutation.
+        await expect.poll(async () => Number((await b.db.query(
+          "SELECT count(*) FROM confsys.notifications WHERE status IN ('pending','processing')",
+        )).rows[0].count), { timeout: 30000 }).toBe(0);
         const beforeRestoreFixturesB = await snapshotB();
         await sitePost(pa, a, "/api/auth/reauthenticate", { password: newA });
         evidence.restoreFixtures = await enrichRestoreFixtures({
