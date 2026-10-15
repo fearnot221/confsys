@@ -40941,6 +40941,11 @@
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "type": "object",
                   "properties": {
+                    "round": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
                     "effectiveDeadline": {
                       "type": "string",
                       "format": "date-time",
@@ -41210,6 +41215,7 @@
                     }
                   },
                   "required": [
+                    "round",
                     "effectiveDeadline",
                     "deadlineHistory",
                     "id",
@@ -43616,6 +43622,47 @@
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "type": "object",
                   "properties": {
+                    "rounds": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "revisionId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "round": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "pending": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "submitted": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "closed": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "revisionId",
+                          "round",
+                          "pending",
+                          "submitted",
+                          "closed"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "screenings": {
                       "type": "array",
                       "items": {
@@ -43885,6 +43932,11 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "round": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20
+                          },
                           "effectiveDeadline": {
                             "type": "string",
                             "format": "date-time",
@@ -44159,6 +44211,7 @@
                           }
                         },
                         "required": [
+                          "round",
                           "effectiveDeadline",
                           "deadlineHistory",
                           "id",
@@ -44180,6 +44233,11 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "round": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20
+                          },
                           "id": {
                             "type": "string",
                             "format": "uuid",
@@ -44226,6 +44284,7 @@
                           }
                         },
                         "required": [
+                          "round",
                           "id",
                           "submissionId",
                           "revisionId",
@@ -44253,6 +44312,7 @@
                     }
                   },
                   "required": [
+                    "rounds",
                     "screenings",
                     "workload",
                     "papers",
@@ -44825,6 +44885,11 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "round": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20
+                          },
                           "effectiveDeadline": {
                             "type": "string",
                             "format": "date-time",
@@ -45094,6 +45159,7 @@
                           }
                         },
                         "required": [
+                          "round",
                           "effectiveDeadline",
                           "deadlineHistory",
                           "id",
@@ -46969,6 +47035,12 @@
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
                 "type": "object",
                 "properties": {
+                  "round": {
+                    "default": 1,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
                   "id": {
                     "type": "string",
                     "format": "uuid",
@@ -46999,6 +47071,7 @@
                   }
                 },
                 "required": [
+                  "round",
                   "id",
                   "submissionId",
                   "revisionId",
@@ -47020,6 +47093,11 @@
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "type": "object",
                   "properties": {
+                    "round": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
                     "effectiveDeadline": {
                       "type": "string",
                       "format": "date-time",
@@ -47289,6 +47367,7 @@
                     }
                   },
                   "required": [
+                    "round",
                     "effectiveDeadline",
                     "deadlineHistory",
                     "id",
@@ -47939,6 +48018,11 @@
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "type": "object",
                   "properties": {
+                    "round": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
                     "effectiveDeadline": {
                       "type": "string",
                       "format": "date-time",
@@ -48208,6 +48292,7 @@
                     }
                   },
                   "required": [
+                    "round",
                     "effectiveDeadline",
                     "deadlineHistory",
                     "id",
@@ -48770,6 +48855,12 @@
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
                 "type": "object",
                 "properties": {
+                  "round": {
+                    "default": 1,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
                   "id": {
                     "type": "string",
                     "format": "uuid",
@@ -48823,6 +48914,7 @@
                   }
                 },
                 "required": [
+                  "round",
                   "id",
                   "submissionId",
                   "revisionId",
@@ -48846,6 +48938,11 @@
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "type": "object",
                   "properties": {
+                    "round": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid",
@@ -48892,6 +48989,7 @@
                     }
                   },
                   "required": [
+                    "round",
                     "id",
                     "submissionId",
                     "revisionId",
@@ -49475,6 +49573,11 @@
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "type": "object",
                   "properties": {
+                    "round": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid",
@@ -49521,6 +49624,7 @@
                     }
                   },
                   "required": [
+                    "round",
                     "id",
                     "submissionId",
                     "revisionId",
@@ -50093,6 +50197,11 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "round": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20
+                          },
                           "submissionId": {
                             "type": "string",
                             "format": "uuid",
@@ -50175,6 +50284,7 @@
                           }
                         },
                         "required": [
+                          "round",
                           "submissionId",
                           "registrationRequirement",
                           "outcome",
