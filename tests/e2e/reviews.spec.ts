@@ -35,6 +35,10 @@ test.afterAll(async () => {
     [papers],
   );
   await f.admin.query(
+    "DELETE FROM confsys.review_assignment_revocations WHERE assignment_id IN(SELECT id FROM confsys.review_assignments WHERE submission_id=ANY($1::uuid[]))",
+    [papers],
+  );
+  await f.admin.query(
     "DELETE FROM confsys.review_deadline_extensions WHERE assignment_id IN(SELECT id FROM confsys.review_assignments WHERE submission_id=ANY($1::uuid[]))",
     [papers],
   );
@@ -404,6 +408,60 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
     await expect(
       authorPage.getByText("SECOND_ROUND_PRIVATE", { exact: false }),
     ).toHaveCount(0);
+    await page.reload();
+    await page
+      .getByRole("combobox", { name: "正式投稿", exact: true })
+      .selectOption(paper.id);
+    await page
+      .getByRole("combobox", { name: "指派審查輪次", exact: true })
+      .selectOption("3");
+    await page
+      .getByRole("combobox", { name: "審查委員", exact: true })
+      .selectOption(id(reviewerEmail));
+    await page
+      .getByRole("combobox", { name: "評分表版本", exact: true })
+      .selectOption(formId);
+    await page
+      .getByLabel("已人工確認稿件內容與中繼資料符合匿名要求（雙盲必要）", {
+        exact: true,
+      })
+      .check();
+    await page
+      .getByRole("button", { name: "指派此不可變版本", exact: true })
+      .click();
+    await expect(page.getByRole("status")).toContainText(
+      "已指派不可變投稿版本",
+    );
+    await page
+      .getByLabel("撤銷指派理由（委員可見）", { exact: true })
+      .fill("Synthetic browser reviewer reassignment");
+    const thirdRound = page
+      .locator("details")
+      .filter({
+        has: page
+          .locator("summary")
+          .filter({ hasText: paper.document.title })
+          .filter({ hasText: "第 3 輪" }),
+      });
+    await thirdRound.locator("summary").click();
+    await thirdRound
+      .getByRole("button", { name: "撤銷此待審指派", exact: true })
+      .click();
+    await expect(page.getByRole("status")).toContainText("指派已撤銷");
+    await reviewerPage.reload();
+    const stopped = reviewerPage
+      .locator("article")
+      .filter({ hasText: "Synthetic browser reviewer reassignment" });
+    await expect(
+      stopped.getByRole("heading", { name: "已停止的審查指派", exact: true }),
+    ).toBeVisible();
+    await expect(
+      stopped.getByRole("button", { name: "接受指派", exact: true }),
+    ).toHaveCount(0);
+    await authorPage.reload();
+    await expect(
+      authorPage.getByText("SECOND_ROUND_BROWSER_FEEDBACK", { exact: true }),
+    ).toBeVisible();
   } finally {
     await Promise.all([
       reviewerContext.close(),
