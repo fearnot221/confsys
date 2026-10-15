@@ -81,6 +81,8 @@ export function createReviewClient(
       call(reviewEndpoints.reviewAction, input, signal),
     decide: (input: unknown, signal: AbortSignal) =>
       call(reviewEndpoints.reviewDecide, input, signal),
+    publishBatch: (ids: string[], signal: AbortSignal) =>
+      call(reviewEndpoints.reviewPublishBatch, { ids }, signal),
     publish: (id: string, signal: AbortSignal) =>
       call(reviewEndpoints.reviewPublish, { id }, signal),
     async download(assignmentId: string, fileId: string, signal: AbortSignal) {

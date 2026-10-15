@@ -182,6 +182,49 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
       },
     );
   }
+  async function publishOne(
+    db: PoolClient,
+    actor: Actor,
+    id: string,
+    requestId: string,
+  ) {
+    const row = await repo.decision(db, id);
+    if (!row) throw new AuthError("NOT_FOUND");
+    const submission = await repo.submissionForReview(db, row.submission_id);
+    if (
+      !submission ||
+      submission.state !== "submitted" ||
+      submission.current_revision_id !== row.revision_id ||
+      (await repo.decisionVersion(db, row.submission_id)) !== row.version
+    )
+      throw new AuthError("CONFLICT");
+    const paper = await repo.paper(db, row.revision_id);
+    if (!paper) throw new AuthError("NOT_FOUND");
+    await manageTrack(db, actor.id, repo.paperDocument(paper).trackId, true);
+    await noConflict(db, paper, actor);
+    if (row.outcome === "accept_oral" || row.outcome === "accept_poster")
+      await assertScreening(
+        db,
+        row.revision_id,
+        await repo.requiresScreening(db, row.revision_id),
+      );
+    if (row.published) return repo.decisionDto(row);
+    if (row.revision_deadline && row.revision_deadline <= new Date())
+      throw new AuthError("CONFLICT");
+    await repo.savePublicationSnapshot(db, row);
+    await repo.publishDecision(db, row, actor.id);
+    if (row.outcome === "revision_requested")
+      await repo.saveRevisionRequest(db, randomUUID(), row);
+    await notify(
+      db,
+      submission.owner_id,
+      `review-result:${row.id}`,
+      "投稿結果已發布 / Submission result published",
+      requestId,
+    );
+    await safeAudit(db, actor, "review.result_published", row.id, requestId);
+    return repo.decisionDto({ ...row, published: true });
+  }
   return {
     async board(raw: string | undefined, input: unknown) {
       const { offset } = reviewPageInput.parse(input);
@@ -744,68 +787,21 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
     async publish(raw: string | undefined, input: unknown, requestId: string) {
       const { id } = reviewEndpoints.reviewPublish.input.parse(input);
       return transaction(raw, "reviews.decide", true, async (db, actor) => {
-        const row = await repo.decision(db, id);
-        if (!row) throw new AuthError("NOT_FOUND");
-        const submission = await repo.submissionForReview(
-          db,
-          row.submission_id,
-        );
-        if (
-          !submission ||
-          submission.state !== "submitted" ||
-          submission.current_revision_id !== row.revision_id ||
-          (await repo.decisionVersion(db, row.submission_id)) !== row.version
-        )
-          throw new AuthError("CONFLICT");
-        const paper = await repo.paper(db, row.revision_id);
-        if (!paper) throw new AuthError("NOT_FOUND");
-        await manageTrack(
-          db,
-          actor.id,
-          repo.paperDocument(paper).trackId,
-          true,
-        );
-        await noConflict(db, paper, actor);
-        if (row.outcome === "accept_oral" || row.outcome === "accept_poster")
-          await assertScreening(
-            db,
-            row.revision_id,
-            await repo.requiresScreening(db, row.revision_id),
-          );
-        if (row.published) return repo.decisionDto(row);
-        if (row.revision_deadline && row.revision_deadline <= new Date())
-          throw new AuthError("CONFLICT");
-        await db.query(
-          `INSERT INTO confsys.review_publication_snapshots(decision_id,author_comments) SELECT $1,coalesce(jsonb_agg(a.document->>'authorComment' ORDER BY a.id),'[]'::jsonb) FROM confsys.review_assignments a WHERE a.revision_id=$2 AND a.round=$3 AND a.state='submitted' ON CONFLICT(decision_id) DO NOTHING`,
-          [row.id, row.revision_id, row.round],
-        );
-        await repo.publishDecision(db, row, actor.id);
-        if (row.outcome === "revision_requested")
-          await db.query(
-            "INSERT INTO confsys.submission_revision_requests(id,submission_id,revision_id,decision_id,deadline) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(decision_id) DO NOTHING",
-            [
-              randomUUID(),
-              row.submission_id,
-              row.revision_id,
-              row.id,
-              row.revision_deadline,
-            ],
-          );
-        await notify(
-          db,
-          submission.owner_id,
-          `review-result:${row.id}`,
-          "投稿結果已發布 / Submission result published",
-          requestId,
-        );
-        await safeAudit(
-          db,
-          actor,
-          "review.result_published",
-          row.id,
-          requestId,
-        );
-        return repo.decisionDto({ ...row, published: true });
+        return publishOne(db, actor, id, requestId);
+      });
+    },
+    async publishBatch(
+      raw: string | undefined,
+      input: unknown,
+      requestId: string,
+    ) {
+      const { ids } = reviewEndpoints.reviewPublishBatch.input.parse(input);
+      return transaction(raw, "reviews.decide", true, async (db, actor) => {
+        // One bounded transaction: any stale, withdrawn or forbidden item rolls back all releases.
+        const items = [];
+        for (const id of ids)
+          items.push(await publishOne(db, actor, id, requestId));
+        return { items };
       });
     },
     async authorResults(raw: string | undefined, input: unknown) {

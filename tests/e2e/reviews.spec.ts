@@ -372,6 +372,38 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
     await expect(
       authorPage.getByText("PRIVATE_BROWSER_DECISION_REASON", { exact: false }),
     ).toHaveCount(0);
+    // Keep the single-result flow above; exercise explicit batch release on a new immutable decision.
+    await chairPage
+      .getByLabel("發布後給作者的訊息")
+      .fill("BATCH_PUBLIC_BROWSER_DECISION");
+    await chairPage.getByRole("button", { name: "儲存新決議版本" }).click();
+    await expect(chairPage.getByRole("status")).toContainText("決議草稿已保存");
+    const batchChoice = chairPage.getByRole("checkbox", {
+      name: /選取決議 .* 供批次發布/,
+    });
+    await expect(batchChoice).toHaveCount(1);
+    await batchChoice.check();
+    await chairPage
+      .getByRole("button", {
+        name: "明確發布所選 1 筆結果並通知作者",
+        exact: true,
+      })
+      .click();
+    await expect(chairPage.getByRole("status")).toContainText(
+      "已發布 1 筆結果",
+    );
+    await authorPage
+      .getByRole("button", { name: "重新整理", exact: true })
+      .click();
+    await expect(
+      authorPage.getByText("BATCH_PUBLIC_BROWSER_DECISION", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      authorPage.getByText("SECOND_ROUND_BROWSER_FEEDBACK", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      authorPage.getByText("SECOND_ROUND_PRIVATE", { exact: false }),
+    ).toHaveCount(0);
   } finally {
     await Promise.all([
       reviewerContext.close(),

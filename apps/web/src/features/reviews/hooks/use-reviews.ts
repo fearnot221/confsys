@@ -280,6 +280,11 @@ export function useReviews() {
         await client.decide({ ...input, id: stableId(input) }, signal);
         return "決議草稿已保存，作者尚未看到新結果。";
       }),
+    onPublishBatch: (ids: string[]) =>
+      void perform(async (signal) => {
+        const result = await client.publishBatch(ids, signal);
+        return `已發布 ${result.items.length} 筆結果，作者通知已排入佇列。`;
+      }),
     onPublish: (id: string) =>
       void perform(async (signal) => {
         await client.publish(id, signal);

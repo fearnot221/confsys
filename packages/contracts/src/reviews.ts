@@ -278,6 +278,18 @@ export const reviewEndpoints = {
     input: reviewDecisionInput,
     output: reviewDecisionSchema,
   },
+  reviewPublishBatch: {
+    method: "post",
+    path: "/api/reviews/publish-batch",
+    input: z.strictObject({
+      ids: z
+        .array(z.uuid())
+        .min(1)
+        .max(50)
+        .refine((ids) => new Set(ids).size === ids.length),
+    }),
+    output: z.strictObject({ items: z.array(reviewDecisionSchema).max(50) }),
+  },
   reviewPublish: {
     method: "post",
     path: "/api/reviews/publish",

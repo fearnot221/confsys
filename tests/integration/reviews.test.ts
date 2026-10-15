@@ -1329,3 +1329,94 @@ it("assignment INSERT requires manager context while reviewer scoring cannot alt
       }),
     ).rejects.toMatchObject({ code: "42501" });
 });
+
+it("publishes selected latest decisions atomically, rejects mixed authority/staleness and deduplicates retries", async () => {
+  const first = await submitted(),
+    second = await submitted();
+  const one = await decision(first),
+    old = await decision(second);
+  const two = await decision(second, {
+    expectedVersion: old.version,
+    authorMessage: "Latest result",
+  });
+  const input = { ids: [one.id, two.id] };
+  await expect(
+    reviews.publishBatch(outsider.raw, input, rid()),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await expect(
+    reviews.publishBatch(chair.raw, { ids: [one.id, old.id] }, rid()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(
+    (
+      await f.admin.query(
+        "SELECT count(*)::int AS n FROM confsys.review_publication_snapshots WHERE decision_id=ANY($1::uuid[])",
+        [[one.id, old.id]],
+      )
+    ).rows[0].n,
+  ).toBe(0);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT count(*)::int AS n FROM confsys.notifications WHERE event_key=$1",
+        [`review-result:${one.id}`],
+      )
+    ).rows[0].n,
+  ).toBe(0);
+  const foreignPaper = await submitted({ trackId: "other", topicIds: [] });
+  await reviews.scope(
+    admin.raw,
+    { userId: chair.id, trackId: "other", remove: false },
+    rid(),
+  );
+  const foreign = await decision(foreignPaper);
+  await reviews.scope(
+    admin.raw,
+    { userId: chair.id, trackId: "other", remove: true },
+    rid(),
+  );
+  await expect(
+    reviews.publishBatch(chair.raw, { ids: [one.id, foreign.id] }, rid()),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  expect(
+    (
+      await f.admin.query(
+        "SELECT count(*)::int AS n FROM confsys.review_publication_snapshots WHERE decision_id=$1",
+        [one.id],
+      )
+    ).rows[0].n,
+  ).toBe(0);
+  const results = await Promise.all([
+    reviews.publishBatch(chair.raw, input, rid()),
+    reviews.publishBatch(chair.raw, input, rid()),
+  ]);
+  for (const result of results)
+    expect(result.items.map((item) => item.published)).toEqual([true, true]);
+  for (const id of input.ids) {
+    expect(
+      (
+        await f.admin.query(
+          "SELECT count(*)::int AS n FROM confsys.review_publication_snapshots WHERE decision_id=$1",
+          [id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect(
+      (
+        await f.admin.query(
+          "SELECT count(*)::int AS n FROM confsys.notifications WHERE event_key=$1",
+          [`review-result:${id}`],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+  }
+  await expect(
+    reviews.publishBatch(chair.raw, { ids: [one.id, one.id] }, rid()),
+  ).rejects.toThrow();
+  await expect(
+    reviews.publishBatch(
+      chair.raw,
+      { ids: Array.from({ length: 51 }, rid) },
+      rid(),
+    ),
+  ).rejects.toThrow();
+});

@@ -60,6 +60,8 @@ export function registerReviewRoutes(
             return service.action(raw, input.data, req.id);
           case "reviewDecide":
             return service.decide(raw, input.data, req.id);
+          case "reviewPublishBatch":
+            return service.publishBatch(raw, input.data, req.id);
           case "reviewPublish":
             return service.publish(raw, input.data, req.id);
           case "reviewAuthorResults":

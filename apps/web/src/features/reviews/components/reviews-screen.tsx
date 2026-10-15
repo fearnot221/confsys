@@ -67,6 +67,7 @@ type Props = {
     round: number,
   ) => void;
   onPublish: (id: string) => void;
+  onPublishBatch: (ids: string[]) => void;
   onDownload: (assignmentId: string, fileId: string) => void;
 };
 function ScoreForm({
@@ -429,6 +430,7 @@ function Manage({
   onConflict,
   onDecide,
   onPublish,
+  onPublishBatch,
 }: {
   board: ReviewBoard;
   busy: boolean;
@@ -440,7 +442,20 @@ function Manage({
   onConflict: Props["onConflict"];
   onDecide: Props["onDecide"];
   onPublish: Props["onPublish"];
+  onPublishBatch: Props["onPublishBatch"];
 }) {
+  const [selectedDecisions, setSelectedDecisions] = useState<string[]>([]);
+  const publishable = board.decisions.filter(
+    (d) =>
+      !d.published &&
+      !board.decisions.some(
+        (other) =>
+          other.submissionId === d.submissionId && other.version > d.version,
+      ),
+  );
+  const selected = selectedDecisions.filter((id) =>
+    publishable.some((d) => d.id === id),
+  );
   const [assignRound, setAssignRound] = useState(1),
     [decisionRound, setDecisionRound] = useState(1),
     [historyRound, setHistoryRound] = useState("all");
@@ -822,6 +837,20 @@ function Manage({
         <button disabled={busy || !paper}>申報本人衝突並停止處理</button>
       </form>
       <h3>決議歷程與發布</h3>
+      {canDecide && (
+        <fieldset disabled={busy}>
+          <legend>批次結果發布</legend>
+          <p>
+            逐筆勾選本頁最新草稿；發布後作者可見並排入通知。任一筆已過期、撤稿或無權處理時，整批不發布。
+          </p>
+          <button
+            disabled={busy || selected.length === 0 || selected.length > 50}
+            onClick={() => onPublishBatch(selected)}
+          >
+            明確發布所選 {selected.length} 筆結果並通知作者
+          </button>
+        </fieldset>
+      )}
       {board.decisions.map((d) => (
         <article key={d.id}>
           <p>
@@ -830,6 +859,23 @@ function Manage({
             · 第 {d.round} 輪 · 決議 v{d.version} · {d.outcome} ·{" "}
             {d.published ? "目前已發布" : "草稿／歷史版本"}
           </p>
+          {canDecide && publishable.some((item) => item.id === d.id) && (
+            <label>
+              <input
+                type="checkbox"
+                disabled={busy}
+                checked={selected.includes(d.id)}
+                onChange={(e) =>
+                  setSelectedDecisions((current) =>
+                    e.target.checked
+                      ? [...current.filter((id) => id !== d.id), d.id]
+                      : current.filter((id) => id !== d.id),
+                  )
+                }
+              />
+              選取決議 {d.id} 供批次發布
+            </label>
+          )}
           <p>{d.authorMessage}</p>
           <p>內部理由：{d.internalReason}</p>
           {canDecide && !d.published && (
@@ -880,6 +926,7 @@ export function ReviewsScreen(props: Props) {
           onConflict={props.onConflict}
           onDecide={props.onDecide}
           onPublish={props.onPublish}
+          onPublishBatch={props.onPublishBatch}
         />
       )}
       {props.canReview && (

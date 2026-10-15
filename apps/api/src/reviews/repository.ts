@@ -575,3 +575,23 @@ export async function roundProgress(db: PoolClient, revisionIds: string[]) {
     )
   ).rows;
 }
+
+export async function savePublicationSnapshot(
+  db: PoolClient,
+  row: DecisionRow,
+) {
+  await db.query(
+    `INSERT INTO confsys.review_publication_snapshots(decision_id,author_comments) SELECT $1,coalesce(jsonb_agg(a.document->>'authorComment' ORDER BY a.id),'[]'::jsonb) FROM confsys.review_assignments a WHERE a.revision_id=$2 AND a.round=$3 AND a.state='submitted' ON CONFLICT(decision_id) DO NOTHING`,
+    [row.id, row.revision_id, row.round],
+  );
+}
+export async function saveRevisionRequest(
+  db: PoolClient,
+  id: string,
+  row: DecisionRow,
+) {
+  await db.query(
+    "INSERT INTO confsys.submission_revision_requests(id,submission_id,revision_id,decision_id,deadline) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(decision_id) DO NOTHING",
+    [id, row.submission_id, row.revision_id, row.id, row.revision_deadline],
+  );
+}
