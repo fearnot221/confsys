@@ -1,5 +1,7 @@
 # 可重複部署的研討會管理系統
 
+工作樹入口與歷史資料夾整理見 [WORKSPACE_CONSOLIDATION](docs/WORKSPACE_CONSOLIDATION.md)。本目錄是主要整合工作樹；未完成程式片段集中保存在 `integration-pending/20261016`，尚未套用或驗證。
+
 **一份程式碼，每場研討會獨立部署，每個實例只服務一場。** 帳號、Session、token、資料、佇列與郵件各自獨立；不是全域帳號跨研討會平台。主辦單位是介紹／聯絡資料，不是 tenant。產品決策見 [SPEC](docs/SPEC.md)／[ADR 0003](docs/adr/0003-single-conference.md)。
 
 目前開發分支已接上私有檔案／邀請、報名與人工核帳、投稿、審查、議程／競賽及現場／行政作業。這些功能使用真實 PostgreSQL、Redis、worker 與 Mailpit；各項驗證與尚未完成範圍見 [連續開發紀錄](docs/CONTINUOUS_RUN.md)。2026-10-15 本輪明確授權連續推進至 Phase 6，截止台北時間 10:00；不代表已全數驗收或可正式上線。

@@ -1,0 +1,249 @@
+import { beforeAll, afterAll, it, expect } from "vitest";
+import { randomUUID } from "node:crypto";
+import { withIdentityTransaction } from "@confsys/db";
+import { authFixture, password } from "../helpers/auth.js";
+import { createAuthService } from "../../apps/api/src/auth/service.js";
+import { createRegistrationService } from "../../apps/api/src/registration/service.js";
+import * as repository from "../../apps/api/src/registration/repository.js";
+const f = authFixture(),
+  auth = createAuthService(f.app, f.config),
+  service = createRegistrationService(f.app, f.config);
+const rid = () => randomUUID(),
+  ticket = rid(),
+  raceTicket = rid();
+async function account(admin = false) {
+  const email = f.email();
+  await auth.requestMail("register", email, rid());
+  await auth.consume("verify", (await f.link(email)).token, password, rid());
+  const login = await auth.login(email, password, rid());
+  if (admin)
+    await f.admin.query(
+      "INSERT INTO confsys.user_roles(user_id,role) VALUES($1,'conference_admin')",
+      [login.account.user.id],
+    );
+  return { id: login.account.user.id, raw: login.raw };
+}
+let admin: Awaited<ReturnType<typeof account>>,
+  owner: typeof admin,
+  waiting: typeof admin,
+  racers: (typeof admin)[] = [],
+  oldVersion: number | null,
+  version: number;
+let document: NonNullable<
+  Awaited<ReturnType<typeof service.configuration>>["document"]
+>;
+const users: string[] = [];
+const input = (id = ticket) => ({
+  idempotencyKey: rid(),
+  configVersion: version,
+  ticketId: id,
+  badgeName: "Synthetic capacity",
+  affiliation: "Synthetic",
+  consent: true as const,
+  answers: {},
+});
+beforeAll(async () => {
+  f.migrate();
+  admin = await account(true);
+  owner = await account();
+  waiting = await account();
+  racers = [await account(), await account()];
+  users.push(admin.id, owner.id, waiting.id, ...racers.map((v) => v.id));
+  const before = await service.configuration();
+  oldVersion = before.version || null;
+  const startsAt = new Date(Date.now() - 3600000).toISOString(),
+    endsAt = new Date(Date.now() + 3600000).toISOString();
+  document = {
+    opensAt: startsAt,
+    closesAt: endsAt,
+    currency: "TWD",
+    timezone: "Asia/Taipei",
+    consent: "Synthetic authority consent",
+    fields: [],
+    tickets: [
+      ...(before.document?.tickets ?? []),
+      {
+        id: ticket,
+        name: "Capacity",
+        capacity: 1,
+        waitlist: true,
+        rates: [{ startsAt, endsAt, amount: "100" }],
+      },
+      {
+        id: raceTicket,
+        name: "Concurrent",
+        capacity: 1,
+        waitlist: false,
+        rates: [{ startsAt, endsAt, amount: "0" }],
+      },
+    ],
+  };
+  version = (
+    await service.configure(
+      admin.raw,
+      { expectedVersion: before.version, document },
+      rid(),
+    )
+  ).version;
+});
+afterAll(async () => {
+  for (const table of [
+    "order_items",
+    "orders",
+    "registration_changes",
+    "registrations",
+  ]) {
+    const where =
+      table === "order_items"
+        ? "order_id IN(SELECT id FROM confsys.orders WHERE user_id=ANY($1::uuid[]))"
+        : table === "registration_changes"
+          ? "registration_id IN(SELECT id FROM confsys.registrations WHERE user_id=ANY($1::uuid[]))"
+          : "user_id=ANY($1::uuid[])";
+    await f.admin.query(`DELETE FROM confsys.${table} WHERE ${where}`, [users]);
+  }
+  if (oldVersion !== undefined)
+    await f.admin.query("UPDATE confsys.registration_state SET version=$1", [
+      oldVersion,
+    ]);
+  await f.admin.query(
+    "DELETE FROM confsys.registration_config_versions WHERE created_by=ANY($1::uuid[])",
+    [users],
+  );
+  await f.cleanup();
+});
+it("denies configuration writes without configure authority and binds the publisher identity", async () => {
+  const insert = (
+    actor: string | undefined,
+    configure = false,
+    createdBy = admin.id,
+  ) =>
+    withIdentityTransaction(f.app, async (db) => {
+      if (actor) await repository.context(db, actor, false, configure);
+      return db.query(
+        "INSERT INTO confsys.registration_config_versions(version,document,created_by) VALUES($1,$2,$3)",
+        [version + 1, document, createdBy],
+      );
+    });
+  await expect(insert(undefined)).rejects.toMatchObject({ code: "42501" });
+  await expect(insert(owner.id)).rejects.toMatchObject({ code: "42501" });
+  await expect(insert(admin.id, true, owner.id)).rejects.toMatchObject({
+    code: "42501",
+  });
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await repository.context(db, owner.id, false);
+      await db.query("UPDATE confsys.registration_state SET version=NULL");
+    }),
+  ).rejects.toMatchObject({ code: "42501" });
+  await withIdentityTransaction(f.worker, async (db) => {
+    await db.query(
+      "SELECT singleton FROM confsys.registration_state FOR SHARE",
+    );
+  });
+  await expect(
+    f.worker.query("UPDATE confsys.registration_state SET version=NULL"),
+  ).rejects.toMatchObject({ code: "42501" });
+  expect((await service.configuration()).version).toBe(version);
+});
+it("blocks owner raw promotion, full promotion and capacity reduction but preserves cancellation and FIFO promotion with original price", async () => {
+  const first = await service.create(owner.raw, input(), rid());
+  const second = await service.create(waiting.raw, input(), rid());
+  expect(first.state).toBe("confirmed");
+  expect(second.state).toBe("waitlisted");
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await repository.context(db, waiting.id, false);
+      await db.query(
+        "UPDATE confsys.registrations SET state='confirmed' WHERE id=$1",
+        [second.id],
+      );
+    }),
+  ).rejects.toMatchObject({ code: "42501" });
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await repository.context(db, admin.id, true);
+      await db.query(
+        "UPDATE confsys.registrations SET state='confirmed' WHERE id=$1",
+        [second.id],
+      );
+    }),
+  ).rejects.toMatchObject({
+    code: "23514",
+    constraint: "registration_capacity_guard",
+  });
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await repository.context(db, admin.id, true, true);
+      const reduced = {
+        ...document,
+        tickets: document.tickets.map((t) =>
+          t.id === ticket ? { ...t, capacity: 0 } : t,
+        ),
+      };
+      await repository.saveConfiguration(db, reduced, version + 1, admin.id);
+    }),
+  ).rejects.toMatchObject({
+    code: "23514",
+    constraint: "registration_configuration_guard",
+  });
+  expect((await service.configuration()).version).toBe(version);
+  await service.cancel(
+    owner.raw,
+    {
+      id: first.id,
+      expectedVersion: first.version,
+      reason: "Synthetic release",
+    },
+    rid(),
+  );
+  const promoted = await service.promote(
+    admin.raw,
+    {
+      id: second.id,
+      expectedVersion: second.version,
+      reason: "Synthetic FIFO promotion",
+    },
+    rid(),
+  );
+  expect(promoted.state).toBe("confirmed");
+  expect(promoted.order?.amount).toBe("100");
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await repository.context(db, owner.id, false);
+      await db.query(
+        "UPDATE confsys.registrations SET state='confirmed' WHERE id=$1",
+        [first.id],
+      );
+    }),
+  ).rejects.toMatchObject({
+    code: "23514",
+    constraint: "registration_capacity_guard",
+  });
+});
+it("serializes two direct app admissions at one remaining seat without owner-RLS undercount", async () => {
+  const results = await Promise.allSettled(
+    racers.map((person) =>
+      withIdentityTransaction(f.app, async (db) => {
+        await repository.context(db, person.id, false);
+        return db.query(
+          "INSERT INTO confsys.registrations(id,user_id,config_version,ticket_id,ticket_name,state,badge_name,affiliation,answers,consent_snapshot,idempotency_key,request_hash) VALUES($1,$2,$3,$4,'Concurrent','confirmed','Synthetic','Synthetic','{}','Synthetic',$5,'synthetic')",
+          [rid(), person.id, version, raceTicket, rid()],
+        );
+      }),
+    ),
+  );
+  expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  const failed = results.find((r) => r.status === "rejected");
+  expect(failed?.status === "rejected" && failed.reason).toMatchObject({
+    code: "23514",
+    constraint: "registration_capacity_guard",
+  });
+  expect(
+    (
+      await f.admin.query(
+        "SELECT count(*)::int AS count FROM confsys.registrations WHERE ticket_id=$1 AND state='confirmed'",
+        [raceTicket],
+      )
+    ).rows[0].count,
+  ).toBe(1);
+});

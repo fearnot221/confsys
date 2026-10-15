@@ -1,0 +1,63 @@
+diff --git a/tests/integration/reviews.test.ts b/tests/integration/reviews.test.ts
+index a4fb7f5..1a89d22 100644
+--- a/tests/integration/reviews.test.ts
++++ b/tests/integration/reviews.test.ts
+@@ -1417,3 +1417,58 @@ it("final review documents cannot be rewritten or reopened through direct applic
+     ),
+   ).rejects.toMatchObject({ code: "23514" });
+ });
++
++it("revocation and final review submission serialize against the same assignment version", async () => {
++  const p = await submitted(),
++    a = await assigned(p);
++  const accepted = await reviews.action(
++    reviewer.raw,
++    { id: a.id, expectedVersion: a.version, action: "accept" },
++    rid(),
++  );
++  const operation = rid();
++  const results = await Promise.allSettled([
++    reviews.revoke(
++      admin.raw,
++      {
++        id: operation,
++        assignmentId: a.id,
++        expectedVersion: accepted.version,
++        reason: "Concurrent reassignment request",
++      },
++      rid(),
++    ),
++    reviews.action(
++      reviewer.raw,
++      {
++        id: a.id,
++        expectedVersion: accepted.version,
++        action: "submit",
++        document: {
++          scores: [{ criterionId: "quality", value: 4 }],
++          authorComment: "Concurrent final comment",
++          privateComment: "Concurrent private comment",
++        },
++      },
++      rid(),
++    ),
++  ]);
++  expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
++  expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
++  const row = (
++    await f.admin.query(
++      "SELECT state,version FROM confsys.review_assignments WHERE id=$1",
++      [a.id],
++    )
++  ).rows[0];
++  expect(["revoked", "submitted"]).toContain(row.state);
++  expect(row.version).toBe(accepted.version + 1);
++  expect(
++    (
++      await f.admin.query(
++        "SELECT id FROM confsys.review_assignment_revocations WHERE assignment_id=$1",
++        [a.id],
++      )
++    ).rowCount,
++  ).toBe(row.state === "revoked" ? 1 : 0);
++});

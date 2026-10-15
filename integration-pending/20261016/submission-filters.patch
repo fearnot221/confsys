@@ -1,0 +1,278 @@
+diff --git a/apps/api/src/submissions/repository.ts b/apps/api/src/submissions/repository.ts
+index 810ff7e..ea8c633 100644
+--- a/apps/api/src/submissions/repository.ts
++++ b/apps/api/src/submissions/repository.ts
+@@ -6,6 +6,7 @@ import {
+   submissionRevisionSchema,
+   submissionConfigSchema,
+   type SubmissionDocument,
++  type SubmissionListFilters,
+   type SubmissionConfig,
+   type SubmissionRegistrationRequirement,
+ } from "@confsys/contracts";
+@@ -55,11 +56,12 @@ export async function list(
+   actorId: string,
+   admin: boolean,
+   offset: number,
++  filters:SubmissionListFilters,
+ ) {
+   const rows = (
+     await db.query(
+-      `SELECT ${fields} FROM confsys.submissions WHERE ($1::boolean OR owner_id=$2) ORDER BY updated_at DESC,id LIMIT 21 OFFSET $3`,
+-      [admin, actorId, offset],
++      `SELECT ${fields} FROM confsys.submissions WHERE ($1::boolean OR owner_id=$2) AND ($4='any' OR state=$4) AND ($5='' OR document->>'trackId'=$5) AND ($6='' OR number::text=$6 OR strpos(lower(document->>'title'),lower($6))>0) ORDER BY updated_at DESC,id LIMIT 21 OFFSET $3`,
++      [admin, actorId, offset,filters.state,filters.trackId,filters.query],
+     )
+   ).rows;
+   return {
+diff --git a/apps/api/src/submissions/routes.ts b/apps/api/src/submissions/routes.ts
+index d958004..0ac2a0e 100644
+--- a/apps/api/src/submissions/routes.ts
++++ b/apps/api/src/submissions/routes.ts
+@@ -44,7 +44,7 @@ export function registerSubmissionRoutes(
+             return service.configure(raw, req.body, req.id);
+           case "submissionList": {
+             const q = submissionEndpoints.submissionList.input.parse(req.query);
+-            return service.list(raw, q.scope, q.offset);
++            return service.list(raw, q.scope, q.offset,{state:q.state,trackId:q.trackId,query:q.query});
+           }
+           case "submissionDetail": {
+             const q = submissionEndpoints.submissionDetail.input.parse(
+diff --git a/apps/api/src/submissions/service.ts b/apps/api/src/submissions/service.ts
+index a906136..3d5e312 100644
+--- a/apps/api/src/submissions/service.ts
++++ b/apps/api/src/submissions/service.ts
+@@ -5,6 +5,8 @@ import { enqueueBusinessNotification } from "@confsys/notifications";
+ import { effectivePublicSite } from "../site/branding.js";
+ import {
+   submissionEndpoints,
++  submissionListInput,
++  submissionListFiltersSchema,
+   submissionSaveInput,
+   submissionTransitionInput,
+   submissionConfigInput,
+@@ -135,12 +137,14 @@ export function createSubmissionService(
+         return saved;
+       });
+     },
+-    list: (raw: string | undefined, scope: "own" | "admin", offset: number) =>
+-      authenticated(
++    list: (raw: string | undefined, scope: "own" | "admin", offset: number,filters:unknown={}) => {
++      const data=submissionListInput.parse({scope,offset,...submissionListFiltersSchema.parse(filters)});
++      return authenticated(
+         raw,
+-        scope === "admin" ? "submissions.read_all" : undefined,
+-        (db, actor) => repo.list(db, actor, scope === "admin", offset),
+-      ),
++        data.scope === "admin" ? "submissions.read_all" : undefined,
++        (db, actor) => repo.list(db, actor, data.scope === "admin", data.offset,data),
++      );
++    },
+     detail: (
+       raw: string | undefined,
+       id: string,
+diff --git a/apps/web/src/features/submissions/components/submissions-screen.tsx b/apps/web/src/features/submissions/components/submissions-screen.tsx
+index 6fd9a96..2fb9075 100644
+--- a/apps/web/src/features/submissions/components/submissions-screen.tsx
++++ b/apps/web/src/features/submissions/components/submissions-screen.tsx
+@@ -2,6 +2,7 @@ import { useState } from "react";
+ import { RegistrationRequirement } from "./registration-requirement.js";
+ import type {
+   Submission,
++  SubmissionListFilters,
+   SubmissionConfig,
+   SubmissionDocument,
+   SubmissionRegistrationRequirement,
+@@ -21,6 +22,8 @@ type Props = {
+   error: string;
+   message: string;
+   items: Submission[];
++  filters:SubmissionListFilters;
++  onFilters:(filters:SubmissionListFilters)=>void;
+   offset: number;
+   nextOffset: number | null;
+   current: Submission | null;
+@@ -46,6 +49,15 @@ type Props = {
+   onConfigure: () => void;
+   onRegistrationReminder: () => void;
+ };
++function SubmissionFilters({filters,tracks,busy,onApply}:{filters:SubmissionListFilters;tracks:SubmissionConfig["tracks"];busy:boolean;onApply:(filters:SubmissionListFilters)=>void}) {
++ const [state,setState]=useState(filters.state),[trackId,setTrackId]=useState(filters.trackId),[query,setQuery]=useState(filters.query);
++ return <form onSubmit={e=>{e.preventDefault();onApply({state,trackId,query});}}>
++ <label htmlFor="submission-filter-state">篩選投稿狀態</label><select id="submission-filter-state" value={state} onChange={e=>{const v=e.target.value;if(v==="any"||v==="draft"||v==="submitted"||v==="withdrawn")setState(v);}}><option value="any">全部狀態</option><option value="draft">草稿</option><option value="submitted">已提交</option><option value="withdrawn">已撤回</option></select>
++ <label htmlFor="submission-filter-track">篩選主題軌</label><select id="submission-filter-track" value={trackId} onChange={e=>setTrackId(e.target.value)}><option value="">全部主題軌</option>{tracks.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
++ <label htmlFor="submission-filter-query">搜尋標題或完整投稿編號</label><input id="submission-filter-query" value={query} onChange={e=>setQuery(e.target.value)} maxLength={120}/>
++ <button disabled={busy}>套用投稿篩選</button><button type="button" disabled={busy} onClick={()=>{setState("any");setTrackId("");setQuery("");onApply({state:"any",trackId:"",query:""});}}>清除投稿篩選</button>
++ </form>;
++}
+ export function SubmissionsScreen(p: Props) {
+   const [confirm, setConfirm] = useState<"submit" | "withdraw" | null>(null),
+     [historical, setHistorical] = useState<string | null>(null),
+@@ -335,7 +347,8 @@ export function SubmissionsScreen(p: Props) {
+               建立新草稿
+             </button>
+           )}
+-          {!p.items.length && !p.loading && <p>目前沒有稿件。</p>}
++          <SubmissionFilters filters={p.filters} tracks={config?.tracks ?? []} busy={p.busy || p.loading} onApply={p.onFilters} />
++          {!p.items.length && !p.loading && <p>目前沒有符合篩選的稿件。</p>}
+           <ul>
+             {p.items.map((s) => (
+               <li key={s.id}>
+@@ -348,7 +361,7 @@ export function SubmissionsScreen(p: Props) {
+                 >
+                   {s.document.title || "未命名稿件"}
+                 </button>{" "}
+-                —{" "}
++                · 投稿編號 {s.number} —{" "}
+                 {s.state === "draft"
+                   ? "草稿未提交"
+                   : s.state === "submitted"
+diff --git a/apps/web/src/features/submissions/hooks/use-submissions.ts b/apps/web/src/features/submissions/hooks/use-submissions.ts
+index bb467f4..d552268 100644
+--- a/apps/web/src/features/submissions/hooks/use-submissions.ts
++++ b/apps/web/src/features/submissions/hooks/use-submissions.ts
+@@ -12,6 +12,7 @@ import {
+   submissionDetailSchema,
+   submissionListSchema,
+   type SubmissionDocument,
++  type SubmissionListFilters,
+   type SubmissionConfig,
+   type Submission,
+ } from "@confsys/contracts";
+@@ -38,6 +39,7 @@ export function useSubmissions(admin = false) {
+     epoch = useRef(0),
+     controller = useRef<AbortController | null>(null),
+     reminderKeys = useRef(new Map<string, string>());
++  const [filters,setFilters]=useState<SubmissionListFilters>({state:"any",trackId:"",query:""});
+   const [expired, setExpired] = useState(false),
+     [offset, setOffset] = useState(0),
+     [revisionOffset, setRevisionOffset] = useState(0),
+@@ -69,12 +71,12 @@ export function useSubmissions(admin = false) {
+     enabled: allowed,
+   });
+   const list = useQuery({
+-    queryKey: ["private", "submissions", "list", admin, offset],
++    queryKey: ["private", "submissions", "list", admin, offset,filters],
+     queryFn: async ({ signal }) =>
+       submissionListSchema.parse(
+         await client(
+           "submissionList",
+-          { scope: admin ? "admin" : "own", offset },
++          { scope: admin ? "admin" : "own", offset,...filters },
+           signal,
+         ),
+       ),
+@@ -177,6 +179,8 @@ export function useSubmissions(admin = false) {
+           ? "讀取失敗，請重試。"
+           : ""),
+     message,
++    filters,
++    onFilters:(next:SubmissionListFilters)=>{setFilters(next);setOffset(0);},
+     items: allowed ? (list.data?.items ?? []) : [],
+     offset,
+     nextOffset: list.data?.nextOffset ?? null,
+diff --git a/packages/contracts/src/submissions.ts b/packages/contracts/src/submissions.ts
+index dca123e..fe2888c 100644
+--- a/packages/contracts/src/submissions.ts
++++ b/packages/contracts/src/submissions.ts
+@@ -85,7 +85,13 @@ export const submissionDetailSchema = z.strictObject({
+   revisions: z.array(submissionRevisionSchema),
+   nextRevisionOffset: z.number().int().nullable(),
+ });
+-export const submissionListInput = z.strictObject({
++export const submissionListFiltersSchema = z.strictObject({
++ state:z.enum(["any","draft","submitted","withdrawn"]).default("any"),
++ trackId:z.string().trim().max(80).default(""),
++ query:z.string().trim().max(120).default(""),
++});
++export type SubmissionListFilters=z.infer<typeof submissionListFiltersSchema>;
++export const submissionListInput = submissionListFiltersSchema.extend({
+   scope: z.enum(["own", "admin"]).default("own"),
+   offset: z.coerce.number().int().min(0).max(100000).default(0),
+ });
+diff --git a/tests/e2e/submissions.spec.ts b/tests/e2e/submissions.spec.ts
+index 686f5fc..ba1da74 100644
+--- a/tests/e2e/submissions.spec.ts
++++ b/tests/e2e/submissions.spec.ts
+@@ -1,4 +1,5 @@
+ import { test, expect } from "@playwright/test";
++import { randomUUID } from "node:crypto";
+ import { execFileSync } from "node:child_process";
+ import { authFixture } from "../helpers/auth.js";
+ import { register, login } from "../helpers/browser-account.js";
+@@ -153,5 +154,23 @@ test("admin configures real window; author saves, submits, revises, inspects his
+   await expect(
+     author.getByRole("button", { name: "儲存草稿", exact: true }),
+   ).toBeDisabled();
++  // Real draft API creates a second result page so changing filters must reset paging.
++  const csrf=(await (await author.request.get("/api/auth/csrf")).json()).csrfToken;
++  for(let i=0;i<21;i++) {
++   const response=await author.request.post("/api/submissions",{headers:{origin:process.env.PUBLIC_APP_ORIGIN!,"x-csrf-token":csrf},data:{id:randomUUID(),expectedVersion:0,document:{title:`Filter pagination fixture ${i}`,abstract:"",keywords:[],correspondingAuthorIndex:0,trackId:"research",topicIds:[],authors:[{name:"Synthetic Author",email:authorEmail,affiliation:""}],presenterIndex:0,presentationPreference:"either",competition:false,attachmentIds:[],slidesFileId:null,videoUrl:""}}});
++   expect(response.ok()).toBe(true);
++  }
++  await author.reload();
++  await author.getByRole("button",{name:"下一頁",exact:true}).click();
++  await expect(author.getByRole("button",{name:"上一頁",exact:true})).toBeEnabled();
++  await author.getByLabel("篩選投稿狀態",{exact:true}).selectOption("withdrawn");
++  await author.getByLabel("篩選主題軌",{exact:true}).selectOption("research");
++  await author.getByLabel("搜尋標題或完整投稿編號",{exact:true}).fill("revised manuscript");
++  await author.getByRole("button",{name:"套用投稿篩選",exact:true}).click();
++  await expect(author.getByRole("button",{name:"上一頁",exact:true})).toBeDisabled();
++  await expect(author.getByRole("button",{name:"Synthetic revised manuscript",exact:true})).toBeVisible();
++  await author.getByLabel("搜尋標題或完整投稿編號",{exact:true}).fill("% OR fake wildcard");
++  await author.getByRole("button",{name:"套用投稿篩選",exact:true}).click();
++  await expect(author.getByText("目前沒有符合篩選的稿件。",{exact:true})).toBeVisible();
+   await authorContext.close();
+ });
+diff --git a/tests/integration/submissions.test.ts b/tests/integration/submissions.test.ts
+index d261a9c..a99b112 100644
+--- a/tests/integration/submissions.test.ts
++++ b/tests/integration/submissions.test.ts
+@@ -850,3 +850,28 @@ it("pins optional post-acceptance registration deadlines and exposes status only
+     ]);
+   }
+ });
++
++it("filters bounded lists by state, track and literal title/number without widening owner scope",async()=>{
++ const token=`filter-${rid()}`;
++ const rows=[];
++ for(let i=0;i<23;i++) rows.push(await draft({...doc(),title:`${token} item ${i}`}));
++ const selected=rows[0]!;
++ const submitted=await service.transition(author.raw,{id:selected.id,expectedVersion:selected.version,action:"submit"},rid());
++ const otherTrack=await draft({...doc(),trackId:"other-track",topicIds:[],title:`${token} other-track`});
++ const strangerPaper=await service.save(stranger.raw,{id:rid(),expectedVersion:0,document:{...doc(),title:`${token} private stranger`}},rid());
++ const first=await service.list(author.raw,"own",0,{query:token,trackId:"science",state:"draft"});
++ expect(first.items).toHaveLength(20);expect(first.nextOffset).toBe(20);
++ const second=await service.list(author.raw,"own",20,{query:token,trackId:"science",state:"draft"});
++ expect(second.items).toHaveLength(2);expect(second.nextOffset).toBeNull();
++ expect(new Set([...first.items,...second.items].map(r=>r.id)).size).toBe(22);
++ expect((await service.list(author.raw,"own",0,{state:"submitted",query:token})).items.map(r=>r.id)).toEqual([submitted.id]);
++ expect((await service.list(author.raw,"own",0,{query:selected.number})).items.map(r=>r.id)).toEqual([selected.id]);
++ expect((await service.list(author.raw,"own",0,{query:token,trackId:"other-track"})).items.map(r=>r.id)).toEqual([otherTrack.id]);
++ expect((await service.list(author.raw,"own",0,{query:strangerPaper.number})).items).toEqual([]);
++ expect((await service.list(leader.raw,"admin",0,{query:strangerPaper.number})).items.map(r=>r.id)).toEqual([strangerPaper.id]);
++ await expect(service.list(staff.raw,"admin",0,{query:token})).rejects.toMatchObject({code:"FORBIDDEN"});
++ for(const query of ["%","_","' OR true --"])
++ expect((await service.list(author.raw,"own",0,{query})).items).toEqual([]);
++ await expect(service.list(author.raw,"own",0,{query:"x".repeat(121)})).rejects.toThrow();
++ await expect(service.list(author.raw,"own",0,{state:"accepted"})).rejects.toThrow();
++});
+diff --git a/tests/unit/submissions-sdk.test.ts b/tests/unit/submissions-sdk.test.ts
+index dd21d91..56c59c9 100644
+--- a/tests/unit/submissions-sdk.test.ts
++++ b/tests/unit/submissions-sdk.test.ts
+@@ -42,3 +42,14 @@ it("submission SDK encodes bounded history query, forwards abort and validates f
+   ).rejects.toThrow();
+   expect(calls).toHaveLength(1);
+ });
++
++it("encodes submission filters as bounded query values with no authority inferred from search",async()=>{
++ const urls:string[]=[];
++ const client=createSubmissionClient("",async(input)=>{urls.push(String(input));return new Response(JSON.stringify({items:[],nextOffset:null}));});
++ const signal=new AbortController().signal;
++ await client("submissionList",{scope:"own",offset:20,state:"withdrawn",trackId:"science",query:"50% O'Reilly + 空白"},signal);
++ const url=new URL(urls[0]!,"https://example.invalid");
++ expect(Object.fromEntries(url.searchParams)).toEqual({scope:"own",offset:"20",state:"withdrawn",trackId:"science",query:"50% O'Reilly + 空白"});
++ await expect(client("submissionList",{query:"x".repeat(121)},signal)).rejects.toThrow();
++ expect(urls).toHaveLength(1);
++});
