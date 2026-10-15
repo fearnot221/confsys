@@ -52,6 +52,7 @@ export function createRegistrationService(pool: Pool, config: ApiConfig) {
         db,
         actor.id,
         permissionsFor(roles).includes("registration.manage"),
+        permissionsFor(roles).includes("registration.configure"),
       );
       return work(db, actor.id);
     });
@@ -274,8 +275,16 @@ export function createRegistrationService(pool: Pool, config: ApiConfig) {
         await repo.lockConfiguration(db);
         const current = await repo.detail(db, data.id);
         if (current.state === "cancelled") return current;
-        await assertActivityCancellationAllowed(db,{registrationId:data.id},permissionsFor(await rolesFor(db,actor)).includes("registration.manage"));
-        const result = await repo.cancel(db, data.id).catch(translateActivityConflict);
+        await assertActivityCancellationAllowed(
+          db,
+          { registrationId: data.id },
+          permissionsFor(await rolesFor(db, actor)).includes(
+            "registration.manage",
+          ),
+        );
+        const result = await repo
+          .cancel(db, data.id)
+          .catch(translateActivityConflict);
         await repo.recordChange(db, actor, current, result, data.reason);
         await audit(
           db,

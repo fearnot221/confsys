@@ -34,10 +34,15 @@ export async function saveConfiguration(
   );
   await db.query("UPDATE confsys.registration_state SET version=$1", [version]);
 }
-export async function context(db: PoolClient, actor: string, admin: boolean) {
+export async function context(
+  db: PoolClient,
+  actor: string,
+  admin: boolean,
+  configure = false,
+) {
   await db.query(
-    "SELECT set_config('app.actor_id',$1,true),set_config('app.registration_admin',$2,true)",
-    [actor, String(admin)],
+    "SELECT set_config('app.actor_id',$1,true),set_config('app.registration_admin',$2,true),set_config('app.registration_configure',$3,true)",
+    [actor, String(admin), String(configure)],
   );
 }
 const projection = `SELECT r.id,r.number::text,r.version,coalesce(v.document->'fields','[]'::jsonb) AS "formFields",r.state,r.ticket_name AS "ticketName",r.badge_name AS "badgeName",r.affiliation,r.config_version AS "configVersion",r.answers,r.created_at,
@@ -270,12 +275,10 @@ export async function history(db: PoolClient, id: string, offset = 0) {
     )
   ).rows;
   return {
-    items: rows
-      .slice(0, 20)
-      .map(({ created_at, ...row }) => ({
-        ...row,
-        createdAt: (created_at as Date).toISOString(),
-      })),
+    items: rows.slice(0, 20).map(({ created_at, ...row }) => ({
+      ...row,
+      createdAt: (created_at as Date).toISOString(),
+    })),
     nextOffset: rows.length > 20 ? offset + 20 : null,
   };
 }
