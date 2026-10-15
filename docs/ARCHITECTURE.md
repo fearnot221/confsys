@@ -167,3 +167,20 @@ The reporting query uses one statement snapshot across all aggregates. Program c
 A group payment is a recorded payment with actual allocations to orders belonging to at least two distinct registration owners. Statistics group these payments by currency and current verification state. Payment records, unique payers and unique participants are counted independently per row. Declared payment amount, allocated amount and recorded refunds are separate exact minor-unit strings; allocation amounts are not new revenue, and refunds do not erase historical allocations. Date and ticket statistics retain their documented UTC creation-day and current registration-state semantics; these totals do not imply historical state reconstruction or individualized reading analytics.
 
 Migration 0051 restores the original prohibition on direct runtime `UPDATE users.email`. The fixed-search-path, app-executable-only `confirm_email_change(user_id, token_hash)` database function locks user then token, requires trusted actor equality and a live verified account, and matches the persisted single-use token's purpose, source address, epoch and expiry. It accepts no arbitrary target address. It atomically appends old/new verified aliases, updates only the confirmed target and consumes the token. The service still owns the access fence, recent password proof, session revocation and audit transaction; audit failure rolls the function's writes back as well. PUBLIC and worker receive no execute privilege.
+
+### Payment write and replacement-settlement boundaries
+
+Payment SELECT visibility does not grant reconciliation rights. App submissions
+start `submitted` without a verifier; only trusted finance context can update
+verification state, and confirmed/rejected states are terminal. The service still
+requires `finance.reconcile`, recent password proof, atomic audit and notification.
+
+Allocation constraints retain the original payment's gross allocation limit:
+refunds cannot make that original money available again. An open order instead
+uses net allocations minus recorded refunds, allowing a separately verified
+replacement payment to restore settlement. All paths retain the same PostgreSQL
+registration-state lock; history and refund limits remain unchanged.
+
+Activity duplicate-booking and redeemed-cancellation constraints have explicit
+identities mapped to HTTP409 in the domain boundary, including registration
+cascades. Unrelated constraint and infrastructure failures are rethrown unchanged.
