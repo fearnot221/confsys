@@ -184,3 +184,29 @@ registration-state lock; history and refund limits remain unchanged.
 Activity duplicate-booking and redeemed-cancellation constraints have explicit
 identities mapped to HTTP409 in the domain boundary, including registration
 cascades. Unrelated constraint and infrastructure failures are rethrown unchanged.
+
+### Payment reminder batches
+
+`finance-reminders` owns the finance-authorized unpaid audience and bounded request
+flow. It reuses notification batch persistence, immutable content, business
+outbox, idempotency, cancellation and SMTP worker; it does not create another mail
+engine. The exact shared registry permission is `finance.reconcile`. General bulk
+mail remains `notifications.manage`. Shared batch-kind permission selection is
+used for worker authority and general administrative retry/cancel/delivery access.
+A reminder retry retains its kind and excludes recipients who are now settled.
+
+The scoped audience returns active verified recipients with open orders whose
+net allocated amount is below the order amount, grouped by currency. Preview is
+100 recipients per page; each explicit batch is at most100 recipients. The fixed
+message directs recipients to authenticated finance details and intentionally
+contains no frozen amount. UI retries after uncertain network failures retain the
+same idempotency key for the same recipient selection/reason. Changing pages
+clears selections, so hidden pages are never implicitly mailed.
+
+Worker preflight locks access control, then takes a shared registration-state row
+lock and rereads current settlement and issuer authority. Finance mutations use
+the corresponding exclusive lock. Payment before this linearization point wins;
+SMTP after authorization cannot be recalled if payment arrives later. Immediate
+reminders, like scheduled notifications, stay absent from the inbox until this
+worker release. Worker receives only the singleton column lock grant and an
+eligibility boolean, not raw financial tables or an unrestricted balance view.
