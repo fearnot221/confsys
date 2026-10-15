@@ -46,7 +46,23 @@ export const reviewPaperSchema = z.strictObject({
     z.strictObject({ name: z.string(), affiliation: z.string() }),
   ),
 });
+export const reviewDeadlineExtensionSchema = z.strictObject({
+  id: z.uuid(),
+  previousDeadline: z.iso.datetime(),
+  deadline: z.iso.datetime(),
+  reason: z.string(),
+  createdAt: z.iso.datetime(),
+});
+export const reviewDeadlineExtensionInput = z.strictObject({
+  id: z.uuid(),
+  assignmentId: z.uuid(),
+  expectedVersion: z.number().int().min(1),
+  deadline: z.iso.datetime(),
+  reason: z.string().trim().min(3).max(2000),
+});
 export const reviewAssignmentSchema = z.strictObject({
+  effectiveDeadline: z.iso.datetime(),
+  deadlineHistory: z.array(reviewDeadlineExtensionSchema).max(50),
   id: z.uuid(),
   submissionId: z.uuid(),
   revisionId: z.uuid(),
@@ -168,6 +184,12 @@ export const reviewPageInput = z.strictObject({
   offset: z.coerce.number().int().min(0).max(100000).default(0),
 });
 export const reviewEndpoints = {
+  reviewExtendDeadline: {
+    method: "post",
+    path: "/api/reviews/extend-deadline",
+    input: reviewDeadlineExtensionInput,
+    output: reviewAssignmentSchema,
+  },
   reviewScreen: {
     method: "post",
     path: "/api/reviews/screen",

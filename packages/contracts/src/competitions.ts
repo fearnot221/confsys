@@ -58,7 +58,23 @@ export const competitionScoreSchema = z.strictObject({
   comment: z.string().max(4000),
 });
 export type CompetitionScore = z.infer<typeof competitionScoreSchema>;
+export const competitionDeadlineExtensionSchema = z.strictObject({
+  id: z.uuid(),
+  previousDeadline: z.iso.datetime(),
+  deadline: z.iso.datetime(),
+  reason: z.string(),
+  createdAt: z.iso.datetime(),
+});
+export const competitionDeadlineExtensionInput = z.strictObject({
+  id: z.uuid(),
+  assignmentId: z.uuid(),
+  expectedVersion: z.number().int().min(1),
+  deadline: z.iso.datetime(),
+  reason: z.string().trim().min(3).max(2000),
+});
 export const competitionAssignmentSchema = z.strictObject({
+  effectiveDeadline: z.iso.datetime(),
+  deadlineHistory: z.array(competitionDeadlineExtensionSchema).max(50),
   id,
   competitionId: id,
   entryId: id,
@@ -130,6 +146,12 @@ export const competitionPublicSchema = z.strictObject({
 });
 export type CompetitionPublic = z.infer<typeof competitionPublicSchema>;
 export const competitionEndpoints = {
+  competitionExtendDeadline: {
+    method: "post",
+    path: "/api/competitions/extend-deadline",
+    input: competitionDeadlineExtensionInput,
+    output: competitionAssignmentSchema,
+  },
   competitionPublic: {
     method: "get",
     path: "/api/competitions/awards",
@@ -179,7 +201,12 @@ export const competitionEndpoints = {
   competitionReplaceEntry: {
     method: "post",
     path: "/api/competitions/replace-entry",
-    input: z.strictObject({ predecessorId: id, expectedVersion: version, revisionId: id, reason }),
+    input: z.strictObject({
+      predecessorId: id,
+      expectedVersion: version,
+      revisionId: id,
+      reason,
+    }),
     output: competitionEntrySchema,
   },
   competitionEntry: {
