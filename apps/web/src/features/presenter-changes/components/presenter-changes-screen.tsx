@@ -68,16 +68,17 @@ function RequestCard({ row, props }: { row: PresenterChange; props: Props }) {
         <fieldset disabled={props.busy} className="space-y-2">
           <label className="block" htmlFor={`presenter-reason-${row.id}`}>
             處理理由（至少 3 字）
-            <textarea
-              id={`presenter-reason-${row.id}`}
-              required
-              minLength={3}
-              maxLength={300}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="block w-full rounded border p-2"
-            />
           </label>
+          <textarea
+            id={`presenter-reason-${row.id}`}
+            required
+            minLength={3}
+            maxLength={300}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="block w-full rounded border p-2"
+          />
+
           <div className="flex gap-3">
             {props.scope === "incoming" && row.state === "requested" && (
               <>
@@ -193,41 +194,40 @@ export function PresenterChangesScreen(props: Props) {
                 aria-describedby="presenter-help"
                 className="grid gap-3"
               >
-                <label htmlFor="presenter-submission">
-                  選擇投稿
-                  <select
-                    id="presenter-submission"
-                    required
-                    value={draft.submissionId}
-                    onChange={(e) => {
-                      const submission = props.candidates.find(
-                        (s) => s.id === e.target.value,
-                      );
-                      if (submission)
-                        setDraft({
-                          ...draft,
-                          submissionId: submission.id,
-                          sourceRevisionId: submission.currentRevisionId ?? "",
-                          expectedSubmissionVersion: submission.version,
-                          targetAuthorIndex: submission.document.presenterIndex,
-                        });
-                      else
-                        setDraft({
-                          ...draft,
-                          submissionId: "",
-                          sourceRevisionId: "",
-                        });
-                    }}
-                    className="block w-full border p-2"
-                  >
-                    <option value="">請選擇</option>
-                    {props.candidates.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        #{s.number} {s.document.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <label htmlFor="presenter-submission">選擇投稿</label>
+                <select
+                  id="presenter-submission"
+                  required
+                  value={draft.submissionId}
+                  onChange={(e) => {
+                    const submission = props.candidates.find(
+                      (s) => s.id === e.target.value,
+                    );
+                    if (submission)
+                      setDraft({
+                        ...draft,
+                        submissionId: submission.id,
+                        sourceRevisionId: submission.currentRevisionId ?? "",
+                        expectedSubmissionVersion: submission.version,
+                        targetAuthorIndex: submission.document.presenterIndex,
+                      });
+                    else
+                      setDraft({
+                        ...draft,
+                        submissionId: "",
+                        sourceRevisionId: "",
+                      });
+                  }}
+                  className="block w-full border p-2"
+                >
+                  <option value="">請選擇</option>
+                  {props.candidates.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      #{s.number} {s.document.title}
+                    </option>
+                  ))}
+                </select>
+
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -251,43 +251,41 @@ export function PresenterChangesScreen(props: Props) {
                     下一頁投稿
                   </button>
                 </div>
-                <label htmlFor="presenter-target">
-                  新報告者
-                  <select
-                    id="presenter-target"
-                    required
-                    value={draft.targetAuthorIndex}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        targetAuthorIndex: Number(e.target.value),
-                      })
-                    }
-                    className="block w-full border p-2"
-                  >
-                    {props.candidates
-                      .find((s) => s.id === draft.submissionId)
-                      ?.document.authors.map((author, index) => (
-                        <option key={index} value={index}>
-                          {author.name}（{author.email}）
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label htmlFor="presenter-request-reason">
-                  申請理由
-                  <textarea
-                    id="presenter-request-reason"
-                    required
-                    minLength={3}
-                    maxLength={300}
-                    value={draft.reason}
-                    onChange={(e) =>
-                      setDraft({ ...draft, reason: e.target.value })
-                    }
-                    className="block w-full border p-2"
-                  />
-                </label>
+                <label htmlFor="presenter-target">新報告者</label>
+                <select
+                  id="presenter-target"
+                  required
+                  value={draft.targetAuthorIndex}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      targetAuthorIndex: Number(e.target.value),
+                    })
+                  }
+                  className="block w-full border p-2"
+                >
+                  {props.candidates
+                    .find((s) => s.id === draft.submissionId)
+                    ?.document.authors.map((author, index) => (
+                      <option key={index} value={index}>
+                        {author.name}（{author.email}）
+                      </option>
+                    ))}
+                </select>
+
+                <label htmlFor="presenter-request-reason">申請理由</label>
+                <textarea
+                  id="presenter-request-reason"
+                  required
+                  minLength={3}
+                  maxLength={300}
+                  value={draft.reason}
+                  onChange={(e) =>
+                    setDraft({ ...draft, reason: e.target.value })
+                  }
+                  className="block w-full border p-2"
+                />
+
                 <button type="submit">提出變更申請</button>
               </fieldset>
             </form>
