@@ -2,7 +2,7 @@
 
 依使用者後續要求，桌面的封存資料夾及8個舊相容連結已移除。桌面只保留：
 
-`/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous`
+`/Users/fearnot/Desktop/confsys`
 
 此目錄現在是獨立Git repository，`.git`為實際目錄，不再依賴任何其他桌面資料夾。分支維持`codex/phase-1-4-to-6-continuous`；所有分支／tags／Git物件與主樹index均保留，沒有merge、reset或push。
 
@@ -30,3 +30,6 @@
 ## 可維護性檢查
 
 主專案改為自含Git資料庫，消除對外部封存資料夾的依賴。沒有新增業務規則、權限來源或套件依賴；未完成片段與已驗證程式仍清楚分開。歷史分支與未提交成果可恢復，最新功能仍依CONTINUOUS_DELIVERY所列項目待驗證。
+
+## 最終目錄名稱
+依使用者要求，唯一專案資料夾已改名為`/Users/fearnot/Desktop/confsys`。主.env的PRIVATE_STORAGE_ROOT及本地ClamAV設定中的絕對路徑同步更新，原設定私有備份保存在`.git/consolidation/rename-20261016`。Git分支／歷史不變，沒有保留舊桌面路徑連結。舊交付文件及測試證據中的原路徑屬歷史紀錄。未重啟本地服務或修改Docker容器；後續啟動應使用新路徑。
