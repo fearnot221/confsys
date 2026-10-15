@@ -140,11 +140,11 @@ export function useNotificationBatches() {
     canManage,
     preview: canManage ? preview : null,
     previewFilters: canManage ? previewFilters : null,
-    previewAudience: (filters: NotificationAudience) =>
+    previewAudience: (filters: NotificationAudience, offset = 0) =>
       run(async (signal) => {
         setPreview(null);
         setPreviewFilters(null);
-        const result = await client.preview(filters, signal);
+        const result = await client.preview(filters, signal, offset);
         if (signal.aborted) return;
         setPreview(result);
         setPreviewFilters(filters);

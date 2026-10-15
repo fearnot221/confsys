@@ -2,6 +2,7 @@ import {
   notificationBatchEndpoints,
   csrfSchema,
   errorSchema,
+  type NotificationAudience,
 } from "@confsys/contracts";
 import { ApiError } from "./errors.js";
 export function createNotificationBatchClient(
@@ -61,10 +62,10 @@ export function createNotificationBatchClient(
     );
   }
   return {
-    preview: (input: unknown, signal: AbortSignal) =>
+    preview: (filters: NotificationAudience, signal: AbortSignal, offset = 0) =>
       call(
         notificationBatchEndpoints.notificationAudiencePreview,
-        input,
+        { ...filters, offset },
         signal,
       ),
     templates: (offset: number, signal: AbortSignal) =>

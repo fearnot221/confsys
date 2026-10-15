@@ -15,7 +15,10 @@ type Props = {
   canManage: boolean;
   preview: NotificationAudiencePreview | null;
   previewFilters: NotificationAudience | null;
-  previewAudience: (filters: NotificationAudience) => Promise<void>;
+  previewAudience: (
+    filters: NotificationAudience,
+    offset?: number,
+  ) => Promise<void>;
   templates: NotificationTemplate[];
   templateOffset: number;
   templateNext: number | null;

@@ -1,0 +1,7 @@
+# Notification audience pagination
+
+Preview accepts offset(default 0, maximum 1,000,000); ordered email/id pages return <=100 items, actual offset and nullable nextOffset. LIMIT101 determines continuation without guessing from total. Existing audience filter shape stored in batch snapshots remains unchanged, and create still validates <=100 unique currently eligible recipients.
+
+SDK owns offset transport, hook owns preview server state; presentation paginates current filters, clears page-local checkboxes on every returned page, and explicitly replaces composer recipients when adopted. Loading/errors retain existing permission/session handling. Templates, scheduled recipient snapshots, send/retry behavior and permissions are unchanged. No migration, configuration or dependency changes.
+
+Verification: targeted ESLint and `pnpm exec tsc --noEmit -p tsconfig.json` PASS. Real PostgreSQL test authored with 103 synthetic account fixtures plus actual app-role pagination/outbox, boundary100/101, no omissions/duplicates, and disabled-after-preview denial. Browser test authored for later-page selection, cleared selections, exact recipient batch and real Mailpit delivery. Neither new PG/browser suite has run yet; waiting shared slot/main wiring. Offset pages are live views, not frozen datasets: concurrent identity/status changes may shift page positions; user selects explicit IDs and create rechecks state. This is disclosed in UI and not an automatic send-all function.

@@ -53,14 +53,13 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
   }
   return {
     preview: (raw: string | undefined, input: unknown) =>
-      transaction(raw, false, (db) =>
-        repo.audience(
-          db,
+      transaction(raw, false, (db) => {
+        const { offset, ...filters } =
           notificationBatchEndpoints.notificationAudiencePreview.input.parse(
             input,
-          ),
-        ),
-      ),
+          );
+        return repo.audience(db, filters, offset);
+      }),
     templates: (raw: string | undefined, input: unknown) =>
       transaction(raw, false, (db) =>
         repo.templates(

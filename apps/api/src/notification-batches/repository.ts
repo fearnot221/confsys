@@ -181,12 +181,16 @@ const audienceValues = (filters: NotificationAudience) => [
   filters.submission,
   filters.publishedOutcome,
 ];
-export async function audience(db: PoolClient, filters: NotificationAudience) {
+export async function audience(
+  db: PoolClient,
+  filters: NotificationAudience,
+  offset = 0,
+) {
   const values = audienceValues(filters);
   const items = (
     await db.query<{ id: string; email: string }>(
-      `SELECT id,email FROM confsys.notification_audience WHERE ${audienceWhere} ORDER BY email,id LIMIT 100`,
-      values,
+      `SELECT id,email FROM confsys.notification_audience WHERE ${audienceWhere} ORDER BY email,id LIMIT 101 OFFSET $5`,
+      [...values, offset],
     )
   ).rows;
   const total = Number(
@@ -197,7 +201,13 @@ export async function audience(db: PoolClient, filters: NotificationAudience) {
       )
     ).rows[0]?.total ?? 0,
   );
-  return { items, total, truncated: total > items.length };
+  return {
+    items: items.slice(0, 100),
+    total,
+    offset,
+    nextOffset: items.length > 100 ? offset + 100 : null,
+    truncated: total > 100,
+  };
 }
 export async function matchesAudience(
   db: PoolClient,
@@ -305,23 +315,21 @@ export async function deliveries(db: PoolClient, id: string, offset: number) {
     )
   ).rows;
   return {
-    items: rows
-      .slice(0, 20)
-      .map((row) =>
-        notificationDelivery.parse({
-          id: row.id,
-          userId: row.user_id,
-          email: row.email,
-          status: row.status,
-          resultCode: row.result_code,
-          providerId: row.provider_id,
-          attempts: row.attempts,
-          nextAttemptAt: row.next_attempt_at.toISOString(),
-          availableAt: row.available_at.toISOString(),
-          expiresAt: row.expires_at.toISOString(),
-          createdAt: row.created_at.toISOString(),
-        }),
-      ),
+    items: rows.slice(0, 20).map((row) =>
+      notificationDelivery.parse({
+        id: row.id,
+        userId: row.user_id,
+        email: row.email,
+        status: row.status,
+        resultCode: row.result_code,
+        providerId: row.provider_id,
+        attempts: row.attempts,
+        nextAttemptAt: row.next_attempt_at.toISOString(),
+        availableAt: row.available_at.toISOString(),
+        expiresAt: row.expires_at.toISOString(),
+        createdAt: row.created_at.toISOString(),
+      }),
+    ),
     nextOffset: rows.length > 20 ? offset + 20 : null,
   };
 }

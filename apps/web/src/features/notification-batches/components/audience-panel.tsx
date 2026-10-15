@@ -8,7 +8,7 @@ type Props = {
   busy: boolean;
   preview: NotificationAudiencePreview | null;
   previewFilters: NotificationAudience | null;
-  onPreview: (filters: NotificationAudience) => Promise<void>;
+  onPreview: (filters: NotificationAudience, offset?: number) => Promise<void>;
   onAdopt: (ids: string[], filters: NotificationAudience) => void;
 };
 export function NotificationAudiencePanel(p: Props) {
@@ -40,7 +40,8 @@ export function NotificationAudiencePanel(p: Props) {
           onChange={(e) =>
             setFilters({
               ...filters,
-              role: p.roleOptions.find(role => role === e.target.value) ?? null,
+              role:
+                p.roleOptions.find((role) => role === e.target.value) ?? null,
             })
           }
         >
@@ -109,9 +110,35 @@ export function NotificationAudiencePanel(p: Props) {
       {p.preview && current && (
         <>
           <p>
-            符合 {p.preview.total} 位；本次預覽 {p.preview.items.length} 位。
-            {p.preview.truncated && "超過每批100位，請縮小篩選或分批處理。"}
+            符合 {p.preview.total} 位；第{" "}
+            {Math.floor(p.preview.offset / 100) + 1} 頁，本次預覽{" "}
+            {p.preview.items.length} 位。
+            {p.preview.truncated && "可換頁分批處理，每批仍最多100位。"}
           </p>
+          <p>
+            換頁會清空本頁勾選；採用名單會替換編輯器目前收件者。帳號或狀態可能變更，送出時會重新檢查。
+          </p>
+          <nav aria-label="受眾預覽分頁">
+            <button
+              type="button"
+              disabled={p.busy || p.preview.offset === 0}
+              onClick={() =>
+                p.onPreview(filters, Math.max(0, p.preview!.offset - 100))
+              }
+            >
+              上一頁受眾
+            </button>
+            <button
+              type="button"
+              disabled={p.busy || p.preview.nextOffset === null}
+              onClick={() =>
+                p.preview?.nextOffset !== null &&
+                p.onPreview(filters, p.preview?.nextOffset)
+              }
+            >
+              下一頁受眾
+            </button>
+          </nav>
           <button
             type="button"
             disabled={p.busy}
