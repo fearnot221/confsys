@@ -67,7 +67,21 @@ export const reviewAssignmentSchema = z.strictObject({
   id: z.uuid(),
   submissionId: z.uuid(),
   revisionId: z.uuid(),
-  state: z.enum(["invited", "accepted", "declined", "conflicted", "submitted"]),
+  state: z.enum([
+    "invited",
+    "accepted",
+    "declined",
+    "conflicted",
+    "submitted",
+    "revoked",
+  ]),
+  revocation: z
+    .strictObject({
+      id: z.uuid(),
+      reason: z.string(),
+      createdAt: z.iso.datetime(),
+    })
+    .nullable(),
   version: z.number().int(),
   paper: reviewPaperSchema,
   form: reviewFormSchema,
@@ -198,6 +212,17 @@ export const reviewPageInput = z.strictObject({
   offset: z.coerce.number().int().min(0).max(100000).default(0),
 });
 export const reviewEndpoints = {
+  reviewRevoke: {
+    method: "post",
+    path: "/api/reviews/revoke",
+    input: z.strictObject({
+      id: z.uuid(),
+      assignmentId: z.uuid(),
+      expectedVersion: z.number().int().min(1),
+      reason: text(2000).min(3),
+    }),
+    output: reviewAssignmentSchema,
+  },
   reviewExtendDeadline: {
     method: "post",
     path: "/api/reviews/extend-deadline",
