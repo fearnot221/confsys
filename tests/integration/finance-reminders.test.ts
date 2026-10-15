@@ -403,6 +403,21 @@ it("known pre-SMTP retry preserves finance kind and audit failure rolls back bat
     sender.close();
   }
   expect((await state(batch.id)).status).toBe("failed");
+  await expect(
+    batches.retry(
+      admin.raw,
+      {
+        id: batch.id,
+        idempotencyKey: rid(),
+        reason: "Admin without finance cannot retry reminder",
+      },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await f.admin.query(
+    "INSERT INTO confsys.user_roles(user_id,role) VALUES($1,'finance')",
+    [admin.id],
+  );
   const retry = await batches.retry(
     admin.raw,
     {
@@ -449,4 +464,26 @@ it("known pre-SMTP retry preserves finance kind and audit failure rolls back bat
     );
     await f.admin.query("DROP FUNCTION confsys.reminder_test_failure()");
   }
+});
+
+it("finance cancellation is conference-wide while creation cannot forge another issuer", async () => {
+  const batch = await reminders.create(admin.raw, input([unpaid.id]), rid());
+  const cancelled = await reminders.cancel(
+    officer.raw,
+    { id: batch.id, reason: "Finance colleague cancels pending reminder" },
+    rid(),
+  );
+  expect(cancelled.cancelledAt).not.toBeNull();
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await db.query(
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.finance_admin','true',true),set_config('app.notifications_manage','false',true)",
+        [officer.id],
+      );
+      await db.query(
+        "INSERT INTO confsys.notification_batches(id,created_by,issuer_credential_version,idempotency_key,request_hash,subject,message_text,recipient_ids,kind) SELECT $1,id,credential_version,$2,'forged','Forged issuer','Must fail',ARRAY[$3]::uuid[],'payment_reminder' FROM confsys.users WHERE id=$4",
+        [rid(), rid(), unpaid.id, admin.id],
+      );
+    }),
+  ).rejects.toMatchObject({ code: "42501" });
 });
