@@ -272,29 +272,25 @@ test("one participant traverses paid registration, manuscript review, public pro
     const participant = (await get(page, "/api/registration/mine")).items[0];
     expect(participant.order.paid).toBe("0");
     await page.goto("/activities");
-    const meal = page
-      .locator("article")
-      .filter({
-        has: page.getByRole("heading", {
-          level: 2,
-          name: "跨階段合成午餐",
-          exact: true,
-        }),
-      });
+    const meal = page.locator("article").filter({
+      has: page.getByRole("heading", {
+        level: 2,
+        name: "跨階段合成午餐",
+        exact: true,
+      }),
+    });
     await meal.locator("select[name=mealType]").selectOption("素食");
     await meal
       .getByRole("button", { name: "確認預訂並建立訂單", exact: true })
       .click();
     await expect(
-      page
-        .locator("article")
-        .filter({
-          has: page.getByRole("heading", {
-            level: 3,
-            name: "跨階段合成午餐",
-            exact: true,
-          }),
+      page.locator("article").filter({
+        has: page.getByRole("heading", {
+          level: 3,
+          name: "跨階段合成午餐",
+          exact: true,
         }),
+      }),
     ).toContainText("reserved");
     const booking = (await get(page, "/api/activities/mine")).items.find(
       (b: { activityId: string }) => b.activityId === activityId,
@@ -312,11 +308,9 @@ test("one participant traverses paid registration, manuscript review, public pro
     ).payments.find((p: { reference: string }) => p.reference === reference);
     expect(payment.state).toBe("submitted");
     await admin.goto("/admin/finance");
-    const paymentRow = admin
-      .locator("article")
-      .filter({
-        has: admin.getByRole("heading", { name: reference, exact: true }),
-      });
+    const paymentRow = admin.locator("article").filter({
+      has: admin.getByRole("heading", { name: reference, exact: true }),
+    });
     await paymentRow
       .getByLabel("核帳理由", { exact: true })
       .fill("Synthetic manual transfer verified");
@@ -325,14 +319,12 @@ test("one participant traverses paid registration, manuscript review, public pro
       .click();
     await status(admin, "已記錄成功");
     await expect(paymentRow).toContainText("verified");
-    const allocation = admin
-      .locator("form")
-      .filter({
-        has: admin.getByRole("heading", {
-          name: "分配已核帳款項",
-          exact: true,
-        }),
-      });
+    const allocation = admin.locator("form").filter({
+      has: admin.getByRole("heading", {
+        name: "分配已核帳款項",
+        exact: true,
+      }),
+    });
     for (const [index, order] of [
       { id: participant.order.id, amount: "100" },
       { id: booking.orderId, amount: "20" },
@@ -366,7 +358,9 @@ test("one participant traverses paid registration, manuscript review, public pro
       closesAt: future,
       requireRegistration: true,
       requireAttachment: false,
-      acceptedRegistrationDeadline: future,
+      acceptedRegistrationDeadline: new Date(
+        Date.parse(future) + 86_400_000,
+      ).toISOString(),
       mode: "abstract",
       presenterMustBeSubmitter: true,
       tracks: [{ id: "continuity", name: "Continuity science", topics: [] }],
