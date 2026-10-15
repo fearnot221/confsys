@@ -135,3 +135,11 @@ Full gate at593bab1 passed70 unit/190 integration/16 contract/27 browser tests. 
 Before this authorized CI repair, inspected README/SPEC, manifests, migration history, CI and the latest failure. Blocking evidence: CI never started the real scanner (quarantined uploads), an inner join suppressed closed review assignments under manuscript RLS, and the site race test counted cluster-wide lock waiters. The two-instance default container path also allocated the same scanner host port to A and B; the previously exercised native-scanner path did not expose that collision. Fix within this repair; preserve RLS, authorization assertions and historical migrations.
 
 Nonblocking debt: the full workflow runs three service stacks sequentially and depends on external scanner signatures/container registries. Practical risk is cold-start latency and shared-host memory pressure. Stop the completed CI smoke stack before A/B; retain genuine scans and both deployments. Further caching/resource tuning belongs in infrastructure hardening, accepted only with repeatable cold-start and isolation evidence. Functional CI success does not establish production load capacity.
+
+## GitHub main consolidation recheck — 2026-10-16
+
+Scope: consolidate all three GitHub branch histories, with no product implementation or dependency/schema changes. All remote tips are ancestors of cf7a994; local uncommitted fragments remain pending. Branch inventory and exact local gates are recorded in [BRANCH_CONSOLIDATION](BRANCH_CONSOLIDATION.md).
+
+| Evidence | Practical risk | Acceptance criteria / treatment phase |
+| --- | --- | --- |
+| UI PR Actions 38803307612: site E2E logout at tests/e2e/site.spec.ts:233 returned 500 instead of 200; 27 other browser cases passed | Latest UI integration lacks a complete green gate; logout failure cause is unverified | Next maintenance unit: inspect/reproduce the server failure, preserve revocation and late-response assertions, and obtain a complete main CI pass including real-service integration, E2E, smoke and two-instance isolation before release acceptance. No assertion weakening or unsupported flaky-test claim. |

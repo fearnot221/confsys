@@ -1,5 +1,7 @@
 # 可重複部署的研討會管理系統
 
+GitHub 主線統一為 `main`；原分支完整歷史與驗證限制見 [分支整合紀錄](docs/BRANCH_CONSOLIDATION.md)。
+
 工作樹入口與歷史資料夾整理見 [WORKSPACE_CONSOLIDATION](docs/WORKSPACE_CONSOLIDATION.md)。本目錄是主要整合工作樹；未完成程式片段集中保存在 `integration-pending/20261016`，尚未套用或驗證。
 
 **一份程式碼，每場研討會獨立部署，每個實例只服務一場。** 帳號、Session、token、資料、佇列與郵件各自獨立；不是全域帳號跨研討會平台。主辦單位是介紹／聯絡資料，不是 tenant。產品決策見 [SPEC](docs/SPEC.md)／[ADR 0003](docs/adr/0003-single-conference.md)。
