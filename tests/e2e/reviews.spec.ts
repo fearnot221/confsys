@@ -435,14 +435,12 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
     await page
       .getByLabel("撤銷指派理由（委員可見）", { exact: true })
       .fill("Synthetic browser reviewer reassignment");
-    const thirdRound = page
-      .locator("details")
-      .filter({
-        has: page
-          .locator("summary")
-          .filter({ hasText: paper.document.title })
-          .filter({ hasText: "第 3 輪" }),
-      });
+    const thirdRound = page.locator("details").filter({
+      has: page
+        .locator("summary")
+        .filter({ hasText: paper.document.title })
+        .filter({ hasText: "第 3 輪" }),
+    });
     await thirdRound.locator("summary").click();
     await thirdRound
       .getByRole("button", { name: "撤銷此待審指派", exact: true })
