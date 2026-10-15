@@ -23,8 +23,8 @@ type Props = {
 };
 export function FinanceRemindersScreen(p: Props) {
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-6">
-      <h1 className="text-2xl font-semibold">付款催繳通知</h1>
+    <main className="layout">
+      <h1>付款催繳通知</h1>
       <p>
         依目前未繳足的有效訂單選取收件者，每批最多100人。金額以各幣別最小單位顯示。寄送前會再檢查付款狀態；已繳足者不寄送。
       </p>

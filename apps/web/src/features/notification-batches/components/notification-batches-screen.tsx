@@ -209,9 +209,9 @@ export function NotificationBatchesScreen(p: Props) {
           {!p.items.length && <p>此頁沒有通知批次。</p>}
           <ul>
             {p.items.map((b) => (
-              <li key={b.id} className="my-4 border p-4">
+              <li key={b.id} className="record">
                 <h3>{b.subject}</h3>
-                <p className="whitespace-pre-wrap">{b.text}</p>
+                <p className="pre-wrap">{b.text}</p>
                 <p>
                   {b.recipientCount}位收件人 ·{" "}
                   {new Date(b.createdAt).toLocaleString()} ·{" "}

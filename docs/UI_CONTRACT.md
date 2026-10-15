@@ -94,3 +94,17 @@ is revoked on replacement/unmount. Presentation never fetches or constructs API 
 The notification/reporting workspace links to full exports and labels its preview
 CSV pages separately. Statistics display the common snapshot time, UTC date grouping
 and separate currency totals without an invented net-income calculation.
+
+## Presentation design system ("Proceedings")
+
+Presentation-only refresh; no contract, endpoint, hook or permission change. Styles live in `apps/web/src/design`, imported in this order by `styles.css` (shared by the SPA and the SSR `/public-site.css`):
+
+- `tokens.css` — colour (warm paper, ink, one vermilion signal, semantic state pairs), type stacks, fluid type scale, spacing, radius, shadow and motion tokens, with a `prefers-color-scheme: dark` set.
+- `base.css` — reset, document typography, links, focus ring, skip link, `.eyebrow`, global reduced-motion override.
+- `workspace.css` — buttons, `AppBar`, and element-level styling for everything inside `.layout` (header block, sections, article cards, fieldset panels, forms, details, tables, live `status`/`alert` callouts, `.status` chips). Feature screens keep semantic HTML and get consistent styling without bespoke classes.
+- `screens.css` — compositions keyed to classes set by one component each (`status-page`, `auth-layout`, `dashboard`, `program-public`, `site-editor`) plus small helpers (`record`, `panel`, `button-row`, `button-link`, `table-scroll`, `pre-wrap`).
+- `public-site.css` — the static public website, all rules scoped under `.public-site` and resetting workspace element styles so the same markup also renders inside the admin preview frame.
+
+Constraints honoured: the public site CSP is `default-src 'self'`, so fonts are system stacks (serif display, sans text, mono metadata) and every decoration (orbit rings, rules, markers) is pure CSS — no web fonts, data URIs, inline styles or client JS. Decorative text such as navigation indices and arrows is `aria-hidden`; pseudo-elements never carry text, so accessible names used by tests are unchanged. Motion is entrance fades, hover transitions and a slow orbit spin, all disabled by `prefers-reduced-motion`.
+
+`@confsys/ui` adds `AppBar` (plain links: 工作台, 議程, 官網, 帳號) rendered by `app/main.tsx` on workspace routes; sign-in flows and `/system/status` keep their focused chrome. Links do not imply access — each destination still enforces server authorization. `Layout` accepts an optional `className`. Former Tailwind-style class names (Tailwind was never installed) were replaced with the helpers above. Public programme times are displayed as `HH:MM` with date/offset while `<time datetime>` keeps the full ISO value.

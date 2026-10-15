@@ -47,7 +47,7 @@ export function ReportingScreen(p: Props) {
     [id, setId] = useState(""),
     [reason, setReason] = useState("");
   return (
-    <main className="mx-auto max-w-5xl space-y-8 p-6">
+    <main className="layout">
       <header>
         <h1>通知與管理報表</h1>
         <p>
@@ -68,9 +68,9 @@ export function ReportingScreen(p: Props) {
             {p.feed?.items.length === 0 && <p>尚無通知。</p>}
             <ul>
               {p.feed?.items.map((n) => (
-                <li key={n.id} className="my-4 border p-4">
+                <li key={n.id} className="record">
                   <h3>{n.subject}</h3>
-                  <p className="whitespace-pre-wrap">{n.text}</p>
+                  <p className="pre-wrap">{n.text}</p>
                   <p>
                     {new Date(n.createdAt).toLocaleString()} ·{" "}
                     {statuses[n.status]} · {n.readAt ? "已讀" : "未讀"}
@@ -186,81 +186,87 @@ export function ReportingScreen(p: Props) {
                       : "尚未發布"}
                     。兩者不可相加。
                   </p>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>版本</th>
-                        <th>形式</th>
-                        <th>場次</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(["draft", "published"] as const).flatMap((version) =>
-                        p.stats!.program[version].map((row) => (
-                          <tr key={version + row.kind}>
-                            <td>
-                              {version === "draft" ? "目前草稿" : "公開快照"}
-                            </td>
-                            <td>{row.kind}</td>
-                            <td>{row.count}</td>
-                          </tr>
-                        )),
-                      )}
-                    </tbody>
-                  </table>
+                  <div className="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>版本</th>
+                          <th>形式</th>
+                          <th>場次</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(["draft", "published"] as const).flatMap((version) =>
+                          p.stats!.program[version].map((row) => (
+                            <tr key={version + row.kind}>
+                              <td>
+                                {version === "draft" ? "目前草稿" : "公開快照"}
+                              </td>
+                              <td>{row.kind}</td>
+                              <td>{row.count}</td>
+                            </tr>
+                          )),
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                   <h3>團體付款</h3>
                   <p>
                     同一筆付款實際分配給至少兩個不同報名帳號才計入；各幣別及核帳狀態分開。參與者及付款人於同一列去重。金額以最小貨幣單位表示；申報、分配及退款不可相加。
                   </p>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>狀態</th>
-                        <th>幣別</th>
-                        <th>付款筆數</th>
-                        <th>付款人</th>
-                        <th>參與者</th>
-                        <th>申報金額</th>
-                        <th>分配金額</th>
-                        <th>退款金額</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {p.stats.groupPayments.map((row) => (
-                        <tr key={row.state + row.currency}>
-                          <td>{row.state}</td>
-                          <td>{row.currency}</td>
-                          <td>{row.payments}</td>
-                          <td>{row.payers}</td>
-                          <td>{row.participants}</td>
-                          <td>{row.declaredAmount}</td>
-                          <td>{row.allocatedAmount}</td>
-                          <td>{row.refundedAmount}</td>
+                  <div className="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>狀態</th>
+                          <th>幣別</th>
+                          <th>付款筆數</th>
+                          <th>付款人</th>
+                          <th>參與者</th>
+                          <th>申報金額</th>
+                          <th>分配金額</th>
+                          <th>退款金額</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {p.stats.groupPayments.map((row) => (
+                          <tr key={row.state + row.currency}>
+                            <td>{row.state}</td>
+                            <td>{row.currency}</td>
+                            <td>{row.payments}</td>
+                            <td>{row.payers}</td>
+                            <td>{row.participants}</td>
+                            <td>{row.declaredAmount}</td>
+                            <td>{row.allocatedAmount}</td>
+                            <td>{row.refundedAmount}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                   <h3>訂單</h3>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>狀態</th>
-                        <th>幣別</th>
-                        <th>筆數</th>
-                        <th>金額（最小貨幣單位）</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {p.stats.orders.map((r) => (
-                        <tr key={r.state + r.currency}>
-                          <td>{r.state}</td>
-                          <td>{r.currency}</td>
-                          <td>{r.count}</td>
-                          <td>{r.amount}</td>
+                  <div className="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>狀態</th>
+                          <th>幣別</th>
+                          <th>筆數</th>
+                          <th>金額（最小貨幣單位）</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {p.stats.orders.map((r) => (
+                          <tr key={r.state + r.currency}>
+                            <td>{r.state}</td>
+                            <td>{r.currency}</td>
+                            <td>{r.count}</td>
+                            <td>{r.amount}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </>
               )}
             </section>
@@ -360,7 +366,7 @@ export function ReportingScreen(p: Props) {
                 <button disabled={p.busy}>開啟唯讀預覽</button>
               </form>
               {p.preview && (
-                <div className="border p-4">
+                <div className="record">
                   <h3>唯讀預覽：{p.preview.email}</h3>
                   <p role="status">
                     目前仍以管理員帳號操作；此處沒有作者操作功能。
@@ -439,26 +445,28 @@ function Money({
   return (
     <>
       <h3>{title}</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>幣別</th>
-            <th>狀態</th>
-            <th>筆數</th>
-            <th>金額（最小貨幣單位）</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.currency + (r.state ?? "")}>
-              <td>{r.currency}</td>
-              <td>{r.state ?? "已記錄"}</td>
-              <td>{r.count}</td>
-              <td>{r.amount}</td>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>幣別</th>
+              <th>狀態</th>
+              <th>筆數</th>
+              <th>金額（最小貨幣單位）</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.currency + (r.state ?? "")}>
+                <td>{r.currency}</td>
+                <td>{r.state ?? "已記錄"}</td>
+                <td>{r.count}</td>
+                <td>{r.amount}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

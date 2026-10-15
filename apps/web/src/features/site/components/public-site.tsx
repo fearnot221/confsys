@@ -19,6 +19,11 @@ const labels = {
     venue: "場地待公告",
     organizers: "主辦單位",
     hosts: "承辦單位",
+    when: "會期",
+    where: "地點",
+    timezone: "時區",
+    reachUs: "聯絡大會",
+    skip: "跳至主要內容",
   },
   en: {
     committee: "Committee",
@@ -38,6 +43,11 @@ const labels = {
     venue: "Venue to be announced",
     organizers: "Organizers",
     hosts: "Hosts",
+    when: "Dates",
+    where: "Venue",
+    timezone: "Time zone",
+    reachUs: "Get in touch",
+    skip: "Skip to content",
   },
 };
 export function PublicSiteContent({
@@ -88,132 +98,204 @@ export function PublicSiteContent({
     preview ? `#preview-${lang}-${next}` : `/${lang}/${next}`;
   const mediaUrl = (id: string) =>
     preview ? `/api/files/${id}/download` : `/api/media/${id}`;
+  const name = t?.name || site.conferenceName;
+  const pages = d ? siteNavigation(d, locale) : [];
+  const venue = value("venue");
   return (
-    <div className="layout public-site">
+    <div className="public-site" data-page={page}>
       <a className="skip-link" href="#site-main">
-        {locale === "en" ? "Skip to content" : "跳至主要內容"}
+        {l.skip}
       </a>
-      <header>
-        <a className="brand" href={href("home")}>
-          {d?.media?.logoId && (
-            <img
-              src={mediaUrl(d.media.logoId)}
-              alt=""
-              width="64"
-              height="64"
-              className="site-logo"
-            />
-          )}
-          {t?.name || site.conferenceName}
-        </a>
-        <nav aria-label="帳號 / Account">
-          <a href="/auth/login">{l.login}</a>
-          <a href="/auth/register">{l.register}</a>
-        </nav>
+      <header className="site-header">
+        <div className="site-container site-header__inner">
+          <a className="brand" href={href("home")}>
+            {d?.media?.logoId && (
+              <img
+                src={mediaUrl(d.media.logoId)}
+                alt=""
+                width="64"
+                height="64"
+                className="site-logo"
+              />
+            )}
+            {name}
+          </a>
+          <nav className="site-account" aria-label="帳號 / Account">
+            <a href="/auth/login">{l.login}</a>
+            <a className="site-account__primary" href="/auth/register">
+              {l.register}
+            </a>
+          </nav>
+        </div>
       </header>
       {d && (
         <nav className="site-nav" aria-label="官網 / Website">
-          {siteNavigation(d, locale).map((key) => (
-            <a
-              key={key}
-              href={href(key)}
-              aria-current={key === page ? "page" : undefined}
-            >
-              {l[key]}
-            </a>
-          ))}
-          <span className="site-languages">
-            {d.enabledLocales
-              .filter((lang) => siteNavigation(d, lang).includes(page))
-              .map((lang) => (
+          <div className="site-container site-nav__inner">
+            <div className="site-nav__pages">
+              {pages.map((key, index) => (
                 <a
-                  key={lang}
-                  href={href(page, lang)}
-                  hrefLang={lang}
-                  lang={lang}
+                  key={key}
+                  href={href(key)}
+                  aria-current={key === page ? "page" : undefined}
                 >
-                  {lang === "en" ? "English" : "繁體中文"}
+                  <span className="site-nav__index" aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  {l[key]}
                 </a>
               ))}
-          </span>
+            </div>
+            <span className="site-languages">
+              {d.enabledLocales
+                .filter((lang) => siteNavigation(d, lang).includes(page))
+                .map((lang) => (
+                  <a
+                    key={lang}
+                    href={href(page, lang)}
+                    hrefLang={lang}
+                    lang={lang}
+                    aria-current={lang === locale ? "true" : undefined}
+                  >
+                    {lang === "en" ? "English" : "繁體中文"}
+                  </a>
+                ))}
+            </span>
+          </div>
         </nav>
       )}
       <main id="site-main">
-        {page === "home" && d?.media?.heroId && (
-          <img src={mediaUrl(d.media.heroId)} alt="" className="site-hero" />
-        )}
-        <section className="intro">
-          <p className="eyebrow">{l[page]}</p>
-          <h1>
-            {page === "home"
-              ? t?.name || site.conferenceName
-              : p?.title || l[page]}
-          </h1>
-          {paragraph("subtitle")}
-          {!d ? (
-            <p>{l.pending}</p>
-          ) : (
-            <>
-              <p>
-                <time dateTime={d.startDate}>{d.startDate}</time> —{" "}
-                <time dateTime={d.endDate}>{d.endDate}</time> · {d.timezone}
-              </p>
-              <p lang={value("venue").lang}>{value("venue").text || l.venue}</p>
-              {paragraph("summary")}
-            </>
-          )}
+        <section
+          className={
+            page === "home"
+              ? "intro site-hero site-hero--home"
+              : "intro site-hero"
+          }
+        >
+          <div className="site-orbit" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="site-container site-hero__inner">
+            <p className="eyebrow">{l[page]}</p>
+            <h1>{page === "home" ? name : p?.title || l[page]}</h1>
+            {paragraph("subtitle")}
+            {!d ? (
+              <p className="site-pending">{l.pending}</p>
+            ) : (
+              <>
+                <dl className="site-facts">
+                  <div>
+                    <dt>{l.when}</dt>
+                    <dd>
+                      <time dateTime={d.startDate}>{d.startDate}</time> —{" "}
+                      <time dateTime={d.endDate}>{d.endDate}</time>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{l.timezone}</dt>
+                    <dd>{d.timezone}</dd>
+                  </div>
+                  <div>
+                    <dt>{l.where}</dt>
+                    <dd lang={venue.lang}>{venue.text || l.venue}</dd>
+                  </div>
+                </dl>
+                {paragraph("summary")}
+              </>
+            )}
+          </div>
         </section>
+        {page === "home" && d?.media?.heroId && (
+          <div className="site-container">
+            <img
+              src={mediaUrl(d.media.heroId)}
+              alt=""
+              className="site-hero-image"
+            />
+          </div>
+        )}
         {d && (
           <section className="site-section" aria-label={l[page]}>
-            {body && (
-              <p
-                className="site-copy"
-                lang={p?.body ? locale : d.defaultLocale}
-              >
-                {body}
+            <div className="site-container site-section__grid">
+              <p className="site-section__label" aria-hidden="true">
+                <span>
+                  {String(Math.max(pages.indexOf(page), 0) + 1).padStart(
+                    2,
+                    "0",
+                  )}
+                </span>
+                {l[page]}
               </p>
-            )}
-            {!!bullets?.length && (
-              <ul lang={p?.bullets.length ? locale : d.defaultLocale}>
-                {bullets.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            )}
-            {!!links?.length && (
-              <ul lang={p?.links.length ? locale : d.defaultLocale}>
-                {links.map((link, i) => (
-                  <li key={i}>
-                    <a href={link.url}>{link.label}</a>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {page === "about" && (
-              <>
-                {value("organizers").text && <h2>{l.organizers}</h2>}
-                {paragraph("organizers")}
-                {value("hosts").text && <h2>{l.hosts}</h2>}
-                {paragraph("hosts")}
-              </>
-            )}
-            {page === "contact" && (
-              <>
-                {paragraph("address")}
-                {paragraph("contactNote")}
-                {d.phone && <p>{d.phone}</p>}
-              </>
-            )}
+              <div className="site-section__body">
+                {body && (
+                  <p
+                    className="site-copy site-lede"
+                    lang={p?.body ? locale : d.defaultLocale}
+                  >
+                    {body}
+                  </p>
+                )}
+                {!!bullets?.length && (
+                  <ul
+                    className="site-bullets"
+                    lang={p?.bullets.length ? locale : d.defaultLocale}
+                  >
+                    {bullets.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                )}
+                {!!links?.length && (
+                  <ul
+                    className="site-links"
+                    lang={p?.links.length ? locale : d.defaultLocale}
+                  >
+                    {links.map((link, i) => (
+                      <li key={i}>
+                        <a href={link.url}>
+                          {link.label}
+                          <span
+                            className="site-links__arrow"
+                            aria-hidden="true"
+                          >
+                            →
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {page === "about" && (
+                  <div className="site-credits">
+                    {value("organizers").text && <h2>{l.organizers}</h2>}
+                    {paragraph("organizers")}
+                    {value("hosts").text && <h2>{l.hosts}</h2>}
+                    {paragraph("hosts")}
+                  </div>
+                )}
+                {page === "contact" && (
+                  <div className="site-contact">
+                    {paragraph("address")}
+                    {paragraph("contactNote")}
+                    {d.phone && <p>{d.phone}</p>}
+                  </div>
+                )}
+              </div>
+            </div>
           </section>
         )}
       </main>
-      <footer>
-        {d?.contactEmail && (
-          <p>
-            <a href={`mailto:${d.contactEmail}`}>{d.contactEmail}</a>
-          </p>
-        )}
-        <p>{t?.name || site.conferenceName}</p>
+      <footer className="site-footer">
+        <div className="site-container">
+          {d?.contactEmail && (
+            <p className="site-footer__cta">
+              <span className="eyebrow">{l.reachUs}</span>
+              <a href={`mailto:${d.contactEmail}`}>{d.contactEmail}</a>
+            </p>
+          )}
+          <p className="site-footer__name">{name}</p>
+        </div>
       </footer>
     </div>
   );

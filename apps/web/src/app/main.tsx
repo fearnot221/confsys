@@ -1,6 +1,7 @@
 import React,{Component,lazy,Suspense,type ReactNode} from "react";
 import {createRoot} from "react-dom/client";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
+import {AppBar,type AppBarLink} from "@confsys/ui";
 import "../design/styles.css";
 const App=lazy(()=>import("../features/health/entry.js").then(module=>({default:module.App})));
 const PresenterChangesApp=lazy(()=>import("../features/presenter-changes/entry.js"));
@@ -90,4 +91,13 @@ const pages:Record<string,ReactNode>={
 const queryClient=new QueryClient();
 const pathname=window.location.pathname;
 const page=pages[pathname]??(pathname.startsWith('/auth/')?<AuthApp/>:<App/>);
-createRoot(document.getElementById("root")!).render(<React.StrictMode><ErrorBoundary><QueryClientProvider client={queryClient}><Suspense fallback={<main className='layout'><p role='status'>載入工作區…</p></main>}>{page}</Suspense></QueryClientProvider></ErrorBoundary></React.StrictMode>);
+// Workspace routes share a navigation bar; sign-in flows and /system/status keep their own focused chrome.
+const showAppBar=pathname in pages||pathname==="/auth/account";
+// Plain navigation only: each destination enforces its own server authorization.
+const workspaceLinks:AppBarLink[]=[
+ {href:"/dashboard",label:"工作台"},
+ {href:"/program",label:"議程"},
+ {href:"/",label:"官網"},
+ {href:"/auth/account",label:"帳號"},
+];
+createRoot(document.getElementById("root")!).render(<React.StrictMode><ErrorBoundary><QueryClientProvider client={queryClient}>{showAppBar&&<AppBar title="研討會工作區" links={workspaceLinks} currentPath={pathname}/>}<Suspense fallback={<main className='layout'><p role='status'>載入工作區…</p></main>}>{page}</Suspense></QueryClientProvider></ErrorBoundary></React.StrictMode>);

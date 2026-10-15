@@ -44,7 +44,7 @@ export function NotificationTemplatePanel(p: Props) {
                 預覽：{template.name} v{template.version}
               </summary>
               <p>{template.subject}</p>
-              <pre className="whitespace-pre-wrap">{template.text}</pre>
+              <pre className="pre-wrap">{template.text}</pre>
             </details>
           </li>
         ))}

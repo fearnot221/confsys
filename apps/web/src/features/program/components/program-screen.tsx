@@ -532,53 +532,105 @@ export function ProgramScreen(p: Props) {
     </main>
   );
 }
+// Display-only split of an ISO timestamp; unparseable values are shown verbatim.
+function clock(value: string) {
+  const match =
+    /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/.exec(
+      value,
+    );
+  return match
+    ? {
+        date: match[1]!,
+        time: match[2]!,
+        zone: match[3] === "Z" ? "UTC" : (match[3] ?? ""),
+      }
+    : { date: "", time: value, zone: "" };
+}
 export function PublicProgramContent({ program }: { program: PublicProgram }) {
   const [search, setSearch] = useState("");
+  const query = search.toLocaleLowerCase();
   return (
-    <main className="layout">
-      <a href="/">研討會首頁</a>
-      <h1>研討會議程</h1>
+    <main className="layout program-public">
+      <header>
+        <a href="/">研討會首頁</a>
+        <p className="eyebrow">Programme · 議程</p>
+        <h1>研討會議程</h1>
+        {program.publicationId && (
+          <p className="program-public__stamp">
+            發布時間：
+            <time dateTime={program.publishedAt ?? undefined}>
+              {program.publishedAt}
+            </time>
+          </p>
+        )}
+      </header>
       {!program.publicationId ? (
-        <p>議程尚未發布。</p>
+        <p className="program-public__empty">議程尚未發布。</p>
       ) : (
         <>
-          <p>發布時間：{program.publishedAt}</p>
-          <label>
+          <label className="program-search">
             搜尋題目或發表者
-            <input value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </label>
           {program.sessions.map((s) => {
             const slots = s.slots.filter((v) =>
               `${v.title} ${v.presenterName}`
                 .toLocaleLowerCase()
-                .includes(search.toLocaleLowerCase()),
+                .includes(query),
             );
             if (search && !slots.length) return null;
             return (
-              <section key={s.id}>
-                <h2>{s.title}</h2>
-                <p>
-                  {s.venue} / {s.roomName} · {s.startsAt} – {s.endsAt}
-                </p>
-                <p>主持人：{s.chairName}</p>
-                <ol>
-                  {slots.map((v) => (
-                    <li key={v.id}>
-                      <strong>{v.title}</strong>
-                      <p>
-                        {v.presenterName} · {v.presenterAffiliation}
-                      </p>
-                      <p>
-                        {v.startsAt} – {v.endsAt} ·{" "}
-                        {v.kind === "oral"
-                          ? "口頭"
-                          : v.kind === "poster"
-                            ? `壁報 ${v.posterNumber}`
-                            : "邀請演講"}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
+              <section key={s.id} className="program-session">
+                <div className="program-session__when">
+                  <span className="program-session__date">
+                    {[clock(s.startsAt).date, clock(s.startsAt).zone]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                  <span className="program-session__clock">
+                    <time dateTime={s.startsAt}>{clock(s.startsAt).time}</time>
+                    <span aria-hidden="true"> – </span>
+                    <time dateTime={s.endsAt}>{clock(s.endsAt).time}</time>
+                  </span>
+                </div>
+                <div className="program-session__body">
+                  <h2>{s.title}</h2>
+                  <p className="program-session__meta">
+                    {s.venue} / {s.roomName}
+                  </p>
+                  <p className="program-session__meta">主持人：{s.chairName}</p>
+                  <ol className="program-slots">
+                    {slots.map((v) => (
+                      <li key={v.id}>
+                        <strong>{v.title}</strong>
+                        <p>
+                          {v.presenterName} · {v.presenterAffiliation}
+                        </p>
+                        <p className="program-slots__time">
+                          <time dateTime={v.startsAt}>
+                            {clock(v.startsAt).time}
+                          </time>{" "}
+                          –{" "}
+                          <time dateTime={v.endsAt}>
+                            {clock(v.endsAt).time}
+                          </time>{" "}
+                          ·{" "}
+                          <span className="program-kind">
+                            {v.kind === "oral"
+                              ? "口頭"
+                              : v.kind === "poster"
+                                ? `壁報 ${v.posterNumber}`
+                                : "邀請演講"}
+                          </span>
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               </section>
             );
           })}

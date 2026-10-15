@@ -1,8 +1,129 @@
+/*
+ * Design tokens — "Proceedings" system.
+ * Warm paper, deep ink and a single vermilion signal colour. Fonts are system
+ * stacks on purpose: the public site CSP only allows 'self', so no web fonts
+ * or data: URIs can be loaded without an API change.
+ */
 :root {
-  color-scheme: light;
-  --canvas: #f5f6f2;
-  --paper: #fff;
-  --ink: #24332c;
-  --muted: #59645c;
-  --line: #d9dfd8;
+  color-scheme: light dark;
+
+  /* Surfaces */
+  --canvas: #f2efe8;
+  --canvas-sunk: #e9e5dc;
+  --paper: #fbfaf6;
+  --paper-raised: #ffffff;
+
+  /* Ink */
+  --ink: #15171a;
+  --ink-soft: #33373c;
+  --muted: #62666b;
+  --faint: #8b8e91;
+
+  /* Lines */
+  --line: rgb(21 23 26 / 0.12);
+  --line-strong: rgb(21 23 26 / 0.26);
+
+  /* Signal */
+  --accent: #c7341c;
+  --accent-ink: #ffffff;
+  --accent-bright: #ff5533;
+  --accent-wash: rgb(199 52 28 / 0.08);
+
+  /* Inverse panels (footer, auth aside) */
+  --inverse-bg: #15171a;
+  --inverse-fg: #f4f1ea;
+
+  /* Semantic states (text + wash pairs meet 4.5:1) */
+  --ok: #1d6440;
+  --ok-wash: #e2efe5;
+  --warn: #84480c;
+  --warn-wash: #f6ead3;
+  --danger: #a2261a;
+  --danger-wash: #f9e4df;
+  --info: #24457a;
+  --info-wash: #e3eaf5;
+
+  /* Type */
+  --font-display:
+    "Iowan Old Style", "Palatino Linotype", Palatino, "Songti TC",
+    "Noto Serif TC", "Source Han Serif TC", "Noto Serif CJK TC", Georgia, serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC",
+    "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  --text-2xl: clamp(1.5rem, 1.2rem + 1.2vw, 2.125rem);
+  --text-3xl: clamp(2.125rem, 1.4rem + 3vw, 3.75rem);
+  --text-display: clamp(2.75rem, 1.2rem + 4.6vw, 5.75rem);
+
+  /* Space (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+  --space-10: 144px;
+  --gutter: clamp(20px, 4vw, 56px);
+  --measure: 68ch;
+  --page-max: 1180px;
+
+  /* Shape & depth */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 0 rgb(21 23 26 / 0.04), 0 1px 2px rgb(21 23 26 / 0.06);
+  --shadow: 0 1px 0 rgb(21 23 26 / 0.04), 0 8px 24px -12px rgb(21 23 26 / 0.18);
+  --shadow-lg: 0 24px 60px -24px rgb(21 23 26 / 0.3);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 140ms;
+  --dur: 240ms;
+  --dur-slow: 700ms;
+
+  --focus: var(--accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0f1012;
+    --canvas-sunk: #0a0b0c;
+    --paper: #17191c;
+    --paper-raised: #1d2023;
+    --ink: #eeebe4;
+    --ink-soft: #d0cdc6;
+    --muted: #a09d97;
+    --faint: #75736f;
+    --line: rgb(238 235 228 / 0.12);
+    --line-strong: rgb(238 235 228 / 0.26);
+    --accent: #ff6a4d;
+    --accent-ink: #160806;
+    --accent-bright: #ff7a5c;
+    --accent-wash: rgb(255 106 77 / 0.12);
+    --inverse-bg: #1c1e22;
+    --inverse-fg: #eeebe4;
+    --ok: #7fd3a1;
+    --ok-wash: rgb(127 211 161 / 0.12);
+    --warn: #f0bf74;
+    --warn-wash: rgb(240 191 116 / 0.12);
+    --danger: #ff9c8c;
+    --danger-wash: rgb(255 156 140 / 0.12);
+    --info: #9fbcf2;
+    --info-wash: rgb(159 188 242 / 0.12);
+    --shadow-sm: 0 1px 0 rgb(0 0 0 / 0.3);
+    --shadow: 0 1px 0 rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+    --shadow-lg: 0 24px 60px -24px rgb(0 0 0 / 0.7);
+  }
 }

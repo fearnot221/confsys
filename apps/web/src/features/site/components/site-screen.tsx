@@ -421,7 +421,7 @@ export function SiteScreen(p: Props) {
                 預覽已儲存草稿
               </button>
               {p.preview && (
-                <>
+                <div className="site-preview-frame">
                   <p className="preview-banner">
                     未發布預覽 · 草稿版本 {p.preview.draftVersion}
                   </p>
@@ -438,7 +438,7 @@ export function SiteScreen(p: Props) {
                     locale={p.locale}
                     page={p.page}
                   />
-                </>
+                </div>
               )}
               <h3>發布檢查</h3>
               <p>
