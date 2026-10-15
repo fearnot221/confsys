@@ -124,6 +124,9 @@ test("unpaid browser registration appears in finance reminder preview and explic
     await expect(
       officer.getByRole("heading", { name: "付款催繳通知", exact: true }),
     ).toBeVisible();
+    await expect(
+      officer.getByRole("heading", { name: /目前符合 [1-9]/ }),
+    ).toBeVisible();
     const selection = officer.getByRole("checkbox", {
       name: `${participantEmail} — TWD 100`,
       exact: true,
