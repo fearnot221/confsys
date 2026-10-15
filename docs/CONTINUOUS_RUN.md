@@ -3,6 +3,12 @@
 Start: 06:08:11 Asia/Taipei. Fixed deadline: 10:00 (02:00Z); integration cutoff 09:35.
 Baseline: 9642a62, verified descendant of d4c0788. Branch: codex/phase-1-4-to-6-continuous. Worktree: /Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous.
 
+## 到期後恢復收尾 — 14:05 Taipei
+
+再次收到接續要求時，真實時間已超過10:00截止；不延長期限、不新增功能。最後08:37測試工具結果未取得，恢復時session33621不存在；子代理回報usage limit。中斷期間無可證實工作，不能宣稱連續執行至10:00。
+
+保存0059/0060與readiness為WIP：migration套用已觀察成功，相關PG測試結果未知。完整交付、已驗證基線593bab1、後續增量與精確未完成清單見[CONTINUOUS_DELIVERY.md](CONTINUOUS_DELIVERY.md)。agent未提交filters／registration-authority測試原樣保留，未改其他工作樹。
+
 ## Plan and ownership
 Main: private files/media then registration/finance and dependent workflow; owns migrations/contracts/permissions/lockfile. Separate invitation agent owns invitation-specific source/tests, proposing central changes for main review. Existing stack and access fences retained. No provider credentials required: local storage and Mailpit only.
 
@@ -119,3 +125,6 @@ The entries below are chronological evidence; the current state is summarized ab
 - Latest source1e5a56e/verification71e2478; central schemas52/53 integrated and real PG verified. Nonempty restore attempt881b7181 created PDF/CSV/QR/pending mail but failed exact B audit comparison because B own mail was still finishing. Preserved assertion and added outbox drain before baseline (c36eacc).
 - Attemptcb0295f1 hit exhausted Docker network address pools. Removed only this run created881b7181 A/B andcb0295f1 A containers/networks with exact env `compose --profile app down` WITHOUT volumes; all evidence and volumes retained. New25868fe4 rehearsal uses immutablep6-881b7181 image (through53, before later UI/pagination fixes). Existing user containers/networks untouched.
 - Pending54 immutable assignment deadline amendments and55 current-balance payment reminders; no completion claim until PG/browser verification. Focused worker review found expired document claim could finalize before recovery; regression repair underway.
+
+## 收尾驗證
+14:08 Taipei：最新主樹`pnpm typecheck`及`git diff --check`通過；本輪compose PostgreSQL／Redis／Mailpit保持healthy running。最後整合d833ca2之後只保存既有0059/0060及交付文件，未新增功能。
