@@ -47,8 +47,8 @@ function RequestCard({ row, props }: { row: PresenterChange; props: Props }) {
       ["requested", "accepted"].includes(row.state) &&
       Date.parse(row.expiresAt) > Date.now();
   return (
-    <article className="space-y-3 rounded border p-4">
-      <h2 className="text-lg font-semibold">
+    <article className="panel">
+      <h2>
         #{row.projection.number} {row.projection.title}
       </h2>
       <p>
@@ -65,8 +65,8 @@ function RequestCard({ row, props }: { row: PresenterChange; props: Props }) {
         <p>新正式版本：{row.newRevisionId}。原公開議程及得獎名單尚未改動。</p>
       )}
       {active && (
-        <fieldset disabled={props.busy} className="space-y-2">
-          <label className="block" htmlFor={`presenter-reason-${row.id}`}>
+        <fieldset disabled={props.busy}>
+          <label htmlFor={`presenter-reason-${row.id}`}>
             處理理由（至少 3 字）
           </label>
           <textarea
@@ -76,10 +76,9 @@ function RequestCard({ row, props }: { row: PresenterChange; props: Props }) {
             maxLength={300}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className="block w-full rounded border p-2"
           />
 
-          <div className="flex gap-3">
+          <div className="button-row">
             {props.scope === "incoming" && row.state === "requested" && (
               <>
                 <button
@@ -145,8 +144,8 @@ export function PresenterChangesScreen(props: Props) {
       setDraft((d) => ({ ...d, submissionId: "", sourceRevisionId: "" }));
   }, [props.candidates, draft.submissionId, draft.expectedSubmissionVersion]);
   return (
-    <main className="mx-auto max-w-4xl space-y-5 p-6">
-      <h1 className="text-2xl font-semibold">報告者變更</h1>
+    <main className="layout">
+      <h1>報告者變更</h1>
       <p>
         僅能選擇最新正式投稿中已有的作者。新報告者須有本研討會已驗證帳號並本人同意，再由管理員核准。稿件所有權不會轉移。
       </p>
@@ -158,7 +157,7 @@ export function PresenterChangesScreen(props: Props) {
       {props.loading && <p role="status">載入申請…</p>}
       {props.canUse && (
         <>
-          <nav aria-label="報告者申請類別" className="flex gap-3">
+          <nav aria-label="報告者申請類別" className="button-row">
             {!props.administrative && (
               <>
                 <button
@@ -179,21 +178,17 @@ export function PresenterChangesScreen(props: Props) {
           </nav>
           {props.scope === "own" && (
             <form
-              className="space-y-3 rounded border p-4"
+              className="panel"
               onSubmit={(e) => {
                 e.preventDefault();
                 props.create(draft);
               }}
             >
-              <h2 className="text-lg font-semibold">新增申請</h2>
+              <h2>新增申請</h2>
               <p id="presenter-help">
                 只能選擇沒有未提交修改的正式投稿。若要修改內容，請先完成正常投稿流程。
               </p>
-              <fieldset
-                disabled={props.busy}
-                aria-describedby="presenter-help"
-                className="grid gap-3"
-              >
+              <fieldset disabled={props.busy} aria-describedby="presenter-help">
                 <label htmlFor="presenter-submission">選擇投稿</label>
                 <select
                   id="presenter-submission"
@@ -218,7 +213,6 @@ export function PresenterChangesScreen(props: Props) {
                         sourceRevisionId: "",
                       });
                   }}
-                  className="block w-full border p-2"
                 >
                   <option value="">請選擇</option>
                   {props.candidates.map((s) => (
@@ -228,7 +222,7 @@ export function PresenterChangesScreen(props: Props) {
                   ))}
                 </select>
 
-                <div className="flex gap-3">
+                <div className="button-row">
                   <button
                     type="button"
                     disabled={props.candidateOffset === 0}
@@ -262,7 +256,6 @@ export function PresenterChangesScreen(props: Props) {
                       targetAuthorIndex: Number(e.target.value),
                     })
                   }
-                  className="block w-full border p-2"
                 >
                   {props.candidates
                     .find((s) => s.id === draft.submissionId)
@@ -283,7 +276,6 @@ export function PresenterChangesScreen(props: Props) {
                   onChange={(e) =>
                     setDraft({ ...draft, reason: e.target.value })
                   }
-                  className="block w-full border p-2"
                 />
 
                 <button type="submit">提出變更申請</button>
@@ -296,7 +288,7 @@ export function PresenterChangesScreen(props: Props) {
           {!props.loading && props.items.length === 0 && (
             <p>此類別沒有申請。</p>
           )}
-          <div className="flex gap-3">
+          <div className="button-row">
             <button
               disabled={props.offset === 0 || props.busy}
               onClick={() => props.page(Math.max(0, props.offset - 20))}

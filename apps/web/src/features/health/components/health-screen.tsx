@@ -65,12 +65,14 @@ const copy = {
 export function HealthScreen(props: HealthView) {
   const t = copy[props.locale];
   return (
-    <Layout>
+    <Layout className="status-page">
       <header>
         <a href="#main-content" className="brand">
           {props.conferenceName}
         </a>
-        <a href="/auth/login">{props.locale === "zh" ? "登入" : "Sign in"}</a>
+        <a className="status-page__signin" href="/auth/login">
+          {props.locale === "zh" ? "登入" : "Sign in"}
+        </a>
         <Button
           onClick={props.onLocaleChange}
           aria-label={

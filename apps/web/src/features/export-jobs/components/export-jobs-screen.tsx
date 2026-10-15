@@ -128,7 +128,7 @@ export function ExportJobsScreen(p: Props) {
           )}
           <ul>
             {p.items.map((j) => (
-              <li key={j.id} className="my-4 border p-4">
+              <li key={j.id} className="record">
                 <h2>
                   {j.kind} · {labels[j.status]}
                 </h2>

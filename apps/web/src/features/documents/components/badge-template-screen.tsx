@@ -26,13 +26,13 @@ export function BadgeTemplateScreen(props: Props) {
   }, [props.current]);
   if (props.loading)
     return (
-      <main className="mx-auto max-w-3xl p-6">
+      <main className="layout">
         <p role="status">載入名牌模板…</p>
       </main>
     );
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-6">
-      <h1 className="text-2xl font-semibold">名牌模板</h1>
+    <main className="layout">
+      <h1>名牌模板</h1>
       <p>
         版本 {props.current?.version ?? 0}。既有批次保留建立時的模板；報到 QR
         碼固定顯示。
@@ -41,7 +41,7 @@ export function BadgeTemplateScreen(props: Props) {
       {props.message && <p role="status">{props.message}</p>}
       {props.canRead && (
         <>
-          <div className="flex gap-3">
+          <div className="button-row">
             <button
               type="button"
               disabled={props.busy}
@@ -59,18 +59,15 @@ export function BadgeTemplateScreen(props: Props) {
           </div>
           {props.canManage && (
             <form
-              className="space-y-4"
               onSubmit={(event) => {
                 event.preventDefault();
                 props.save(draft);
               }}
             >
-              <fieldset disabled={props.busy} className="space-y-4">
+              <fieldset disabled={props.busy}>
                 <legend>版面設定</legend>
                 <div>
-                  <label htmlFor="badge-template-size" className="block">
-                    尺寸
-                  </label>
+                  <label htmlFor="badge-template-size">尺寸</label>
                   <select
                     id="badge-template-size"
                     value={draft.size}
@@ -89,9 +86,7 @@ export function BadgeTemplateScreen(props: Props) {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="badge-template-layout" className="block">
-                    文字排列
-                  </label>
+                  <label htmlFor="badge-template-layout">文字排列</label>
                   <select
                     id="badge-template-layout"
                     value={draft.layout}
@@ -106,7 +101,7 @@ export function BadgeTemplateScreen(props: Props) {
                     <option value="left">靠左</option>
                   </select>
                 </div>
-                <label className="block">
+                <label>
                   <input
                     type="checkbox"
                     checked={draft.showAffiliation}
@@ -116,7 +111,7 @@ export function BadgeTemplateScreen(props: Props) {
                   />{" "}
                   顯示單位
                 </label>
-                <label className="block">
+                <label>
                   <input
                     type="checkbox"
                     checked={draft.showRegistrationNumber}
@@ -129,7 +124,7 @@ export function BadgeTemplateScreen(props: Props) {
                   />{" "}
                   顯示報名編號
                 </label>
-                <label className="block">
+                <label>
                   頁尾文字（需能容納單行）
                   <input
                     maxLength={120}
