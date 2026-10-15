@@ -36,6 +36,7 @@ async function dto(db: PoolClient, row: Record<string, unknown>) {
   ).rows;
   return notificationBatch.parse({
     id: row.id,
+    kind: row.kind,
     audience: row.audience ?? null,
     templateVersionId: row.template_version_id ?? null,
     scheduledAt: (row.scheduled_at as Date | null)?.toISOString() ?? null,
@@ -50,7 +51,7 @@ async function dto(db: PoolClient, row: Record<string, unknown>) {
     retryableCount: Number(row.retryable_count ?? 0),
   });
 }
-const batchProjection = `SELECT b.id,b.subject,b.message_text,b.recipient_ids,b.created_at,b.cancelled_at,b.retry_of,b.audience,b.template_version_id,b.scheduled_at,
+const batchProjection = `SELECT b.id,b.kind,b.subject,b.message_text,b.recipient_ids,b.created_at,b.cancelled_at,b.retry_of,b.audience,b.template_version_id,b.scheduled_at,
       (SELECT c.id FROM confsys.notification_batches c WHERE c.retry_of=b.id) AS retried_as,
       CASE WHEN b.cancelled_at IS NULL AND coalesce(b.scheduled_at,b.created_at)>clock_timestamp()-interval '7 days'
         AND NOT EXISTS(SELECT 1 FROM confsys.notification_batches c WHERE c.retry_of=b.id)
@@ -62,11 +63,15 @@ export async function detail(db: PoolClient, id: string) {
     .rows[0];
   return row ? dto(db, row) : null;
 }
-export async function list(db: PoolClient, offset: number) {
+export async function list(
+  db: PoolClient,
+  offset: number,
+  includeFinance = true,
+) {
   const rows = (
     await db.query(
-      `${batchProjection} ORDER BY b.created_at DESC,b.id DESC LIMIT 21 OFFSET $1`,
-      [offset],
+      `${batchProjection} WHERE ($2 OR b.kind='general') ORDER BY b.created_at DESC,b.id DESC LIMIT 21 OFFSET $1`,
+      [offset, includeFinance],
     )
   ).rows;
   const items = [];
@@ -90,6 +95,7 @@ export async function create(
   db: PoolClient,
   actorId: string,
   input: {
+    kind?: "general" | "payment_reminder";
     idempotencyKey: string;
     recipientIds: string[];
     subject: string;
@@ -103,7 +109,7 @@ export async function create(
 ) {
   const id = randomUUID();
   await db.query(
-    "INSERT INTO confsys.notification_batches(id,created_by,issuer_credential_version,idempotency_key,request_hash,subject,message_text,recipient_ids,retry_of,audience,template_version_id,scheduled_at) SELECT $1,id,credential_version,$3,$4,$5,$6,$7,$8,$9,$10,$11 FROM confsys.users WHERE id=$2",
+    "INSERT INTO confsys.notification_batches(id,created_by,issuer_credential_version,idempotency_key,request_hash,subject,message_text,recipient_ids,retry_of,audience,template_version_id,scheduled_at,kind) SELECT $1,id,credential_version,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12 FROM confsys.users WHERE id=$2",
     [
       id,
       actorId,
@@ -116,6 +122,7 @@ export async function create(
       input.audience ?? null,
       input.templateVersionId ?? null,
       input.scheduledAt ?? null,
+      input.kind ?? "general",
     ],
   );
   return id;
@@ -139,10 +146,11 @@ export async function retrySource(db: PoolClient, id: string) {
       cancelled_at: Date | null;
       in_window: boolean;
       issuer_active: boolean;
+      kind: "general" | "payment_reminder";
       audience: NotificationAudience | null;
       template_version_id: string | null;
     }>(
-      "SELECT b.id,b.created_by,b.issuer_credential_version,b.subject,b.message_text,b.cancelled_at,b.audience,b.template_version_id,coalesce(b.scheduled_at,b.created_at)>clock_timestamp()-interval '7 days' AS in_window,u.state='active' AND u.verified_at IS NOT NULL AND u.credential_version=b.issuer_credential_version AS issuer_active FROM confsys.notification_batches b JOIN confsys.users u ON u.id=b.created_by WHERE b.id=$1 FOR UPDATE OF b",
+      "SELECT b.id,b.kind,b.created_by,b.issuer_credential_version,b.subject,b.message_text,b.cancelled_at,b.audience,b.template_version_id,coalesce(b.scheduled_at,b.created_at)>clock_timestamp()-interval '7 days' AS in_window,u.state='active' AND u.verified_at IS NOT NULL AND u.credential_version=b.issuer_credential_version AS issuer_active FROM confsys.notification_batches b JOIN confsys.users u ON u.id=b.created_by WHERE b.id=$1 FOR UPDATE OF b",
       [id],
     )
   ).rows[0];

@@ -43,3 +43,5 @@ export async function enqueueIdentityMail(
   return id;
 }
 export { enqueueBusinessNotification } from './business.js';
+
+export { notificationBatchPermission, type NotificationBatchKind } from './batch-policy.js';

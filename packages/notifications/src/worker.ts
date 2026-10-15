@@ -6,6 +6,10 @@ import { diagnostic, redisOptions, type WorkerConfig } from "@confsys/config";
 import { withIdentityTransaction } from "@confsys/db";
 import { unseal } from "./secrets.js";
 import { permissionsFor } from "@confsys/policy";
+import {
+  notificationBatchPermission,
+  type NotificationBatchKind,
+} from "./batch-policy.js";
 const queueName = "identity-notifications-v1";
 type Notification = {
   id: string;
@@ -74,16 +78,32 @@ export async function recoverNotifications(pool: Pool) {
 }
 // Batches retain their issuing authority. Pending sends fail closed if the
 // issuer is disabled, credentials change, permission is removed, or cancelled.
-async function batchEligible(pool: Pool | PoolClient, row: Notification) {
+async function batchEligible(
+  pool: Pool | PoolClient,
+  row: Notification,
+  lockFinance = false,
+) {
   if (!row.batch_id) return true;
-  const result = await pool.query<{ active: boolean; roles: string[] }>(
-    "SELECT active,roles FROM confsys.notification_batch_authority WHERE id=$1",
+  const result = await pool.query<{
+    active: boolean;
+    roles: string[];
+    kind: NotificationBatchKind;
+  }>(
+    "SELECT active,roles,kind FROM confsys.notification_batch_authority WHERE id=$1",
     [row.id],
   );
   const authority = result.rows[0];
+  if (lockFinance && authority?.kind === "payment_reminder") {
+    await pool.query(
+      "SELECT singleton FROM confsys.registration_state FOR SHARE",
+    );
+    return batchEligible(pool, row);
+  }
   return (
     !!authority?.active &&
-    permissionsFor(authority.roles).includes("notifications.manage")
+    permissionsFor(authority.roles).includes(
+      notificationBatchPermission(authority.kind),
+    )
   );
 }
 export async function processNotification(
@@ -142,7 +162,7 @@ export async function processNotification(
   // retract a notification that was already authorized for the recipient.
   const sending = await withIdentityTransaction(pool, async (db) => {
     await db.query("SELECT singleton FROM confsys.access_control FOR SHARE");
-    if (!(await batchEligible(db, row))) return null;
+    if (!(await batchEligible(db, row, true))) return null;
     const changed = await db.query<{ email: string }>(
       `UPDATE confsys.notifications n SET stage='sending',released_at=coalesce(n.released_at,clock_timestamp())
        FROM confsys.notification_eligibility e

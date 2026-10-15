@@ -3,7 +3,10 @@ import type { Pool, PoolClient } from "pg";
 import type { ApiConfig } from "@confsys/config";
 import { withIdentityTransaction } from "@confsys/db";
 import { notificationBatchEndpoints } from "@confsys/contracts";
-import { enqueueBusinessNotification } from "@confsys/notifications";
+import {
+  notificationBatchPermission,
+  enqueueBusinessNotification,
+} from "@confsys/notifications";
 import { sessionActor } from "../auth/session.js";
 import { AuthError } from "../auth/errors.js";
 import {
@@ -18,6 +21,7 @@ import {
 } from "../access/policy.js";
 import { effectivePublicSite } from "../site/branding.js";
 import * as repo from "./repository.js";
+import { eligible as unpaidRecipients } from "../finance-reminders/repository.js";
 export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
   async function transaction<T>(
     raw: string | undefined,
@@ -30,8 +34,24 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
       requirePermission(await rolesFor(db, actor.id), "notifications.manage");
       if (write) assertRecentPassword(actor.passwordVerifiedAt, new Date());
       await repo.context(db, actor.id);
+      await db.query("SELECT set_config('app.finance_admin',$1,true)", [
+        String(
+          permissionsFor(await rolesFor(db, actor.id)).includes(
+            "finance.reconcile",
+          ),
+        ),
+      ]);
       return work(db, actor.id);
     });
+  }
+  async function requireBatch(db: PoolClient, actorId: string, id: string) {
+    const batch = await repo.detail(db, id);
+    if (!batch) throw new AuthError("NOT_FOUND");
+    requirePermission(
+      await rolesFor(db, actorId),
+      notificationBatchPermission(batch.kind),
+    );
+    return batch;
   }
   async function audit(
     db: PoolClient,
@@ -111,20 +131,23 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
         return saved;
       }),
     deliveries: (raw: string | undefined, input: unknown) =>
-      transaction(raw, false, async (db) => {
+      transaction(raw, false, async (db, actorId) => {
         const data =
           notificationBatchEndpoints.notificationBatchDeliveries.input.parse(
             input,
           );
-        if (!(await repo.detail(db, data.id))) throw new AuthError("NOT_FOUND");
+        await requireBatch(db, actorId, data.id);
         return repo.deliveries(db, data.id, data.offset);
       }),
     list: (raw: string | undefined, input: unknown) =>
-      transaction(raw, false, (db) =>
+      transaction(raw, false, async (db, actorId) =>
         repo.list(
           db,
           notificationBatchEndpoints.notificationBatchList.input.parse(input)
             .offset,
+          permissionsFor(await rolesFor(db, actorId)).includes(
+            "finance.reconcile",
+          ),
         ),
       ),
     create: (raw: string | undefined, input: unknown, requestId: string) =>
@@ -207,10 +230,14 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
         await repo.lockKey(db, data.idempotencyKey);
         const source = await repo.retrySource(db, data.id);
         if (!source) throw new AuthError("NOT_FOUND");
+        requirePermission(
+          await rolesFor(db, actorId),
+          notificationBatchPermission(source.row.kind),
+        );
         if (
           !source.row.issuer_active ||
           !permissionsFor(await rolesFor(db, source.row.created_by)).includes(
-            "notifications.manage",
+            notificationBatchPermission(source.row.kind),
           )
         )
           throw new AuthError("CONFLICT");
@@ -232,7 +259,7 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
           )
         )
           throw new AuthError("CONFLICT");
-        const recipients = source.deliveries
+        let recipients = source.deliveries
           .filter(
             (n) =>
               n.status === "failed" &&
@@ -240,6 +267,12 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
               n.recipient_eligible,
           )
           .map((n) => n.user_id);
+        if (source.row.kind === "payment_reminder") {
+          await db.query(
+            "SELECT singleton FROM confsys.registration_state FOR SHARE",
+          );
+          recipients = await unpaidRecipients(db, recipients);
+        }
         if (!recipients.length) throw new AuthError("CONFLICT");
         const id = await repo.create(
           db,
@@ -247,6 +280,7 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
           {
             idempotencyKey: data.idempotencyKey,
             recipientIds: recipients,
+            kind: source.row.kind,
             subject: source.row.subject,
             text: source.row.message_text,
             audience: source.row.audience,
@@ -287,10 +321,9 @@ export function createNotificationBatchService(pool: Pool, config: ApiConfig) {
     cancel: (raw: string | undefined, input: unknown, requestId: string) =>
       transaction(raw, true, async (db, actorId) => {
         const { id } =
-            notificationBatchEndpoints.notificationBatchCancel.input.parse(
-              input,
-            ),
-          result = await repo.cancel(db, id);
+          notificationBatchEndpoints.notificationBatchCancel.input.parse(input);
+        await requireBatch(db, actorId, id);
+        const result = await repo.cancel(db, id);
         if (!result) throw new AuthError("NOT_FOUND");
         await audit(db, actorId, "notification_batch.cancel", id, requestId);
         return result;
