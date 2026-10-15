@@ -6,4 +6,4 @@ These are recoverable unfinished source fragments, **not applied features or ver
 - `registration-authority.test.ts.pending`: unfinished new test from codex/continuous-invitations at925c43b; compare against canonical0059/0060 before adding to the executable suite.
 - `review-tests.patch`: agent working-copy test delta; some content may already be in main, so compare before applying.
 
-Original worktrees, ignored configuration, generated artifacts and dependencies are preserved intact. Full branch bundle and per-worktree working/index patches are kept privately in the common Git directory under `consolidation/20261016/`. Do not copy old agent dependency/schema snapshots over the canonical main tree.
+Original retired worktrees have been removed after verified private backup. Uncommitted files, ignored configuration and generated artifacts are recoverable from `.git/consolidation/20261016/retired-worktrees/`; only reinstallable node_modules was excluded. All branch history and per-worktree working/index patches remain in this standalone repository under `.git/consolidation/20261016/`. Do not copy old agent dependency/schema snapshots over the canonical main tree.
