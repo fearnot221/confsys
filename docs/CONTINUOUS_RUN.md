@@ -6,7 +6,7 @@ Baseline: 9642a62, verified descendant of d4c0788. Branch: codex/phase-1-4-to-6-
 ## Plan and ownership
 Main: private files/media then registration/finance and dependent workflow; owns migrations/contracts/permissions/lockfile. Separate invitation agent owns invitation-specific source/tests, proposing central changes for main review. Existing stack and access fences retained. No provider credentials required: local storage and Mailpit only.
 
-## Current scope status — 07:54 Taipei
+## Current scope status — 08:07 Taipei
 
 All rows describe implemented source plus actual verification; none imply production readiness or completion of every SPEC requirement.
 
@@ -14,7 +14,7 @@ All rows describe implemented source plus actual verification; none imply produc
 |---|---|---|
 | Phase1 files/media/local invitations | Implemented, integration verified | Real scanner clean/EICAR/limit rejection, private authorization, invitation acceptance; two-instance rehearsal30cec03e passed07:41 |
 | Phase2 registration/forms/prices/capacity/finance/activities/receipts | Core implemented and browser verified; repairs integrating | Conditional forms/history, group allocation/refunds, immutable receipt PDF; safety migration0036 scoped4/4, receipt reissue and allocation pagination browser passed; terminal void and pagination PG passed |
-| Phase3 submissions/authors/revisions/files/withdrawal | Implemented and verified | Author/admin browser flow, postacceptance deadline pinned; dedicated presenter-change consent/approval in progress (0044); not yet verified |
+| Phase3 submissions/authors/revisions/files/withdrawal | Implemented and verified | Author/admin browser flow, postacceptance deadline pinned; dedicated presenter-change consent/approval (0044) passed 5 real integration tests; first browser regression currently running |
 | Phase4 reviews/conflicts/screening/decisions/publication | Implemented and verified | Blind review browser flow, track permissions, conflict gates, screening/reminders; bulk result operations remain to assess |
 | Phase5 program/competitions/awards | Implemented and verified | Program publication and competition browser flows, immutable snapshots/personal schedule; deadline gates scoped tests passed |
 | Phase6 onsite/PDF/notifications/stats/exports/site/preview | Core implemented; further capabilities in progress | Onsite real QR/PDF, real background CSV, notification retries, controlled preview, optional site pages; notification templates/audience/scheduling/release integrated,12 PG passed; reissue integrated and browser passed |
@@ -25,7 +25,7 @@ Pinned Node24.21.0/pnpm10.34.7 at /tmp/confsys-tools/node_modules/.bin. Own proj
 
 Latest full `pnpm check` at07:13–15 passed lint/typecheck/unit48/integration128/contract15/build/E2E19. Later `pnpm build && pnpm test:e2e` passed22 browser flows at07:24; current scoped unit55, contract16 and lint/typecheck passed. Newer feature changes require the next full regression; do not combine these into a claimed full current-suite pass.
 
-Latest picked source checkpoint:99e10a5 (07:43); branch history retains all independent feature commits. Migrations0037–0039/0041–0043 integrated;0040 mailbox and0045 notification release central integration pending checkpoint,0044/0046 presenter/successor proposed. Agent branches are independent; only reviewed commits are cherry-picked into this integration tree.
+Latest source checkpoint: d0b85ca (08:01); migrations through0051 integrated. Current pnpm check passed lint/typecheck, 66 unit, 173 integration, 16 contract tests and build; 25 browser tests are still running, so full current-suite success is not yet claimed. Proposed0052 pins approved presenter identity in personal program publications; proposed0053 closes direct payer verification writes and repairs refund replacement settlement. Agent branches remain independent; only reviewed changes are integrated.
 
 ## Focused baseline review
 Reviewed existing session/access locks, site service/repository, runtime role/transaction helper, contract registry, scripts/migrations and CI. Preserve post-lock actor checks and explicit permissions. No evidenced inherited blocker so far. Existing MFA/TLS/retention/backup/provider debt remains in ROADMAP. New file safety must fail closed and cannot claim a stub scanner is verified.
@@ -101,3 +101,8 @@ The entries below are chronological evidence; the current state is summarized ab
 - Main central44/46/47/48 schemas, presenterAPI/UI/routes/contracts and purpose/stats source integrated. Readiness now tracks latest required migration, with a guard test preventing new schema additions from silently leaving startup checks behind.
 - Completed synthetic30cec03e A/B anded58cf47restore containers stopped after detected Docker memory pressure (B API/workerOOM07:48); volumes/artifacts retained. Original containers unchanged. Native scanner and main synthetic PG/Redis/Mailpit remain available.
 - Next actual work:49source integration thenfullcheck; single participant service lifecycle test across business modules; enrich next two-instance rehearsal with real PDF/CSV/QR/pending encrypted mail before restore. No Phase6-complete claim.
+
+## 08:07 checkpoint
+- Full regression in progress as above; previous failure of original direct email-update denial was fixed with0051 constrained confirmed-token mutation, preserving the original assertion. Auth/email focused21/21 passed.
+- Real cross-phase participant service lifecycle1/1 passed07:57, including scanner, paid reconciliation, review/result, program/competition, QR/redemption, PDF and worker CSV. This is service integration evidence, not a browser claim.
+- Two-instance30cec03e passed07:41 with imagep6-8ecadf2e; restoreed58cf47 passed07:42 with one private file but zero generated artifacts/QR/pending mail. New restore-fixtures helper is ready for a fresh latest-image exercise; enriched recovery remains unverified. Own rehearsal containers stopped and volumes retained after B app OOM; old environments untouched.
