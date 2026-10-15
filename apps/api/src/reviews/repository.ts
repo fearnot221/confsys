@@ -339,17 +339,15 @@ export async function authorResults(
       [offset],
     )
   ).rows;
-  return {
-    items: await Promise.all(
-      rows.slice(0, 20).map(async ({ revisionId, ...r }) => ({
-        ...r,
-        registrationRequirement: await registrationRequirement(db, revisionId),
-        revisionDeadline: r.revisionDeadline?.toISOString() ?? null,
-        publishedAt: r.publishedAt.toISOString(),
-      })),
-    ),
-    nextOffset: rows.length > 20 ? offset + 20 : null,
-  };
+  const items = [];
+  for (const { revisionId, ...r } of rows.slice(0, 20))
+    items.push({
+      ...r,
+      registrationRequirement: await registrationRequirement(db, revisionId),
+      revisionDeadline: r.revisionDeadline?.toISOString() ?? null,
+      publishedAt: r.publishedAt.toISOString(),
+    });
+  return { items, nextOffset: rows.length > 20 ? offset + 20 : null };
 }
 
 export async function candidates(

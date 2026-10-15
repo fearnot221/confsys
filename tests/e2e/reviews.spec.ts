@@ -201,11 +201,9 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
     .check();
   await page.getByRole("button", { name: "指派此不可變版本" }).click();
   await expect(page.getByRole("status")).toContainText("已指派不可變投稿版本");
-  const progress = page
-    .locator("details")
-    .filter({
-      has: page.locator("summary", { hasText: paper.document.title }),
-    });
+  const progress = page.locator("details").filter({
+    has: page.locator("summary", { hasText: paper.document.title }),
+  });
   await progress.locator("summary").click();
   const extendedDeadline = new Date(Date.now() + 7 * 86400000).toISOString();
   await progress
@@ -257,6 +255,53 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
     await expect(reviewerPage.getByRole("status")).toContainText(
       "審查已正式送出",
     );
+    await page.reload();
+    await page
+      .getByRole("combobox", { name: "正式投稿", exact: true })
+      .selectOption(paper.id);
+    await page
+      .getByRole("combobox", { name: "指派審查輪次", exact: true })
+      .selectOption("2");
+    await page
+      .getByRole("combobox", { name: "審查委員", exact: true })
+      .selectOption(id(reviewerEmail));
+    await page
+      .getByRole("combobox", { name: "評分表版本", exact: true })
+      .selectOption(formId);
+    await page
+      .getByLabel("已人工確認稿件內容與中繼資料符合匿名要求（雙盲必要）", {
+        exact: true,
+      })
+      .check();
+    await page
+      .getByRole("button", { name: "指派此不可變版本", exact: true })
+      .click();
+    await expect(page.getByRole("status")).toContainText(
+      "已指派不可變投稿版本",
+    );
+    await reviewerPage.reload();
+    const secondRound = reviewerPage
+      .locator("article")
+      .filter({ hasText: "第 2 輪" });
+    await secondRound
+      .getByRole("button", { name: "接受指派", exact: true })
+      .click();
+    await expect(reviewerPage.getByRole("status")).toContainText(
+      "審查狀態已更新",
+    );
+    await secondRound.getByLabel("研究品質（0–5）").fill("5");
+    await secondRound
+      .getByLabel("給作者的評語", { exact: true })
+      .fill("SECOND_ROUND_BROWSER_FEEDBACK");
+    await secondRound
+      .getByLabel("僅主席可見的內部評語")
+      .fill("SECOND_ROUND_PRIVATE");
+    await secondRound
+      .getByRole("button", { name: "正式送出並鎖定", exact: true })
+      .click();
+    await expect(reviewerPage.getByRole("status")).toContainText(
+      "審查已正式送出",
+    );
     const authorPage = await authorContext.newPage();
     await login(authorPage, authorEmail);
     await authorPage.goto("/reviews");
@@ -268,11 +313,17 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
     await chairPage.goto("/reviews");
     // The title also exists in a hidden <option>; assert the visible review summary.
     await expect(
-      chairPage.locator("summary").filter({ hasText: paper.document.title }),
+      chairPage
+        .locator("summary")
+        .filter({ hasText: paper.document.title })
+        .filter({ hasText: "第 2 輪" }),
     ).toBeVisible();
     await chairPage
       .getByRole("combobox", { name: "正式投稿", exact: true })
       .selectOption(paper.id);
+    await chairPage
+      .getByRole("combobox", { name: "決議依據輪次", exact: true })
+      .selectOption("2");
     await chairPage
       .getByRole("combobox", { name: "決議", exact: true })
       .selectOption("accept_oral");
@@ -301,8 +352,14 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
       authorPage.getByText("PUBLIC_BROWSER_DECISION", { exact: true }),
     ).toBeVisible();
     await expect(
-      authorPage.getByText("PUBLIC_BROWSER_FEEDBACK", { exact: true }),
+      authorPage.getByText("SECOND_ROUND_BROWSER_FEEDBACK", { exact: true }),
     ).toBeVisible();
+    await expect(
+      authorPage.getByText("PUBLIC_BROWSER_FEEDBACK", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      authorPage.getByText("SECOND_ROUND_PRIVATE", { exact: false }),
+    ).toHaveCount(0);
     await expect(
       authorPage.getByRole("complementary", { name: "錄取後報名要求" }),
     ).toContainText("尚待完成報名");
