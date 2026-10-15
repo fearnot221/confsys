@@ -12,8 +12,17 @@ import {
 import { sessionActor } from "../auth/session.js";
 import { AuthError } from "../auth/errors.js";
 import { lockAccess, rolesFor } from "../access/repository.js";
-import { requirePermission, assertRecentPassword } from "../access/policy.js";
+import { requirePermission, assertRecentPassword, permissionsFor } from "../access/policy.js";
 import * as repo from "./repository.js";
+import { validateMediaReferences, referenceMedia, fileContext } from "../files/repository.js";
+import type { SiteDocument } from "@confsys/contracts";
+const mediaIds = (document: SiteDocument) => [...new Set([document.media?.logoId, document.media?.heroId].filter((id): id is string => !!id))];
+async function validateMediaChange(db: PoolClient, actor: string, before: SiteDocument, after: SiteDocument) {
+  if (JSON.stringify(before.media) !== JSON.stringify(after.media)) {
+    requirePermission(await rolesFor(db, actor), "files.media.manage");
+    await validateMediaReferences(db, mediaIds(after));
+  }
+}
 import { effectivePublicSite } from "./branding.js";
 export function createSiteService(pool: Pool, config: ApiConfig) {
   const authorized = <T>(
@@ -26,7 +35,9 @@ export function createSiteService(pool: Pool, config: ApiConfig) {
       // Private reads take the same fence so late authority changes cannot reveal a draft.
       await lockAccess(db);
       const actor = await sessionActor(db, raw, config, new Date(), true);
-      requirePermission(await rolesFor(db, actor.id), permission);
+      const roles=await rolesFor(db,actor.id);
+      requirePermission(roles, permission);
+      await fileContext(db,actor.id,permissionsFor(roles).includes("files.media.manage"));
       if (permission === "site.publish")
         assertRecentPassword(actor.passwordVerifiedAt, new Date());
       return work(db, actor.id);
@@ -55,6 +66,7 @@ export function createSiteService(pool: Pool, config: ApiConfig) {
       return authorized(raw, "site.draft.write", async (db, actor) => {
         const before = await current(db);
         version(before.draftVersion, data.expectedVersion);
+        await validateMediaChange(db, actor, before.document, data.document);
         await repo.save(db, data.document, data.expectedVersion);
         await repo.recordSite(
           db,
@@ -78,6 +90,7 @@ export function createSiteService(pool: Pool, config: ApiConfig) {
         if (existing) return existing;
         const previous = await repo.published(db),
           fields = siteChangedFields(previous?.document ?? null, d.document);
+        await validateMediaReferences(db, mediaIds(d.document));
         const publication = await repo.insertPublication(
           db,
           d.document,
@@ -85,6 +98,7 @@ export function createSiteService(pool: Pool, config: ApiConfig) {
           actor,
           fields,
         );
+        await referenceMedia(db, mediaIds(d.document), publication.publicationId);
         await repo.recordSite(
           db,
           actor,
@@ -103,6 +117,7 @@ export function createSiteService(pool: Pool, config: ApiConfig) {
         const d = await current(db);
         version(d.draftVersion, data.expectedVersion);
         const document = await repo.historicalDocument(db, data.publicationId);
+        await validateMediaChange(db, actor, d.document, document);
         await repo.save(db, document, d.draftVersion);
         await repo.recordSite(
           db,

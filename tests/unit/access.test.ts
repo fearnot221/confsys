@@ -15,7 +15,34 @@ it("fixed explicit grants deny unknown roles, permissions and missing actors", (
   expect(permissionsFor(["conference_staff"])).toEqual([
     "accounts.directory.read",
   ]);
-  expect(permissionsFor(["conference_admin"])).toHaveLength(8);
+  expect(permissionsFor(["conference_admin"])).toEqual([
+    "accounts.directory.read",
+    "access.roles.manage",
+    "accounts.status.manage",
+    "accounts.sessions.revoke",
+    "security_audit.read",
+    "site.draft.read",
+    "site.draft.write",
+    "site.publish",
+    "files.media.manage",
+    "registration.configure",
+    "registration.manage",
+    "submissions.manage",
+    "submissions.read_all",
+    "reviews.manage",
+    "program.manage",
+    "program.publish",
+    "onsite.read",
+    "onsite.checkin",
+    "onsite.redeem",
+    "onsite.undo",
+  "documents.template.manage",
+    "competitions.manage",
+    "reporting.read",
+    "reporting.export",
+    "authors.preview",
+    "notifications.manage",
+  ]);
   for (const roles of [undefined, [], ["conference_staff"]])
     expect(() => requirePermission(roles, "access.roles.manage")).toThrow();
   expect(() =>

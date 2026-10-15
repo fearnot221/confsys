@@ -55,3 +55,42 @@ Admin sections: basic information, fixed page content, preview/publication, publ
 Publishing requires complete fields, explicit whole-site/version confirmation and valid server proof; reauthentication does not auto-publish. Success follows server commit and public DTO refetch, then query invalidation. Loading history confirms replacement of saved draft, refuses unsaved edits, creates a new version and leaves official site unchanged. Failure, denied, expired/revoked, loading, empty and retry states are visible. Revocation clears private queries/form/history/preview and ignores late results. `beforeunload` warns on unsaved form navigation; no browser storage.
 
 Presentation imports only contract types, React/UI and other presentation components. It does not fetch, read secrets or duplicate business permissions. Semantic fields/labels/live errors/focus and 390px behavior are baseline usability, not a complete WCAG claim. No uploaded images, arbitrary theme CSS, fake CTA, sponsor/speaker/count placeholders or new UI framework.
+
+## Role invitation surfaces
+
+`features/invitations/hooks` owns account state, invitation mutations, abort/epoch guards, retry idempotency and private-cache clearing. `components/invitations-screen.tsx` and `invitation-acceptance-screen.tsx` only render props and call callbacks. The SDK owns all fetch/CSRF operations. `/admin/invitations` is for role managers; `/auth/invitation#token=…` requires the recipient to log in first and explicitly confirm their password. The fragment is removed immediately and is never persisted in browser storage. After accepting, all previous sessions are revoked and the UI directs the recipient to log in again. Missing/expired/wrong-account invitations show errors rather than granting fallback access.
+
+## Review workbench
+
+`/reviews` is shared by authors, reviewers and scoped chairs; the feature data hook receives authoritative permissions and only enables appropriate server queries. Pure `ReviewsScreen` subcomponents render form configuration, assignment selection, rubric draft/final review, conflict declaration, chair draft/publication and published author results. The SDK owns CSRF, JSON validation and private file fetches. Server errors preserve truthful state; expired sessions clear private queries and abort in-flight mutations. All board candidate/result collections use bounded pages with `nextOffset`; historical form versions remain pinned to assignments.
+
+### Notification and reporting workspace
+
+Mount `ReportingScreen` with `useReporting()` at `/notifications`. Presentation owns
+only local form controls; SDK owns network calls, hook owns permission-derived view
+flags, abort/lifecycle and server state. The notification list separates read state
+from SMTP acceptance and labels uncertain delivery truthfully. Admin exports offer
+individual bounded CSV pages. Controlled preview has an explicit read-only banner,
+a required reason, no impersonated principal and a close action. All form controls
+have native labels; asynchronous failures/status use alert/status announcements.
+
+### Bounded notification batches
+
+Mount `NotificationBatchesScreen` with `useNotificationBatches()` at
+`/admin/notifications`. Operators paste explicit local UUIDs from the Email export,
+enter a subject/body, and explicitly queue the batch. Recent-password proof is
+available in the workspace. The hook preserves request identity across ambiguous
+retries of the same form. The page lists bounded batch pages, real worker status
+counts, refresh and cancellation, with explicit non-recall/uncertain-delivery labels.
+
+
+### Complete-data export workspace and statistics
+
+Mount `ExportJobsScreen` with `useExportJobs()` at `/admin/exports`. The page explains
+snapshot timing, the explicit 64 MiB failure limit, 24-hour expiry and five-job bound.
+It preserves retry identity, offers an explicit new-snapshot action, current status
+refresh, recent-password verification, and an authorized blob download whose URL
+is revoked on replacement/unmount. Presentation never fetches or constructs API URLs.
+The notification/reporting workspace links to full exports and labels its preview
+CSV pages separately. Statistics display the common snapshot time, UTC date grouping
+and separate currency totals without an invented net-income calculation.

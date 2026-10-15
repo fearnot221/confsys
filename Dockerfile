@@ -7,5 +7,6 @@ FROM node:24.21.0-bookworm-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=node:node /app /app
+RUN mkdir -p /data/private && chown node:node /data/private && chmod 700 /data/private
 USER node
 CMD ["node", "apps/api/dist/main.js"]

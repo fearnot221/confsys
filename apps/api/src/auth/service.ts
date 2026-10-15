@@ -1,3 +1,4 @@
+import { createEmailChangeService } from "./email-change.js";
 import { effectivePublicSite } from "../site/branding.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
@@ -58,6 +59,7 @@ export function createAuthService(
     keyVersion: config.MAIL_KEY_VERSION,
   };
   return {
+    ...createEmailChangeService(pool, config),
     async requestMail(
       action: "register" | "resend" | "forgot",
       inputEmail: string,

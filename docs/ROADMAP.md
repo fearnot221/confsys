@@ -1,6 +1,6 @@
 # Roadmap
 
-Scope follows SPEC. This delivery is limited to authorized Phase 1.3; later units still require approval.
+Scope follows SPEC. **2026-10-15 timed override:** user explicitly authorized continuous implementation from Phase1.3 through Phase6 until10:00 Asia/Taipei. Historical stop rules below describe earlier deliveries and do not block this run. Current implementation/verification checkpoints are in CONTINUOUS_RUN; Phase7 and production remain unauthorized.
 
 | Phase | Status / scope |
 |---|---|
@@ -9,15 +9,15 @@ Scope follows SPEC. This delivery is limited to authorized Phase 1.3; later unit
 | 1.1b | Single-conference deployment correction; runtime display, isolated resource template and dual-instance regression |
 | 1.2 | Implemented fixed local roles/permissions, one-time operator CLI bootstrap, account management UI/API, reauthentication and audit; see PHASE1_2_DELIVERY |
 | 1.3 | Implemented bounded settings/site draft, protected preview, immutable publication/history, initial HTML and official mail branding; see PHASE1_3_DELIVERY |
-| Later Phase 1 | Not started: private files/media safety lifecycle, invitations and resource-specific permissions |
-| 2 | Not started: registration, pricing, capacity, manual reconciliation, group payments, meals, receipts |
-| 3 | Not started: submission, revisions, private content validation/quarantine |
-| 4 | Not started: assignments, conflicts, review and decision publication |
-| 5 | Not started: program, publication versions, oral/poster competitions |
-| 6 | Not started: check-in/redemption, documents, notifications, exports, selected provider sandboxes |
+| Later Phase 1 | Implemented private files/media, actual scanner, local invitations; full128-case integration and19-browser regression pass at07:15 before subsequent additions |
+| 2 | Implemented core; ongoing acceptance coverage: registration, pricing, capacity, manual reconciliation, group payments, meals, receipts |
+| 3 | Implemented core; ongoing acceptance coverage: submission, revisions, private content validation/quarantine |
+| 4 | Implemented core including screening/workload/reminders; ongoing acceptance coverage: assignments, conflicts, review and decision publication |
+| 5 | Implemented core; ongoing acceptance coverage: program, publication versions, oral/poster competitions |
+| 6 | Implemented core; templates/personal schedule/retry and operational checks ongoing: check-in/redemption, documents, notifications, exports, selected provider sandboxes |
 | 7 | Not started: Claude read-only UI audit then isolated presentation PRs; end-to-end launch verification |
 
-## Phase 1 increments (only 1.3 currently authorized)
+## Historical Phase 1 increments (prior delivery baseline)
 
 1. **1.1 retained:** local registration/verification/reset/session, CSRF/Origin, audit/outbox/worker/Mailpit, race and crash recovery.
 2. **1.1b retained:** correct single-conference model in contracts/config/Compose/UI/mail/docs/tests, same-build dual-instance isolation. No role/CMS/business modules.
@@ -25,7 +25,7 @@ Scope follows SPEC. This delivery is limited to authorized Phase 1.3; later unit
 4. **1.3 implemented:** bounded versioned conference/site configuration, dates/timezone/locales, protected saved-draft preview, immutable publications/history and public initial HTML/metadata. Currency/fees/deadlines belong to later business modules. Future reuse exports/imports whitelisted settings into a fresh instance; never clone account/business DBs.
 5. **Later reliability:** local invitations and resource-specific notification policy; private file framework with validation/quarantine/download authorization. Preserve all original registration/finance/submission/review/competition/program/on-site/mail/statistics phases above.
 
-Each unit needs real UI/API/errors/permissions/tests/docs. Stop after Phase 1.3 local commit; no implicit approval for files, invitations or later business work.
+Each unit needs real UI/API/errors/permissions/tests/docs. The earlier Phase1.3 stop is superseded only by the dated, time-bounded authorization above.
 
 Open questions that do not block Phase 0: hosting, volumes/traffic, external mail/payment provider, SSO, receipt requirements, data retention and anonymization policy. No provider/production-readiness claim is made.
 
@@ -100,3 +100,38 @@ Read code/config/migrations/CI and confirmed 9d3e788 contains cc2361d, 520607e, 
 | Minimal native editing forms and text history summary | Field comparison is manual; no full accessibility/browser audit | Later Claude presentation unit: keyboard/assistive-tech audit, ergonomic comparison, keep SDK/data/permission ownership and regression assertions. |
 
 All prior security/operations debt remains: MFA, TLS, trustProxy/IP limits, encryption-key rotation, password screening/Argon2 capacity, retention, backup restore, real providers, load, WCAG and shared-host resource risks. Next minimal unit for new approval: private files/media metadata, bounded content validation/quarantine, authorized access and lifecycle; then invitations/registration per the existing roadmap. None implemented here.
+
+## Continuous Phase 3–5 focused maintainability recheck — 2026-10-15 07:12
+
+Core domain/service/repository, SDK/hook/presentation boundaries remain. Initial screening reuses the access fence, review permissions, conflict/track policy and atomic business notifications. It does not add a second authorization registry or mutate submission/review outcomes. Real PostgreSQL now covers screening version races, nonprivileged reason isolation, blocked downstream actions and notification failure rollback. Submission/program/competition suites also pass, including withdrawal races against publication/scoring. Browser updates still require main integration verification.
+
+| Evidenced remaining item | Practical risk | Acceptance / treatment within authorized scope |
+|---|---|---|
+| Deadline reminders are manual commands; no automatic due-date scheduler or extension of existing assignment deadlines | Administrators must monitor overdue counts and cannot reopen a closed snapshot in place | Record as unfinished workflow; any scheduler must deduplicate real outbox events, while deadline changes need explicit immutable amendment semantics and tests. |
+| Presenter changes use new immutable author revisions, then new published acceptance; no separate presenter-change approval request | Administrative handoff requires explicit re-review and re-publication | Keep current behavior visible; a dedicated approval workflow requires concrete state/contracts and tests before claiming it exists. |
+| Registration checks run at configured submission/competition eligibility points; no automatic post-acceptance registration-deadline enforcement | Accepted presenters may need manual registration follow-up | Add a dated policy and audited enforcement workflow before claiming automatic exclusion or reminders. |
+| Program/competition administration and final scoring serialize through access fence | High-volume throughput remains unmeasured | Preserve correctness regressions; benchmark synthetic contention before replacing the fence. |
+| Native form accessibility fixes cover labels, status/required guidance and expanded sections only | No complete WCAG or cross-browser assurance | Maintain semantic E2E assertions and reserve a full assistive-technology/browser audit for presentation hardening. |
+
+Post-acceptance registration follow-up (07:25): the previously listed missing dated policy now has an implementation pinned to immutable submission revisions, plus explicit author/admin status, reversible eligibility gates and manual deduplicated notices. Static checks pass; real PostgreSQL/browser regressions remain pending at this checkpoint. Automatic scheduled deadline notices, a permanent registration-cutoff exception process and a separate presenter-change approval workflow remain unfinished; none is implied by the manual gate.
+
+## Continuous follow-up — 2026-10-15 07:53
+
+The dated07:12/07:25 gaps above remain historical evidence, not current absence claims. Pinned post-acceptance registration policy/status passed real PG and author browser tests. Presenter consent/approval44 and explicit competition successor46 now have real PG coverage; browser integration remains pending. Notification templates/audience/scheduling with authorized worker inbox release passed PG12 and browser flow. Reminders remain explicit administrative actions; automatic due-date detection and immutable deadline extension workflows are still unimplemented.
+
+Evidenced safety fixes this run include program private draft RLS42, auxiliary review/conflict RLS43, terminal receipt guard39, verified email alias conflict fences40 and scheduled inbox release45. Competition base tables still expose award drafts to direct app-role SELECT despite service checks: focused49 safe-projection/RLS work is in progress and must be verified before closing that blocker.
+
+Docker Desktop resource pressure killed this run's B API/worker at07:48 after the successful07:41 two-instance rehearsal. Completed synthetic A/B and restore containers were stopped, volumes retained; original containers were not changed. Continuous availability under host pressure is unverified. Acceptance before deployment: isolate resource budgets and validate representative concurrency/recovery; do not infer load capacity from functional checks.
+
+## 08:16 verification update
+Competition private-table exposure was repaired by0049 and passed12 scoped PG cases plus the08:01 full173-case integration run. Presenter workflow now passed the original owner/target/admin browser scenario08:15;0052 publication mapping passed8 program cases. Payment own-row verification gap repaired0053 and8 focused cases passed. Notification audience paging beyond100 has actual PG2 and browser1 evidence. Immutable deadline amendment54 and payment reminders55 remain in progress; automatic deadline detection remains unfinished. Do not treat historical pending statuses above as current absences or unverified proposals as complete.
+
+## 08:30 focused review and verification
+
+Full gate at593bab1 passed70 unit/190 integration/16 contract/27 browser tests. Deadline extensions54, review rounds56 and finance reminders55/57 now have current integration/browser evidence. Assignment creation/competition qualification direct app-role weaknesses are repaired by forward0058 with32 scoped PG cases passed; new browser lifecycle and round2 coverage are running. Pending-assignment administrative revocation is an evidenced gap: disabled reviewers can leave pending rounds unresolved. A minimal immutable revocation workflow is being implemented within Phase4; no completion claim until verified. Populated backup/restore passed6e7a3772 (PDF/CSV/QR/envelope), while latest-image rehearsal remains pending.
+
+## Focused Phase 0 baseline recheck — 2026-10-16 CI repair
+
+Before this authorized CI repair, inspected README/SPEC, manifests, migration history, CI and the latest failure. Blocking evidence: CI never started the real scanner (quarantined uploads), an inner join suppressed closed review assignments under manuscript RLS, and the site race test counted cluster-wide lock waiters. The two-instance default container path also allocated the same scanner host port to A and B; the previously exercised native-scanner path did not expose that collision. Fix within this repair; preserve RLS, authorization assertions and historical migrations.
+
+Nonblocking debt: the full workflow runs three service stacks sequentially and depends on external scanner signatures/container registries. Practical risk is cold-start latency and shared-host memory pressure. Stop the completed CI smoke stack before A/B; retain genuine scans and both deployments. Further caching/resource tuning belongs in infrastructure hardening, accepted only with repeatable cold-start and isolation evidence. Functional CI success does not establish production load capacity.

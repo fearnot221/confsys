@@ -42,3 +42,29 @@ export function createClient(baseUrl = "", transport: typeof fetch = fetch) {
   };
 }
 export { createAuthClient } from "./auth.js";
+
+export { createInvitationClient } from "./invitations.js";
+export { createRegistrationClient } from './registration.js';
+export { createFilesClient } from "./files.js";
+
+export { createSubmissionClient } from "./submissions.js";
+
+export {createFinanceClient} from "./finance.js";
+export { createReceiptsClient } from "./documents.js";
+export { createReviewClient } from "./reviews.js";
+export { createProgramClient } from "./program.js";
+
+export {createActivitiesClient} from './activities.js';
+
+export { createOnsiteClient } from "./onsite.js";
+
+export {createDocumentJobsClient} from "./document-jobs.js";
+export { createReportingClient } from './reporting.js';
+export { createCompetitionClient } from "./competitions.js";
+export { createNotificationBatchClient } from './notification-batches.js';
+export { createExportJobsClient } from './export-jobs.js';
+export { createBadgeTemplateClient } from "./badge-template.js";
+
+export * from "./presenter-changes.js";
+
+export { createFinanceReminderClient } from './finance-reminders.js';

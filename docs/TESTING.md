@@ -26,7 +26,7 @@ Phase 0's test-only `phase0_rls` schema, `withTenant` helper and tenant input un
 | Old check | Current protection and executable evidence |
 |---|---|
 | Two orgs / three conferences SELECT/INSERT/UPDATE/DELETE and scope-reassignment denial | Independent PostgreSQL databases and runtime credentials; `test:instances` proves A-only account absent in B, foreign Session/token rejected, resets preserve B state, and independent DB/network/volumes |
-| Missing/partial tenant context; invalid tenant IDs | No tenant parameter/resolver or DB selector exists. `contract/instance` checks canonical Host; auth regressions deny absent/invalid sessions/CSRF. Local account permissions are now verified by integration/access; future business resource permissions remain unimplemented |
+| Missing/partial tenant context; invalid tenant IDs | No tenant parameter/resolver or DB selector exists. `contract/instance` checks canonical Host; auth regressions deny absent/invalid sessions/CSRF. Local account permissions are now verified by integration/access; private files, submissions, finance, review, program, onsite and export resource permissions are verified in their domain integration suites |
 | Non-owner/non-superuser/non-bypass; SET ROLE/ALTER/TRUNCATE denied | `integration/database.test.ts` exercises both actual roles; `integration/auth.test.ts` retains sensitive-table/column-grant denials |
 | Commit/rollback/pool reuse/concurrent callbacks | `integration/database.test.ts` uses one-connection pools and real transactions; auth integration retains atomic outbox rollback and concurrency/race cases |
 | Composite tenant FK rejects cross-tenant parent | No production tenant FK existed. Ordinary FK/check/unique constraints remain enforced in database/auth integration; separate-instance DBs cannot reference another instance's rows |
@@ -38,7 +38,7 @@ Redis integration uses a unique queue in local test DB 1; it executes a real wor
 
 ## Coverage limits
 
-Account/login/CSRF/session/outbox and capture-mail regression exists. Bounded Phase 1.3 site settings/publication is implemented; no payment/submission/upload/private-download or external provider is implemented. Network-error E2E deliberately aborts requests while healthy flows use real services. TLS, full browser/WCAG, load/penetration, backup restore and cloud CI are unverified. Historical counts in PHASE0/PHASE1_1 delivery files are not current evidence; see PHASE1_3_DELIVERY.
+Account/login/CSRF/session/outbox and capture-mail regression exists. Phase1–6 core flows now include real private uploads, registration/manual payment, submissions/reviews/program, onsite and document/export workers. External payment/mail delivery providers remain unconfigured. Network-error E2E deliberately aborts requests while healthy flows use real services. TLS, full browser/WCAG, load/penetration, backup restore and cloud CI are unverified. Historical counts in PHASE0/PHASE1_1 delivery files are not current evidence; see CONTINUOUS_RUN for current run evidence.
 
 ## Test and documentation maintenance
 
@@ -140,3 +140,128 @@ Public source renderer is exercised in HTTP integration, built artifact in E2E a
 On `/admin/site` save 409, keep local input and fetch server version for manual comparison, then explicitly discard/reapply. On 403 REAUTH_REQUIRED, enter current password and separately confirm publication again. On Session revoked, private queries/forms/preview/history clear. Public 503 means check database/migration and safe request ID logs; never change env to force a draft fallback. Public renderer changes in host dev require `pnpm --filter @confsys/web build:public`; normal clean build always creates both artifacts.
 
 The old root health assertions remain at `/system/status`; production ingress now serves `/access/accounts` and `/admin/site` SPA directly. Static hash assets may cache, dynamic content/auth/private previews cannot. No service worker. No complete search-engine indexing, TLS, provider, WCAG, load or production restore claim.
+
+## Local invitations
+
+After the additive invitation migration, run `pnpm exec vitest run tests/integration/invitations.test.ts` with the selected isolated synthetic environment loaded (for example `node --env-file=<isolated-env> node_modules/vitest/vitest.mjs run tests/integration/invitations.test.ts`). It uses real PostgreSQL app/worker roles, Redis, and Mailpit SMTP. Cases exercise verified-recipient prerequisites, recent password proof, idempotent creation, concurrent acceptance, wrong-user tokens, expiration/revocation, issuer and recipient credential fencing, rollback on audit failure, worker recipient restrictions and HTTP CSRF/strict input checks. Fixture cleanup affects only generated test accounts and associated records.
+
+Invitation checkpoint verification (2026-10-15 06:14 Asia/Taipei): `PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/invitations.test.ts` passed 7/7; `pnpm typecheck` and focused invitation/worker ESLint passed. `node scripts/check-boundaries.mjs` passed. Full `pnpm lint` was blocked by an unrelated new files contract control-character regex lint error. Browser navigation/visual validation and business-mail branch await integration wiring/schema; do not treat these as verified by service tests.
+
+Business mail checkpoint (2026-10-15 06:18 Asia/Taipei): `PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/business-mail.test.ts` passed 2/2 using real PostgreSQL and Mailpit SMTP, including captured subject/body, event deduplication, caller rollback and disabled-recipient suppression. Invitation browser flow is provided in `tests/e2e/invitations.spec.ts`; execution awaits the integrated app routing. Unit permission expectations now enumerate the explicit new grant set instead of merely counting entries.
+
+Review checkpoint: `tests/unit/reviews.test.ts` verifies rubric completeness, per-criterion bounds and duplicate/unknown score denial; the focused review/access unit run passed 5/5. `tests/integration/reviews.test.ts` is prepared for real app-role PostgreSQL, real private storage and ClamAV: role/track/self/coauthor restrictions, assignment acceptance, draft/final review concurrency, immutable revision and publication behavior, blinded DTOs, conflict-fenced downloads, decision rollback/outbox, session revocation and chair conflicts. Integration execution is pending the shared synthetic-environment slot and real scanner readiness at this checkpoint; no browser or integration pass is implied by the static checks.
+
+Review verified checkpoint (2026-10-15 06:32 Asia/Taipei): `PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/reviews.test.ts` passed **8/8**, including real ClamAV-backed upload and anonymous authorized download. Earlier scoped run passed 7/7 while scanner startup was pending; the complete run supersedes that limitation. Snapshot preservation after a later conflict, chair conflict declaration and transaction rollback are exercised. No browser review flow has yet been executed at this checkpoint.
+
+### Phase 6 notification/reporting checks
+
+- `pnpm exec vitest run tests/unit/reporting.test.ts`: CSV escaping and formulas,
+  including leading whitespace/control characters.
+- `node --env-file=/path/to/synthetic.env node_modules/vitest/vitest.mjs run tests/integration/reporting.test.ts`:
+  real app-role notification RLS/ownership, read idempotency, session/permission/proof,
+  safe export/preview projections, audited principal preservation, pagination and HTTP CSRF.
+- Reporting exports are bounded live pages, not an asynchronous snapshot export job.
+  Full snapshot exports are now a distinct durable worker flow described below.
+
+### Bounded bulk mail
+
+`node --env-file=/path/to/synthetic.env node_modules/vitest/vitest.mjs run tests/integration/notification-batches.test.ts`
+exercises3 cases with real PostgreSQL and Mailpit SMTP: current permission/recent
+proof, recipient eligibility, concurrent idempotency, immutable body/key binding,
+accepted status, explicit cancellation, issuer-role/credential revocation and disabled
+recipient cancellation. `tests/e2e/notification-batches.spec.ts` exercises the browser
+queue command, actual worker-to-Mailpit capture and the recipient's notification center.
+
+
+### Durable CSV export and aggregate statistics
+
+`node --env-file=/path/to/synthetic.env node_modules/vitest/vitest.mjs run tests/integration/export-jobs.test.ts tests/integration/reporting.test.ts`
+passed 10/10 on 2026-10-15 07:07 Asia/Taipei against the isolated real PostgreSQL,
+Redis and non-privileged runtime roles. Export tests cover over 1,000 source rows,
+keyset batching, a coherent historical read despite a subsequent source edit,
+formula-safe CSV, SHA-256 verification, owner isolation, fresh-password checks,
+revocation between snapshot and publication, credential epochs, expiry, concurrent
+request bounds, lease recovery and actual BullMQ processing. Reporting checks one
+statement timestamp and exact currency aggregates without private detail leakage.
+
+`pnpm exec vitest run tests/unit/export-csv.test.ts tests/unit/reporting.test.ts`
+passed 2/2: CSV escaping/formula neutralization and actual UTF-8 byte accounting;
+exceeding the configured 64 MiB ceiling cannot yield partial successful output.
+The integration test is over 1,000 rows; no throughput benchmark or maximum-size
+performance claim is made. `tests/e2e/export-jobs.spec.ts` exercises request, real
+worker completion and the downloaded browser file (browser verification tracked
+in the integration run report).
+
+Notification retry regression (`tests/integration/notification-batches.test.ts`) uses
+an actual closed ephemeral loopback SMTP port for three exhausted connection
+attempts, then Mailpit for the explicit retry child. It covers same/different-key
+concurrency, immutable source statuses, unknown/accepted/in-progress exclusions,
+seven-day expiry, cancellation, recipient/issuer revocation, recent proof and
+transaction rollback when auditing fails. No uncertain SMTP result is resent.
+
+`tests/integration/finance-activity-boundaries.test.ts` covers real `confsys_app`
+RLS without actor context and across owners, forged booking foreign keys, disabled
+payer revocation/reactivation, and HTTP cancellation deadline equivalence between
+activity and registration endpoints. It creates only synthetic records and
+restores the previous registration configuration pointer after cleanup.
+
+The finance/activity boundary suite also creates 101 real partial allocations,
+walks the independent allocation pager with an order filter, verifies own/admin
+scope separation, and refunds an older allocation through authenticated HTTP.
+Payment/order pagination cannot silently hide this allocation history.
+
+### Verified mailbox change regression (2026-10-15)
+
+Use the isolated instance's env file and canonical migration 0040. Executed:
+
+```sh
+PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/email-change.test.ts tests/integration/email-change-http.test.ts tests/integration/reviews.test.ts tests/integration/competitions.test.ts
+```
+
+Mailbox service 6/6, HTTP 1/1 and competition 11/11 passed. The initial review run had one failure because this independent branch still held the pre-0027 private-file module; after copying the current integrated file source, `... vitest.mjs run tests/integration/reviews.test.ts` passed 9/9 including the same private download/scanner assertion and new alias conflict test. No assertion was removed. Cases include real Mailpit target delivery, original-account binding, confirmation CSRF, stale proof/epoch, expiry/replay, concurrent consumption and competing target claims, audit-failure rollback, obsolete notification suppression, append-only history RLS, stable ownership, reviewer assignment/candidate exclusion and competition assignment/read/score exclusion.
+
+`pnpm typecheck`, targeted ESLint of changed source/tests and `node scripts/check-boundaries.mjs` passed. `tests/e2e/email-change.spec.ts` is authored for the integrated built application; its browser execution remains pending the main integrator's route/build cycle. This test reads the actual captured confirmation mail, proves GET alone does not mutate, confirms the target and verifies a second browser's old session is revoked.
+
+### Export purpose and aggregate statistics (2026-10-15)
+
+Executed the isolated-env Vitest command above for `tests/integration/export-jobs.test.ts tests/integration/reporting.test.ts`: **12/12 passed**. Initial infrastructure attempt timed out before assertions while the host experienced container memory pressure; retry after the main integrator stabilized the synthetic environment passed. Coverage includes required purposes, trimmed immutable persistence, idempotency mismatch on changed purpose, download audit retaining original purpose, worker inability to overwrite purpose, and bounded-export audit failure rollback.
+
+Added aggregate test `reports grouped allocations...`: **1/1 passed** using actual PostgreSQL allocations/refunds and active program publication. The first fixture attempt used a JavaScript array as a node-postgres parameter; it was corrected to explicit JSON serialization, retaining all assertions. The test verifies exact group-payment totals and distinct published program kinds, plus no-context/ordinary-actor denial for the aggregate-only draft view. Typecheck, targeted lint and presentation boundaries passed. Existing reporting/export browser flows now enter explicit purposes; rerun by main integrator on the built application is still required.
+
+### Cross-phase participant lifecycle (2026-10-15)
+
+`tests/integration/participant-lifecycle.test.ts` is an explicitly **service-level integration flow**, not a browser or HTTP claim. Its single test passed with real PostgreSQL/RLS, local ClamAV, Mailpit SMTP and Redis/BullMQ. Every business transition is performed by the actual service; operator SQL is restricted to fixture bootstrap, reads/assertions and scoped cleanup/restoration.
+
+The same participant registers a paid ticket, receives verified payment allocations, books and pays for a meal, uploads a scanned manuscript, submits an immutable revision, receives independent blinded review and a published chair decision, enters the public oral program and a separately scored competition, checks in and redeems the meal, downloads a real receipt PDF, and appears in a real background-generated CSV. Separate administrator, finance officer, chair, participant and reviewer/judge accounts exercise their duties. Preconditions reject unpaid check-in/redemption, participant reconciliation, pre-acceptance manuscript access, premature award publication and repeated meal redemption; the author cannot read a draft decision or private review comment.
+
+Executed: the isolated-env Vitest command above with `tests/integration/participant-lifecycle.test.ts`, **1/1 passed**. Initial attempt reached competition enrollment but used a stale local competition source against canonical migration 0049; synchronizing the already integrated public-catalog implementation resolved it without changing assertions. Typecheck and targeted lint passed. This complements the independent browser flows and does not replace them.
+
+After migration 0051 and constrained confirmation-function integration, the isolated-env Vitest run of `auth.test.ts auth-http.test.ts email-change.test.ts email-change-http.test.ts` passed **21/21**. The pre-existing assertion that app-role direct `UPDATE users.email` receives PostgreSQL `42501` was not edited. Added function-boundary cases deny missing/foreign actor, invalid/replayed token, worker execution, and PUBLIC execute grants; previously covered atomic rollback, mailbox races, old-session revocation and verified-alias history still pass.
+
+### Payment write and activity conflict regression (2026-10-15 08:11 Taipei)
+
+`PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/finance-activity-boundaries.test.ts tests/integration/registration-finance.test.ts tests/integration/activities.test.ts` discovered the own-worktree boundary suite only: **8/8 passed**. The other two named files were absent in this agent checkout and are not counted as executed. The first attempt stopped at module import because a newly referenced central contract was missing locally; canonical contract synchronization resolved it before test execution.
+
+Evidence includes real app-role no-context/own/foreign reconciliation denial; forged verifier rejection; finance verification terminality; replacement payment after refund with concurrent over-allocation rollback and one audit; and authenticated HTTP duplicate-booking/real-redemption cancellation conflicts without orphan orders or altered registration history. Existing assertions are unchanged. Typecheck, targeted lint and the narrow conflict-mapping unit test passed before integration; main full regression remains the integration gate.
+
+### Generated artifact lease finalization regression (2026-10-15)
+
+Document and export worker finalizers must still own a live lease before writing either success or failure. An expired renderer/snapshot claimant leaves the job processing until dispatcher recovery; repeated recovery does not consume another attempt. `tests/integration/onsite.test.ts` and `tests/integration/export-jobs.test.ts` expire a synthetic job's lease at the renderer/snapshot boundary, exercise both successful output and thrown errors, then recover and generate real PDF/CSV bytes on attempt two. CSV SHA-256 is checked; PDF is downloaded through the authorized service. Export finalization additionally checks artifact expiry.
+
+Executed at 08:16 Taipei against the isolated continuous-run PostgreSQL/Redis environment: `node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/onsite.test.ts tests/integration/export-jobs.test.ts` — **13/13 passed**. `pnpm typecheck` and targeted ESLint on both workers and suites passed. No migration, dependency, contract or queue-policy changes. Worker modules retain transaction/authorization ownership; tests use the actual nonprivileged worker role and existing bounded renderer hook, without replacing generated artifact bytes.
+
+### Payment reminders (2026-10-15 08:20 Taipei)
+
+`PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/finance-reminders.test.ts tests/integration/notification-batches.test.ts`: **13/13 passed** with canonical migrations0054–0057, real PostgreSQL app/worker roles, Redis and Mailpit. New reminders account for7 tests; this agent's existing generic batch suite contains6 tests. Initial run was11/12: the fixture incorrectly assumed conference administrators have finance permission; the revised test explicitly proves rejection before granting the separate finance role, retaining the permission boundary.
+
+Coverage: HTTP role/CSRF/recipient bound checks; missing-actor audience denial; worker denied private financial relation; explicit concurrent idempotent batch creation; preflight SMTP/inbox release; paid-before-send suppression; issuer revocation/cancellation; real closed-port failure and safe retry preserving kind; audit rollback; another finance officer's cancellation; forged issuer INSERT denial. Migration0057 preserves conference-wide cancellation while binding creation to the actor; no applied migration was rewritten.
+
+`tests/e2e/finance-reminders.spec.ts` adds browser registration, finance preview/selection, explicit queue confirmation, actual worker/Mailpit receipt and participant inbox. Initial registration configuration uses authenticated HTTP; only roles and cleanup use operator SQL. This browser case is authored and awaiting main built-snapshot execution; it is not counted as passed yet.
+
+## CI regression repair — 2026-10-16
+
+CI starts the digest-pinned ClamAV service before `pnpm check` and runs `node scripts/local-scanner.mjs check` with a bounded startup retry. This verifies the real engine/signatures, clean stream, EICAR and scan-limit rejection; unavailable scanners remain failures. The completed smoke stack is stopped before the two-instance exercise to release runner memory. Default two-instance containers reserve separate scanner loopback ports; the explicit native-scanner option retains its intentional shared host scanner.
+
+The site revocation race uses dedicated nonprivileged connections and `pg_blocking_pids` to observe the exact revoker behind the test's blocker, then observes the publisher waiting before release. Closed review assignment history is listed without requiring access to the manuscript revision; regression coverage also asserts direct revision reads remain empty under app-role RLS. No applied migrations, permission rules or API contracts are weakened.
+
+Local verification in isolated `/tmp/confsys-ci-regression` (Node24.21.0 / pnpm10.34.7): `pnpm db:migrate`, `pnpm test:site` (9/9), `node scripts/local-scanner.mjs check`, and `pnpm check` passed: lint/import boundaries, typecheck,70 unit,198 real integration,17 contract,build,28 Chromium E2E (5.8m). The initial full run exposed one additional fixture dependency (replacement reviewer had previously been disabled); the replacement is now a fresh synthetic account, and the full gate passed on rerun. Local scanner package hash/signature verified by `prepare`; copied local signatures were dated2026-10-14, not a fresh-update claim. Local container smoke and two-instance checks are deferred to the PR's Linux CI. No existing service configuration/data changed.

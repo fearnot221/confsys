@@ -22,17 +22,20 @@ export const settings = {
   PUBLIC_APP_ORIGIN: "http://127.0.0.1:25173",
   MAIL_ENCRYPTION_KEY: key,
   MAIL_KEY_VERSION: "v1",
+  QR_SIGNING_KEY: key,
   CSRF_SIGNING_KEY: key,
 };
 it("separates process configuration, validates origins and production cookie policy", () => {
   const api = loadApiConfig({
     ...settings,
     MIGRATION_DATABASE_URL: "postgres://supersecret@localhost/db",
+    QR_SIGNING_KEY: key,
     WORKER_DATABASE_URL: "postgres://worker@localhost/db",
   });
   expect(api).not.toHaveProperty("MIGRATION_DATABASE_URL");
   expect(api).not.toHaveProperty("WORKER_DATABASE_URL");
   const worker = loadWorkerConfig({
+    QR_SIGNING_KEY: key,
     WORKER_DATABASE_URL: "postgres://worker@localhost/db",
     REDIS_URL: "redis://localhost",
     MAIL_ENCRYPTION_KEY: key,

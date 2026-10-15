@@ -53,6 +53,20 @@ services:
       timeout: 3s
       retries: 20
     mem_limit: 256m
+  clamav:
+    image: clamav/clamav@sha256:9a96980b265cb2b51a20bdcca921dc80aa55ed0e56cdfb076198ee27a9171927
+    ports: ["127.0.0.1:${CLAMAV_PORT:-3310}:3310"]
+    volumes: ["clamav-data:/var/lib/clamav"]
+    environment:
+      CLAMD_CONF_AlertExceedsMax: "yes"
+      CLAMD_CONF_AlertEncrypted: "yes"
+      CLAMD_CONF_MaxThreads: "2"
+      CLAMD_CONF_MaxConnectionQueueLength: "10"
+      CLAMD_CONF_StreamMaxLength: "10M"
+      CLAMD_CONF_MaxScanSize: "40M"
+      CLAMD_CONF_MaxFileSize: "10M"
+      CLAMD_CONF_ConcurrentDatabaseReload: "no"
+    mem_limit: 3g
   migrate:
     profiles: ["app"]
     image: ${APP_IMAGE:?Select a versioned application image}
@@ -76,7 +90,11 @@ services:
       PUBLIC_APP_ORIGIN: ${PUBLIC_APP_ORIGIN:?Set canonical origin}
       MAIL_KEY_VERSION: ${MAIL_KEY_VERSION}
       MAIL_ENCRYPTION_KEY: ${MAIL_ENCRYPTION_KEY}
+      QR_SIGNING_KEY: ${QR_SIGNING_KEY}
       CSRF_SIGNING_KEY: ${CSRF_SIGNING_KEY}
+      PRIVATE_STORAGE_ROOT: /data/private
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
       API_HOST: 0.0.0.0
     depends_on:
       postgres: { condition: service_healthy }
@@ -93,6 +111,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    volumes: ["private-storage:/data/private"]
     stop_grace_period: 15s
     mem_limit: 384m
     init: true
@@ -104,9 +123,13 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       CONFERENCE_NAME: ${CONFERENCE_NAME:?Set conference display name}
+      QR_SIGNING_KEY: ${QR_SIGNING_KEY}
       WORKER_DATABASE_URL: postgresql://confsys_worker:${WORKER_PASSWORD}@postgres:5432/confsys
       REDIS_URL: redis://redis:6379/0
       WORKER_HOST: 0.0.0.0
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-noreply@confsys.invalid}
+      MAIL_REPLY_TO_ADDRESS: ${MAIL_REPLY_TO_ADDRESS:-support@confsys.invalid}
+      MAIL_ENVELOPE_FROM: ${MAIL_ENVELOPE_FROM:-bounce@confsys.invalid}
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       MAIL_KEY_VERSION: ${MAIL_KEY_VERSION}
@@ -157,3 +180,5 @@ volumes:
   postgres-data:
   redis-data:
   mailpit-data:
+  private-storage:
+  clamav-data:

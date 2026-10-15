@@ -1,0 +1,11 @@
+# Notification audience pagination
+
+Preview accepts offset(default 0, maximum 1,000,000); ordered email/id pages return <=100 items, actual offset and nullable nextOffset. LIMIT101 determines continuation without guessing from total. Existing audience filter shape stored in batch snapshots remains unchanged, and create still validates <=100 unique currently eligible recipients.
+
+SDK owns offset transport, hook owns preview server state; presentation paginates current filters, clears page-local checkboxes on every returned page, and explicitly replaces composer recipients when adopted. Loading/errors retain existing permission/session handling. Templates, scheduled recipient snapshots, send/retry behavior and permissions are unchanged. No migration, configuration or dependency changes.
+
+Verification: targeted ESLint and `pnpm exec tsc --noEmit -p tsconfig.json` PASS. Real PostgreSQL test authored with 103 synthetic account fixtures plus actual app-role pagination/outbox, boundary100/101, no omissions/duplicates, and disabled-after-preview denial. Browser test authored for later-page selection, cleared selections, exact recipient batch and real Mailpit delivery. Neither new PG/browser suite has run yet; waiting shared slot/main wiring. Offset pages are live views, not frozen datasets: concurrent identity/status changes may shift page positions; user selects explicit IDs and create rechecks state. This is disclosed in UI and not an automatic send-all function.
+
+## Verified PostgreSQL follow-up — 08:12:09 Taipei
+
+`PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/notification-audience-pages.test.ts`: **2/2 PASS**, 711ms. Exact central migrations49–53 included. Complete paged account projection matches PostgreSQL's own deterministic email/id order (rather than assuming JavaScript and database collation are identical). The nonprivileged app-role path created real notification/outbox rows for the second page and exactly100 selected recipients; >100 and stale disabled selections rejected. No worker delivery is implied by this PG suite; authored browser test covers real Mailpit delivery and awaits primary execution.

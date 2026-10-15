@@ -27,6 +27,9 @@ type Props = {
   confirmation: string | null;
   canWrite: boolean;
   canPublish: boolean;
+  canMedia: boolean;
+  pages: readonly SitePage[];
+  optionalPages: readonly SitePage[];
   onLocale: (v: SiteLocale) => void;
   onPage: (v: SitePage) => void;
   onHistoryPage: (v: number) => void;
@@ -39,8 +42,15 @@ type Props = {
   onExecute: () => void;
   onReauthenticate: (v: string) => void;
 };
-const pages = ["home", "about", "participation", "contact"] as const;
+
 const pageNames = {
+  committee: "大會委員",
+  dates: "重要日期",
+  news: "最新消息",
+  speakers: "講者",
+  travel: "交通住宿",
+  sponsors: "贊助單位",
+  faq: "常見問題",
   home: "首頁",
   about: "關於會議",
   participation: "參與說明",
@@ -69,6 +79,13 @@ export function SiteScreen(p: Props) {
     if (d) p.onChange({ ...d, [key]: value });
   };
   const t = d?.translations[p.locale];
+  const selectedPage = t?.pages[p.page] ?? {
+    title: "",
+    description: "",
+    body: "",
+    bullets: [],
+    links: [],
+  };
   const translation = (key: string, value: unknown) => {
     if (d && t)
       p.onChange({
@@ -178,6 +195,32 @@ export function SiteScreen(p: Props) {
                   </div>
                 ))}
               </div>
+              <fieldset disabled={!p.canMedia || p.busy}>
+                <legend>官網圖片</legend>
+                <p>
+                  先至{" "}
+                  <a href="/account/files" target="_blank" rel="noreferrer">
+                    私人檔案
+                  </a>{" "}
+                  上傳用途為官網媒體的圖片，檢查完成後貼上檔案
+                  ID。草稿不會公開圖片。
+                </p>
+                {(["logoId", "heroId"] as const).map((key) => (
+                  <label key={key}>
+                    {key === "logoId" ? "Logo 檔案 ID" : "主視覺檔案 ID"}
+                    <input
+                      value={d.media?.[key] ?? ""}
+                      onChange={(e) =>
+                        set("media", {
+                          logoId: d.media?.logoId ?? null,
+                          heroId: d.media?.heroId ?? null,
+                          [key]: e.target.value || null,
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+              </fieldset>
               <Locale value={p.locale} onChange={p.onLocale} />
               {t &&
                 (
@@ -222,12 +265,32 @@ export function SiteScreen(p: Props) {
                 value={p.page}
                 onChange={(e) => p.onPage(e.target.value as SitePage)}
               >
-                {pages.map((key) => (
+                {p.pages.map((key) => (
                   <option key={key} value={key}>
                     {pageNames[key]}
                   </option>
                 ))}
               </select>
+              {p.optionalPages.some((key) => key === p.page) && (
+                <div>
+                  <p>
+                    {t.pages[p.page]
+                      ? "此語系已建立此頁；發布後可見。"
+                      : "此語系尚未建立此頁；填寫內容後會建立，或回退預設語系。"}
+                  </p>
+                  <button
+                    disabled={!p.canWrite || p.busy || !t.pages[p.page]}
+                    onClick={() => {
+                      const next = { ...t.pages };
+                      for (const key of p.optionalPages)
+                        if (key === p.page) delete next[key];
+                      translation("pages", next);
+                    }}
+                  >
+                    移除此語系選填頁面
+                  </button>
+                </div>
+              )}
               {(["title", "description", "body"] as const).map((key) => (
                 <div key={key}>
                   {field(
@@ -236,11 +299,11 @@ export function SiteScreen(p: Props) {
                       description: "頁面 description",
                       body: "頁面內文",
                     }[key],
-                    t.pages[p.page][key],
+                    selectedPage[key],
                     (v) =>
                       translation("pages", {
                         ...t.pages,
-                        [p.page]: { ...t.pages[p.page], [key]: v },
+                        [p.page]: { ...selectedPage, [key]: v },
                       }),
                     key === "body",
                   )}
@@ -248,27 +311,27 @@ export function SiteScreen(p: Props) {
               ))}
               {field(
                 "條列（每行一項）",
-                t.pages[p.page].bullets.join("\n"),
+                selectedPage.bullets.join("\n"),
                 (v) =>
                   translation("pages", {
                     ...t.pages,
                     [p.page]: {
-                      ...t.pages[p.page],
+                      ...selectedPage,
                       bullets: v ? v.split("\n") : [],
                     },
                   }),
                 true,
               )}
               <h3>受限連結</h3>
-              {t.pages[p.page].links.map((link, i) => (
+              {selectedPage.links.map((link, i) => (
                 <fieldset key={i}>
                   <legend>連結 {i + 1}</legend>
                   {field("連結文字", link.label, (v) =>
                     translation("pages", {
                       ...t.pages,
                       [p.page]: {
-                        ...t.pages[p.page],
-                        links: t.pages[p.page].links.map((x, j) =>
+                        ...selectedPage,
+                        links: selectedPage.links.map((x, j) =>
                           i === j ? { ...x, label: v } : x,
                         ),
                       },
@@ -278,8 +341,8 @@ export function SiteScreen(p: Props) {
                     translation("pages", {
                       ...t.pages,
                       [p.page]: {
-                        ...t.pages[p.page],
-                        links: t.pages[p.page].links.map((x, j) =>
+                        ...selectedPage,
+                        links: selectedPage.links.map((x, j) =>
                           i === j ? { ...x, url: v } : x,
                         ),
                       },
@@ -291,10 +354,8 @@ export function SiteScreen(p: Props) {
                       translation("pages", {
                         ...t.pages,
                         [p.page]: {
-                          ...t.pages[p.page],
-                          links: t.pages[p.page].links.filter(
-                            (_, j) => i !== j,
-                          ),
+                          ...selectedPage,
+                          links: selectedPage.links.filter((_, j) => i !== j),
                         },
                       })
                     }
@@ -305,14 +366,14 @@ export function SiteScreen(p: Props) {
               ))}
               <button
                 disabled={
-                  !p.canWrite || p.busy || t.pages[p.page].links.length >= 10
+                  !p.canWrite || p.busy || selectedPage.links.length >= 10
                 }
                 onClick={() =>
                   translation("pages", {
                     ...t.pages,
                     [p.page]: {
-                      ...t.pages[p.page],
-                      links: [...t.pages[p.page].links, { label: "", url: "" }],
+                      ...selectedPage,
+                      links: [...selectedPage.links, { label: "", url: "" }],
                     },
                   })
                 }

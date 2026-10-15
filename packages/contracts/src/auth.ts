@@ -22,6 +22,9 @@ export const tokenPasswordInput = z.strictObject({
   token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   password: passwordSchema,
 });
+export const emailChangeConfirmInput = z.strictObject({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+});
 export const emptyInput = z.strictObject({});
 export const acceptedSchema = z.strictObject({ status: z.literal("accepted") });
 export const doneSchema = z.strictObject({ status: z.literal("complete") });
@@ -37,6 +40,18 @@ export const accountSchema = z.strictObject({
 });
 export type Account = z.infer<typeof accountSchema>;
 export const authOperations = {
+  emailChangeRequest: {
+    path: "/api/auth/email-change/request",
+    input: emailInput,
+    output: acceptedSchema,
+    status: 202,
+  },
+  emailChangeConfirm: {
+    path: "/api/auth/email-change/confirm",
+    input: emailChangeConfirmInput,
+    output: doneSchema,
+    status: 200,
+  },
   reauthenticate: {
     path: "/api/auth/reauthenticate",
     input: reauthenticateInput,

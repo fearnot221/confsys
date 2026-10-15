@@ -19,6 +19,7 @@
     "@confsys/config": "workspace:*",
     "@confsys/db": "workspace:*",
     "nodemailer": "10.1.1",
-    "bullmq": "6.3.15"
+    "bullmq": "6.3.15",
+    "@confsys/policy": "workspace:*"
   }
 }

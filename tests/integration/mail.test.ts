@@ -49,7 +49,8 @@ it("durable pending survives queue delay and real independent BullMQ consumer se
   await dispatchNotifications(f.worker, queue);
   const job = await queue.getJob(notification.id);
   expect(job?.data).toEqual({ eventId: notification.id });
-  const worker = startMailWorker(f.worker, f.workerConfig, name);
+  const captureIdentity={...f.workerConfig,MAIL_FROM_ADDRESS:"event@conference.invalid",MAIL_REPLY_TO_ADDRESS:"help@conference.invalid",MAIL_ENVELOPE_FROM:"returns@conference.invalid"};
+  const worker = startMailWorker(f.worker, captureIdentity, name);
   try {
     await worker.worker.waitUntilReady();
     expect((await status(notification.id)).status).toBe("pending");
@@ -65,6 +66,9 @@ it("durable pending survives queue delay and real independent BullMQ consumer se
       `${process.env.MAILPIT_URL ?? "http://127.0.0.1:28025"}/api/v1/message/${result.messages[0].ID}`,
     ).then((r) => r.json());
     expect(detail.Text).toContain(notification.link);
+    expect(detail.From.Address).toBe(captureIdentity.MAIL_FROM_ADDRESS);
+    expect(detail.ReplyTo).toEqual([{Name:"",Address:captureIdentity.MAIL_REPLY_TO_ADDRESS}]);
+    expect(detail.ReturnPath).toBe(captureIdentity.MAIL_ENVELOPE_FROM);
     expect(
       (
         await f.admin.query(
@@ -129,7 +133,8 @@ it("leases recover pre-send crashes, retain uncertain sends, and retry known con
   expect((await status(sending.id)).status).toBe("unknown");
   await processNotification(f.worker, f.workerConfig, claimed.id, async () => {
     throw Object.assign(new Error("do not log smtp secrets"), {
-      code: "ECONNECTION",
+      code: "ESOCKET",
+      originalCode: "ECONNREFUSED",
       command: "CONN",
     });
   });
@@ -221,3 +226,27 @@ it("real worker process crash after Mailpit acceptance becomes unknown and is ne
     if (child.exitCode === null) child.kill("SIGKILL");
   }
 }, 20000);
+it("never retries generic connection errors that may represent a server close during SMTP", async () => {
+  for (const failure of [
+    { code: "ECONNECTION", command: "CONN", responseCode: 421 },
+    { code: "ESOCKET", originalCode: "ECONNRESET", command: "CONN" },
+  ]) {
+    const item = await pending();
+    let calls = 0;
+    await processNotification(f.worker, f.workerConfig, item.id, async () => {
+      calls++;
+      throw Object.assign(
+        new Error("Synthetic ambiguous transport state"),
+        failure,
+      );
+    });
+    expect((await status(item.id)).status).toBe("unknown");
+    await recoverNotifications(f.worker);
+    await processNotification(f.worker, f.workerConfig, item.id, async () => {
+      calls++;
+      return { messageId: "unexpected" };
+    });
+    expect(calls).toBe(1);
+    expect((await status(item.id)).status).toBe("unknown");
+  }
+});

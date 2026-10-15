@@ -9,7 +9,7 @@ export async function enqueueIdentityMail(
     conferenceName: string;
     userId: string;
     tokenId: string | null;
-    kind: "verify" | "reset" | "password_changed";
+    kind: "verify" | "reset" | "password_changed" | "email_change";
     requestId: string;
     expiresAt: Date;
     link: string;
@@ -42,3 +42,6 @@ export async function enqueueIdentityMail(
   );
   return id;
 }
+export { enqueueBusinessNotification } from './business.js';
+
+export { notificationBatchPermission, type NotificationBatchKind } from './batch-policy.js';

@@ -1,0 +1,111 @@
+import { beforeAll, afterAll, it, expect } from "vitest";
+import { randomUUID } from "node:crypto";
+import { Redis } from "ioredis";
+import { buildApp } from "../../apps/api/src/app.js";
+import {
+  registerAuthRoutes,
+  cookiePolicy,
+} from "../../apps/api/src/auth/routes.js";
+import { createAuthService } from "../../apps/api/src/auth/service.js";
+import { createRateLimiter } from "../../apps/api/src/auth/rate-limit.js";
+import { authFixture, password } from "../helpers/auth.js";
+const f = authFixture(),
+  auth = createAuthService(f.app, f.config),
+  redis = new Redis(f.config.REDIS_URL, {
+    maxRetriesPerRequest: 0,
+    enableOfflineQueue: false,
+  }),
+  namespace = `email-change-${randomUUID()}`;
+const up = async () => {},
+  app = buildApp({ postgres: up, redis: up, worker: up });
+beforeAll(async () => {
+  f.migrate();
+  if (redis.status !== "ready")
+    await new Promise<void>((resolve) => redis.once("ready", resolve));
+  await registerAuthRoutes(app, {
+    config: f.config,
+    service: auth,
+    limit: createRateLimiter(redis, f.config.CSRF_SIGNING_KEY, namespace),
+  });
+});
+afterAll(async () => {
+  for (const key of await redis.keys(`${namespace}:*`)) await redis.del(key);
+  redis.disconnect();
+  await app.close();
+  await f.cleanup();
+});
+it("HTTP confirmation requires CSRF, explicit POST and original account; successful response clears session cookie", async () => {
+  const email = f.email(),
+    target = f.email();
+  await auth.requestMail("register", email, randomUUID());
+  await auth.consume(
+    "verify",
+    (await f.link(email)).token,
+    password,
+    randomUUID(),
+  );
+  const session = await auth.login(email, password, randomUUID());
+  const csrf = await app.inject("/api/auth/csrf"),
+    headers = {
+      origin: f.config.PUBLIC_APP_ORIGIN,
+      "x-csrf-token": csrf.json().csrfToken,
+      cookie: `${csrf.cookies.map((c) => `${c.name}=${c.value}`).join("; ")}; ${cookiePolicy(f.config).name}=${session.raw}`,
+    };
+  const request = {
+    method: "POST" as const,
+    url: "/api/auth/email-change/request",
+    payload: { email: target },
+    headers,
+  };
+  expect(
+    (
+      await app.inject({
+        ...request,
+        headers: { ...headers, "x-csrf-token": "" },
+      })
+    ).statusCode,
+  ).toBe(403);
+  expect((await app.inject(request)).statusCode).toBe(202);
+  const token = (await f.link(email, "email_change")).token;
+  expect(
+    (await app.inject(`/api/auth/email-change/confirm?token=${token}`))
+      .statusCode,
+  ).toBe(404);
+  const confirmation = {
+    method: "POST" as const,
+    url: "/api/auth/email-change/confirm",
+    payload: { token },
+    headers,
+  };
+  expect(
+    (
+      await app.inject({
+        ...confirmation,
+        headers: { ...headers, origin: "https://untrusted.example" },
+      })
+    ).statusCode,
+  ).toBe(403);
+  expect(
+    (
+      await app.inject({
+        ...confirmation,
+        headers: {
+          ...headers,
+          cookie: csrf.cookies.map((c) => `${c.name}=${c.value}`).join("; "),
+        },
+      })
+    ).statusCode,
+  ).toBe(401);
+  const response = await app.inject(confirmation);
+  expect(response.statusCode).toBe(200);
+  expect(response.json()).toEqual({ status: "complete" });
+  expect(
+    response.cookies.find((c) => c.name === cookiePolicy(f.config).name)?.value,
+  ).toBe("");
+  expect((await app.inject({ url: "/api/auth/me", headers })).statusCode).toBe(
+    401,
+  );
+  expect(
+    (await auth.login(target, password, randomUUID())).account.user.id,
+  ).toBe(session.account.user.id);
+});

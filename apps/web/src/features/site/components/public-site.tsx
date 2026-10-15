@@ -1,6 +1,14 @@
+import { siteNavigation } from "./site-navigation.js";
 import type { PublicSite, SiteLocale, SitePage } from "@confsys/contracts";
 const labels = {
   "zh-Hant": {
+    committee: "大會委員",
+    dates: "重要日期",
+    news: "最新消息",
+    speakers: "講者",
+    travel: "交通住宿",
+    sponsors: "贊助單位",
+    faq: "常見問題",
     home: "首頁",
     about: "關於會議",
     participation: "參與說明",
@@ -13,6 +21,13 @@ const labels = {
     hosts: "承辦單位",
   },
   en: {
+    committee: "Committee",
+    dates: "Important dates",
+    news: "News",
+    speakers: "Speakers",
+    travel: "Travel",
+    sponsors: "Sponsors",
+    faq: "FAQ",
     home: "Home",
     about: "About",
     participation: "Participation",
@@ -71,6 +86,8 @@ export function PublicSiteContent({
   const links = p?.links.length ? p.links : fp?.links;
   const href = (next: SitePage, lang = locale) =>
     preview ? `#preview-${lang}-${next}` : `/${lang}/${next}`;
+  const mediaUrl = (id: string) =>
+    preview ? `/api/files/${id}/download` : `/api/media/${id}`;
   return (
     <div className="layout public-site">
       <a className="skip-link" href="#site-main">
@@ -78,6 +95,15 @@ export function PublicSiteContent({
       </a>
       <header>
         <a className="brand" href={href("home")}>
+          {d?.media?.logoId && (
+            <img
+              src={mediaUrl(d.media.logoId)}
+              alt=""
+              width="64"
+              height="64"
+              className="site-logo"
+            />
+          )}
           {t?.name || site.conferenceName}
         </a>
         <nav aria-label="帳號 / Account">
@@ -87,27 +113,35 @@ export function PublicSiteContent({
       </header>
       {d && (
         <nav className="site-nav" aria-label="官網 / Website">
-          {(["home", "about", "participation", "contact"] as const).map(
-            (key) => (
-              <a
-                key={key}
-                href={href(key)}
-                aria-current={key === page ? "page" : undefined}
-              >
-                {l[key]}
-              </a>
-            ),
-          )}
+          {siteNavigation(d, locale).map((key) => (
+            <a
+              key={key}
+              href={href(key)}
+              aria-current={key === page ? "page" : undefined}
+            >
+              {l[key]}
+            </a>
+          ))}
           <span className="site-languages">
-            {d.enabledLocales.map((lang) => (
-              <a key={lang} href={href(page, lang)} hrefLang={lang} lang={lang}>
-                {lang === "en" ? "English" : "繁體中文"}
-              </a>
-            ))}
+            {d.enabledLocales
+              .filter((lang) => siteNavigation(d, lang).includes(page))
+              .map((lang) => (
+                <a
+                  key={lang}
+                  href={href(page, lang)}
+                  hrefLang={lang}
+                  lang={lang}
+                >
+                  {lang === "en" ? "English" : "繁體中文"}
+                </a>
+              ))}
           </span>
         </nav>
       )}
       <main id="site-main">
+        {page === "home" && d?.media?.heroId && (
+          <img src={mediaUrl(d.media.heroId)} alt="" className="site-hero" />
+        )}
         <section className="intro">
           <p className="eyebrow">{l[page]}</p>
           <h1>

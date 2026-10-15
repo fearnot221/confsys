@@ -5,15 +5,23 @@ import type { Pool, PoolClient } from "pg";
 import { diagnostic, redisOptions, type WorkerConfig } from "@confsys/config";
 import { withIdentityTransaction } from "@confsys/db";
 import { unseal } from "./secrets.js";
+import { permissionsFor } from "@confsys/policy";
+import {
+  notificationBatchPermission,
+  type NotificationBatchKind,
+} from "./batch-policy.js";
 const queueName = "identity-notifications-v1";
 type Notification = {
   id: string;
+  batch_id: string | null;
   user_id: string;
   request_id: string;
   kind: string;
   attempts: number;
   claim_id: string;
   conference_name: string | null;
+  message_subject: string | null;
+  message_text: string | null;
 };
 type Mail = { to: string; subject: string; text: string; messageId: string };
 export type SendMail = (mail: Mail) => Promise<{ messageId: string }>;
@@ -68,6 +76,36 @@ export async function recoverNotifications(pool: Pool) {
       WHERE s.notification_id=n.id AND (s.expires_at<now() OR n.status IN ('accepted','failed','unknown','cancelled'))`);
   });
 }
+// Batches retain their issuing authority. Pending sends fail closed if the
+// issuer is disabled, credentials change, permission is removed, or cancelled.
+async function batchEligible(
+  pool: Pool | PoolClient,
+  row: Notification,
+  lockFinance = false,
+) {
+  if (!row.batch_id) return true;
+  const result = await pool.query<{
+    active: boolean;
+    roles: string[];
+    kind: NotificationBatchKind;
+  }>(
+    "SELECT active,roles,kind FROM confsys.notification_batch_authority WHERE id=$1",
+    [row.id],
+  );
+  const authority = result.rows[0];
+  if (lockFinance && authority?.kind === "payment_reminder") {
+    await pool.query(
+      "SELECT singleton FROM confsys.registration_state FOR SHARE",
+    );
+    return batchEligible(pool, row);
+  }
+  return (
+    !!authority?.active &&
+    permissionsFor(authority.roles).includes(
+      notificationBatchPermission(authority.kind),
+    )
+  );
+}
 export async function processNotification(
   pool: Pool,
   config: Pick<
@@ -96,45 +134,71 @@ export async function processNotification(
     [id],
   );
   const entry = data.rows[0];
-  if (!entry?.eligible) {
+  if (!entry?.eligible || !(await batchEligible(pool, row))) {
     await finish(pool, row, "cancelled", "INELIGIBLE");
     return;
   }
-  let link: string;
+  let link = "";
   try {
-    if (!entry.ciphertext || entry.key_version !== config.MAIL_KEY_VERSION)
-      throw new Error("Key unavailable");
-    link = unseal(
-      entry.ciphertext,
-      id,
-      config.MAIL_ENCRYPTION_KEY,
-      config.MAIL_KEY_VERSION,
-    );
+    if (row.kind === "business") {
+      if (!row.message_subject || !row.message_text)
+        throw new Error("Message unavailable");
+    } else {
+      if (!entry.ciphertext || entry.key_version !== config.MAIL_KEY_VERSION)
+        throw new Error("Key unavailable");
+      link = unseal(
+        entry.ciphertext,
+        id,
+        config.MAIL_ENCRYPTION_KEY,
+        config.MAIL_KEY_VERSION,
+      );
+    }
   } catch {
     await finish(pool, row, "failed", "SECRET_UNAVAILABLE");
     return;
   }
-  const sending = await pool.query(
-    `UPDATE confsys.notifications n SET stage='sending' FROM confsys.notification_eligibility e
-    WHERE n.id=$1 AND n.claim_id=$2 AND n.status='processing' AND n.lease_until>now() AND n.id=e.id AND e.eligible RETURNING n.id`,
-    [id, row.claim_id],
-  );
-  if (!sending.rowCount) {
+  // This transaction is the authorization linearization point for both inbox
+  // release and SMTP. Access revocation before it wins; SMTP outcomes cannot
+  // retract a notification that was already authorized for the recipient.
+  const sending = await withIdentityTransaction(pool, async (db) => {
+    await db.query("SELECT singleton FROM confsys.access_control FOR SHARE");
+    if (!(await batchEligible(db, row, true))) return null;
+    const changed = await db.query<{ email: string }>(
+      `UPDATE confsys.notifications n SET stage='sending',released_at=coalesce(n.released_at,clock_timestamp())
+       FROM confsys.notification_eligibility e
+       WHERE n.id=$1 AND n.claim_id=$2 AND n.status='processing' AND n.lease_until>now()
+       AND n.id=e.id AND e.eligible AND n.available_at<=clock_timestamp()
+       AND (n.batch_id IS NULL OR EXISTS(SELECT 1 FROM confsys.notification_batch_authority a WHERE a.id=n.id AND a.active))
+       RETURNING e.email`,
+      [id, row.claim_id],
+    );
+    return changed.rows[0]?.email ?? null;
+  });
+  if (!sending) {
     await finish(pool, row, "cancelled", "INELIGIBLE");
     return;
   }
   let receipt: { messageId: string };
   try {
     receipt = await send({
-      to: entry.email,
+      to: sending,
       subject:
-        `[${row.conference_name ?? config.CONFERENCE_NAME}] ` +
-        (row.kind === "verify"
-          ? "確認信箱 / Verify email"
-          : row.kind === "reset"
-            ? "重設密碼 / Reset password"
-            : "密碼已變更 / Password changed"),
-      text: `${row.conference_name ?? config.CONFERENCE_NAME} — 本研討會帳號 / Conference account\n\n${row.kind === "password_changed" ? "Your password changed. Existing sessions were revoked." : "Open the link and explicitly submit the form. Opening it does not change your account."}\n\n${link}\n\nRequest: ${row.request_id}`,
+        row.kind === "business"
+          ? `[${row.conference_name ?? config.CONFERENCE_NAME}] ${row.message_subject}`
+          : `[${row.conference_name ?? config.CONFERENCE_NAME}] ` +
+            (row.kind === "verify"
+              ? "確認信箱 / Verify email"
+              : row.kind === "email_change"
+                ? "確認新信箱 / Confirm new email"
+                : row.kind === "reset"
+                  ? "重設密碼 / Reset password"
+                  : row.kind === "role_invitation"
+                    ? "本研討會角色邀請 / Conference role invitation"
+                    : "密碼已變更 / Password changed"),
+      text:
+        row.kind === "business"
+          ? `${row.conference_name ?? config.CONFERENCE_NAME}\n\n${row.message_text}\n\nRequest: ${row.request_id}`
+          : `${row.conference_name ?? config.CONFERENCE_NAME} — 本研討會帳號 / Conference account\n\n${row.kind === "password_changed" ? "Your password changed. Existing sessions were revoked." : "Open the link and explicitly submit the form. Opening it does not change your account."}\n\n${link}\n\nRequest: ${row.request_id}`,
       messageId: `<${id}@confsys.invalid>`,
     });
   } catch (error) {
@@ -147,8 +211,16 @@ export async function processNotification(
       error && typeof error === "object" && "command" in error
         ? error.command
         : undefined;
+    const originalCode =
+      error && typeof error === "object" && "originalCode" in error
+        ? error.originalCode
+        : undefined;
+    // Nodemailer also labels a server 421 during an in-flight message ECONNECTION/
+    // CONN. Only DNS failure or an explicitly refused socket proves no SMTP send.
     const safeRetry =
-      (code === "ECONNECTION" || code === "EDNS") && command === "CONN";
+      command === "CONN" &&
+      (code === "EDNS" ||
+        (code === "ESOCKET" && originalCode === "ECONNREFUSED"));
     await finish(
       pool,
       row,
@@ -173,7 +245,14 @@ export async function dispatchNotifications(pool: Pool, queue: Queue) {
     );
 }
 export function createMailSender(
-  config: Pick<WorkerConfig, "SMTP_HOST" | "SMTP_PORT">,
+  config: Pick<
+    WorkerConfig,
+    | "SMTP_HOST"
+    | "SMTP_PORT"
+    | "MAIL_FROM_ADDRESS"
+    | "MAIL_REPLY_TO_ADDRESS"
+    | "MAIL_ENVELOPE_FROM"
+  >,
 ) {
   const transport = nodemailer.createTransport({
     host: config.SMTP_HOST,
@@ -189,7 +268,9 @@ export function createMailSender(
   const send: SendMail = async (mail) => {
     const result = await transport.sendMail({
       ...mail,
-      from: "Conference <noreply@confsys.invalid>",
+      from: { name: "Conference", address: config.MAIL_FROM_ADDRESS },
+      replyTo: config.MAIL_REPLY_TO_ADDRESS,
+      envelope: { from: config.MAIL_ENVELOPE_FROM, to: mail.to },
     });
     return { messageId: result.messageId };
   };

@@ -84,6 +84,13 @@ export async function registerAuthRoutes(
           );
         }
         switch (operation) {
+          case "emailChangeRequest":
+            await service.requestEmailChange(req.cookies[policy.name],emailInput.parse(parsed.data).email,req.id);
+            return reply.code(202).send({status:"accepted"});
+          case "emailChangeConfirm":
+            await service.confirmEmailChange(req.cookies[policy.name],parsed.data,req.id);
+            reply.clearCookie(policy.name,policy.options);
+            return {status:"complete"};
           case "register":
           case "resend":
           case "forgot":

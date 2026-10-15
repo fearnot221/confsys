@@ -26,13 +26,15 @@ export async function assertRuntimeRole(
   if (result.rows[0]?.safe !== true)
     throw new Error("Unsafe database runtime role");
 }
+export const REQUIRED_SCHEMA_VERSION = "0060_review_revocation_and_final_scores.sql";
 export async function databaseReady(
   pool: pg.Pool,
   role: "confsys_app" | "confsys_worker",
 ) {
   await assertRuntimeRole(pool, role);
   const result = await pool.query(
-    `SELECT version FROM confsys.schema_migrations WHERE version = '0005_conference_site.sql'`,
+    "SELECT version FROM confsys.schema_migrations WHERE version = $1",
+    [REQUIRED_SCHEMA_VERSION],
   );
   if (result.rowCount !== 1) throw new Error("Database migrations required");
 }

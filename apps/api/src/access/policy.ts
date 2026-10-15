@@ -1,30 +1,7 @@
-import type { Role, Permission, AccessMutation } from "@confsys/contracts";
-import { AuthError } from "../auth/errors.js";
-// Explicit grants: adding a future permission never implicitly grants it to admins.
-export const rolePermissions: Readonly<Record<Role, readonly Permission[]>> = {
-  conference_staff: ["accounts.directory.read"],
-  conference_admin: [
-    "accounts.directory.read",
-    "access.roles.manage",
-    "accounts.status.manage",
-    "accounts.sessions.revoke",
-    "security_audit.read",
-    "site.draft.read",
-    "site.draft.write",
-    "site.publish",
-  ],
-};
-export function permissionsFor(roles: readonly string[]): Permission[] {
-  return [
-    ...new Set(
-      roles.flatMap((role) =>
-        Object.hasOwn(rolePermissions, role)
-          ? rolePermissions[role as Role]
-          : [],
-      ),
-    ),
-  ];
-}
+import type {AccessMutation,Permission} from "@confsys/contracts";
+import {permissionsFor} from "@confsys/policy";
+export {permissionsFor,rolePermissions} from "@confsys/policy";
+import {AuthError} from "../auth/errors.js";
 export function requirePermission(
   roles: readonly string[] | undefined,
   permission: string,

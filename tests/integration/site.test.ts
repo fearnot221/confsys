@@ -17,6 +17,7 @@ import { registerPublicRoutes } from "../../apps/api/src/site/public-routes.js";
 import { processNotification } from "@confsys/notifications/worker";
 import { createRateLimiter } from "../../apps/api/src/auth/rate-limit.js";
 import { Redis } from "ioredis";
+import { createPool } from "@confsys/db";
 const f = authFixture(),
   auth = createAuthService(f.app, f.config),
   site = createSiteService(f.app, f.config),
@@ -236,7 +237,8 @@ it("mail captures only effective published branding; retry preserves snapshot an
   await processNotification(f.worker, f.workerConfig, n.id, async (mail) => {
     captured = mail.subject;
     throw Object.assign(new Error("synthetic"), {
-      code: "ECONNECTION",
+      code: "ESOCKET",
+      originalCode: "ECONNREFUSED",
       command: "CONN",
     });
   });
@@ -273,38 +275,54 @@ it("queued publisher rechecks permission, disabled state and revoked session aft
     );
     target.raw = (await auth.login(target.email, password, rid())).raw;
     const blocker = await f.admin.connect();
-    await blocker.query("BEGIN");
-    await blocker.query("SELECT * FROM confsys.access_control FOR UPDATE");
-    const revocation = access.mutate(
-      leader.raw,
-      target.id,
-      {
-        action,
-        reason: "synthetic race",
-        ...(action === "revoke" ? { role: "conference_admin" } : {}),
-      },
-      rid(),
-    );
-    // Observe an actual PostgreSQL lock waiter before enqueueing publication; no sleep-based race assumption.
-    await expect
-      .poll(async () =>
-        Number(
-          (
-            await f.app.query(
-              "SELECT count(*) FROM pg_stat_activity WHERE usename='confsys_app' AND wait_event_type='Lock'",
-            )
-          ).rows[0].count,
-        ),
-      )
-      .toBeGreaterThan(0);
-    const publishing = site.publish(target.raw, { expectedVersion: 4 }, rid());
-    const rejected = expect(publishing).rejects.toMatchObject({
-      code: "SESSION_EXPIRED",
-    });
-    await blocker.query("COMMIT");
-    blocker.release();
-    await revocation;
-    await rejected;
+    const mutationPool = createPool(f.config.DATABASE_URL, 1);
+    const publicationPool = createPool(f.config.DATABASE_URL, 1);
+    const mutationPid = (await mutationPool.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    const publicationPid = (await publicationPool.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    const blockerPid = (await blocker.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    const operations: Promise<unknown>[] = [];
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SELECT * FROM confsys.access_control FOR UPDATE");
+      const revocation = createAccessService(mutationPool, f.config).mutate(
+        leader.raw,
+        target.id,
+        {
+          action,
+          reason: "synthetic race",
+          ...(action === "revoke" ? { role: "conference_admin" } : {}),
+        },
+        rid(),
+      );
+      operations.push(revocation);
+      // Observe this transaction, in this database, blocked by our exact fence holder.
+      // A cluster-wide waiter count can see unrelated locks before revocation queues.
+      await expect.poll(async () => (await f.app.query(
+        "SELECT $2::int = ANY(pg_blocking_pids($1)) AS waiting",
+        [mutationPid, blockerPid],
+      )).rows[0].waiting).toBe(true);
+      const publishing = createSiteService(publicationPool, f.config).publish(
+        target.raw, { expectedVersion: 4 }, rid(),
+      );
+      // Settle immediately so an assertion failure cannot become an unhandled rejection.
+      const result = publishing.then(
+        value => ({ value, error: null }),
+        (error: unknown) => ({ value: null, error }),
+      );
+      operations.push(result);
+      await expect.poll(async () => (await f.app.query(
+        "SELECT cardinality(pg_blocking_pids($1)) > 0 AS waiting",
+        [publicationPid],
+      )).rows[0].waiting).toBe(true);
+      await blocker.query("COMMIT");
+      await revocation;
+      expect((await result).error).toMatchObject({ code: "SESSION_EXPIRED" });
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      await Promise.allSettled(operations);
+      await Promise.all([mutationPool.end(), publicationPool.end()]);
+    }
     await expect(site.preview(target.raw, 4)).rejects.toMatchObject({
       code: "SESSION_EXPIRED",
     });
@@ -548,4 +566,32 @@ it("disabled translations stay private; enabled missing optional text falls back
   );
   expect(html).toContain('lang="zh-Hant">公開導言');
   expect(html).toContain('hrefLang="zh-Hant"');
+});
+it("optional pages publish atomically, disappear only after next publication, and follow default-language fallback", async () => {
+ const current=await site.draft(leader.raw);
+ const doc=structuredClone(current.document);
+ doc.translations['zh-Hant'].pages.news={title:'大會公告',description:'合成公告測試',body:'<script>alert(1)</script>',bullets:[],links:[{label:'報名入口',url:'/registration'}]};
+ await site.save(leader.raw,{expectedVersion:current.draftVersion,document:doc},rid());
+ const up=async()=>{};
+ const server=buildApp({postgres:up,redis:up,worker:up});
+ const {renderSite}=await import('../../apps/web/src/entry-server.js');
+ await registerPublicRoutes(server,f.config,site,renderSite);
+ const headers={host:new URL(f.config.PUBLIC_APP_ORIGIN).host};
+ try {
+  expect((await server.inject({url:'/zh-Hant/news',headers})).statusCode).toBe(404);
+  await site.publish(leader.raw,{expectedVersion:current.draftVersion+1},rid());
+  const result=await server.inject({url:'/en/news',headers});
+  expect(result.statusCode).toBe(200);
+  expect(result.body).toContain('&lt;script&gt;');
+  expect(result.body).toContain('property="og:title" content="大會公告"');
+  expect(result.body).toContain(`property="og:url" content="${f.config.PUBLIC_APP_ORIGIN}/en/news"`);
+  expect(result.body).toContain('property="og:locale" content="en_US"');
+  expect(result.body).not.toContain('<script>alert');
+  expect((await server.inject({url:'/sitemap.xml',headers})).body).toContain('/en/news');
+  delete doc.translations['zh-Hant'].pages.news;
+  await site.save(leader.raw,{expectedVersion:current.draftVersion+1,document:doc},rid());
+  expect((await server.inject({url:'/zh-Hant/news',headers})).statusCode).toBe(200);
+  await site.publish(leader.raw,{expectedVersion:current.draftVersion+2},rid());
+  expect((await server.inject({url:'/zh-Hant/news',headers})).statusCode).toBe(404);
+ } finally {await server.close();}
 });

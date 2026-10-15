@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { z } from "zod";
 const url = (protocols: string[]) =>
   z
@@ -9,6 +10,8 @@ const url = (protocols: string[]) =>
 const database = url(["postgres:", "postgresql:"]);
 const redis = url(["redis:", "rediss:"]);
 const port = z.coerce.number().int().min(1).max(65535);
+// This transport only supports synthetic capture identities; provider approval is not inferred.
+const captureAddress = z.email().max(254).refine(value => value.endsWith(".invalid"));
 const seconds = z.coerce.number().int().min(60).max(2592000);
 const base = {
   NODE_ENV: z
@@ -42,12 +45,16 @@ const apiSchema = z.object({
   ...instance,
   ...base,
   ...mailKey,
+  PRIVATE_STORAGE_ROOT: z.string().min(1).refine(v => v.startsWith("/")).default(() => resolve(".private-storage")),
+  CLAMAV_HOST: z.enum(["127.0.0.1", "localhost", "clamav", "host.docker.internal"]).default("127.0.0.1"),
+  CLAMAV_PORT: port.default(3310),
   DATABASE_URL: database,
   REDIS_URL: redis,
   WORKER_HEALTH_URL: url(["http:", "https:"]),
   API_HOST: z.string().default("127.0.0.1"),
   API_PORT: port.default(23000),
   PUBLIC_APP_ORIGIN: z.url(),
+  QR_SIGNING_KEY: z.string().regex(/^[a-f0-9]{64}$/),
   CSRF_SIGNING_KEY: z.string().regex(/^[a-f0-9]{64}$/),
   SESSION_IDLE_SECONDS: seconds.default(1800),
   SESSION_ABSOLUTE_SECONDS: seconds.default(43200),
@@ -92,6 +99,7 @@ export function loadWorkerConfig(env: NodeJS.ProcessEnv = process.env) {
       ...base,
       ...instance,
       ...mailKey,
+      QR_SIGNING_KEY: z.string().regex(/^[a-f0-9]{64}$/),
       WORKER_DATABASE_URL: database,
       REDIS_URL: redis,
       WORKER_HOST: z.string().default("127.0.0.1"),
@@ -101,6 +109,9 @@ export function loadWorkerConfig(env: NodeJS.ProcessEnv = process.env) {
         .enum(["127.0.0.1", "localhost", "mailpit"])
         .default("127.0.0.1"),
       SMTP_PORT: port.default(21025),
+      MAIL_FROM_ADDRESS: captureAddress.default("noreply@confsys.invalid"),
+      MAIL_REPLY_TO_ADDRESS: captureAddress.default("support@confsys.invalid"),
+      MAIL_ENVELOPE_FROM: captureAddress.default("bounce@confsys.invalid"),
     }),
     env,
   );

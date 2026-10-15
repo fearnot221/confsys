@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../helpers/browser-test.js";
 test("real Web/API/worker readiness, language switch and refresh", async ({
   page,
   request,

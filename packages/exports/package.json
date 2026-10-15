@@ -1,0 +1,25 @@
+{
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "name": "@confsys/exports",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./worker": {
+      "development": "./src/worker.ts",
+      "types": "./src/worker.ts",
+      "default": "./dist/worker.js"
+    }
+  },
+  "dependencies": {
+    "@confsys/config": "workspace:*",
+    "@confsys/db": "workspace:*",
+    "@confsys/contracts": "workspace:*",
+    "@confsys/policy": "workspace:*",
+    "bullmq": "6.3.15"
+  }
+}

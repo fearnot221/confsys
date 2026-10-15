@@ -10,6 +10,7 @@ const settings = {
   PUBLIC_APP_ORIGIN: "http://a.localhost:35173",
   MAIL_ENCRYPTION_KEY: "a".repeat(64),
   MAIL_KEY_VERSION: "v1",
+  QR_SIGNING_KEY: "c".repeat(64),
   CSRF_SIGNING_KEY: "b".repeat(64),
   CONFERENCE_NAME: "Synthetic A",
 };

@@ -12,3 +12,11 @@ test-results
 .instances
 **/*.env
 **/.env*
+
+.private-storage/
+
+.tools/
+
+output/
+coordination/
+.restore-drills/

@@ -160,3 +160,10 @@ export async function requireOperatorConnection(db: PoolClient) {
   if (result.rows[0]?.current_user !== "confsys_migrator")
     throw new AuthError("FORBIDDEN");
 }
+
+// Shared fence for independent business operations; exclusive role/status writes wait.
+// Acquire before actor/resource locks, revalidate session after acquiring it.
+export async function lockAccessShared(db: PoolClient) {
+  const result = await db.query("SELECT singleton FROM confsys.access_control WHERE singleton=true FOR SHARE");
+  if (!result.rowCount) throw new Error("Access control migration required");
+}

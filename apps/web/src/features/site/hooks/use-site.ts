@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createAuthClient, ApiError } from "@confsys/sdk";
 import {
   siteDraftSchema,
+  siteContentPages,
+  siteExtraPages,
   siteHistorySchema,
   publicSiteSchema,
   siteIssues,
@@ -124,7 +126,7 @@ export function useSite() {
   useEffect(() => {
     const change = () => {
       const m =
-        /^#preview-(zh-Hant|en)-(home|about|participation|contact)$/.exec(
+        /^#preview-(zh-Hant|en)-(home|about|participation|contact|committee|dates|news|speakers|travel|sponsors|faq)$/.exec(
           window.location.hash,
         );
       if (m) {
@@ -162,6 +164,8 @@ export function useSite() {
         (i) => `${i.path.join(".")}: ${i.message}`,
       ) ?? []);
   return {
+    pages: siteContentPages,
+    optionalPages: siteExtraPages,
     loading: !expired && (account.isPending || (canRead && draft.isPending)),
     expired,
     error:
@@ -190,6 +194,7 @@ export function useSite() {
     confirmation,
     canWrite: canRead && permissions.includes("site.draft.write"),
     canPublish: canRead && permissions.includes("site.publish"),
+    canMedia: canRead && permissions.includes("files.media.manage"),
     onLocale: setLocale,
     onPage: setPage,
     onHistoryPage: setOffset,

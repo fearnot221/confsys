@@ -1,0 +1,11 @@
+import { financeEndpoints,csrfSchema,errorSchema } from '@confsys/contracts';
+import { ApiError } from './errors.js';
+export function createFinanceClient(base='',transport:typeof fetch=fetch) {
+ async function request(path:string,init:RequestInit) {const r=await transport(base+path,{credentials:'same-origin',cache:'no-store',...init});const data:unknown=await r.json();if(!r.ok){const e=errorSchema.safeParse(data);throw new ApiError(e.success?e.data.error.code:'INVALID_RESPONSE',r.status,e.success?e.data.error.requestId:undefined);}return data;}
+ return {async downloadEvidence(id:string,signal:AbortSignal){const r=await transport(base+`/api/finance/payments/${encodeURIComponent(id)}/evidence`,{credentials:'same-origin',cache:'no-store',signal});if(!r.ok){const e=errorSchema.safeParse(await r.json());throw new ApiError(e.success?e.data.error.code:'INVALID_RESPONSE',r.status,e.success?e.data.error.requestId:undefined);}return r.blob();},async call<K extends keyof typeof financeEndpoints>(operation:K,input:unknown,signal:AbortSignal) {
+ const spec=financeEndpoints[operation];let path=spec.path;const init:RequestInit={signal};
+ if(spec.method==='post') {const parsed=('input' in spec?spec.input.parse(input):{});const {csrfToken}=csrfSchema.parse(await request('/api/auth/csrf',{signal}));Object.assign(init,{method:'POST',headers:{'content-type':'application/json','x-csrf-token':csrfToken},body:JSON.stringify(parsed)});}
+ else if('input' in spec) {const query=spec.input.parse(input);path+=`?${new URLSearchParams(Object.entries(query).filter(([,v])=>v!==undefined).map(([k,v])=>[k,String(v)]))}`;}
+ return spec.output.parse(await request(path,init));
+ }};
+}

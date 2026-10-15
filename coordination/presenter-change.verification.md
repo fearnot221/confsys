@@ -1,0 +1,17 @@
+# Presenter changes — implementation checkpoint (2026-10-15 07:51 Taipei)
+
+API createPresenterChangesService(pool, config, submissionDependencies), registerPresenterChangesRoutes(app,config,service). Contract presenterChangeEndpoints must be included in central registry/contract tests. UI PresenterChangesScreen receives usePresenterChanges(administrative=false) props. Routes /presenter-changes and /admin/presenter-changes; management uses existing submissions.manage. Add nav to author and authorized administrator areas. No new dependency or environment variable.
+
+Migration0044 centrally copied. Canonical published_acceptances now rejects every revision below most recent approved replacement; old public snapshots untouched. Competition successor0046 owned by submissions agent. Generic save/submit reject identity changes by normalized presenter email relative to latest immutable submitted revision. Target only receives safe projection; no file or owner privileges. Approval clones immutable content with changed presenterIndex only and appends refs, under exclusive access fence. Narrow persistence temporarily scopes to trusted source owner in try/finally; original admin remains audit actor and session. Notifications/outbox and audit atomic.
+
+Executed: pnpm exec tsc --noEmit -p tsconfig.json PASS; targeted pnpm exec eslint on API/submission changes, contracts/SDK/UI/test PASS. PostgreSQL tests authored but waiting allocated PG slot. Browser flow pending integration; do not label verified yet.
+
+Maintainability: handler validation/CSRF, service authorization/transaction/state, repository SQL/projection, SDK transport, hook state, presentation callbacks. Existing submission repository/files/outbox reused. No duplicate permission registry; no new dependencies. Scoped owner context is explicit trusted persistence coupling covered by planned regression. Followup: real PG suite, browser consent/admin approval, competition successor integration and full regression.
+
+## Real PostgreSQL verification (07:52:04 Taipei)
+
+`PATH=/tmp/confsys-tools/node_modules/.bin:$PATH node --env-file=/Users/fearnot/Desktop/confsys-phase-1-4-to-6-continuous/.env node_modules/vitest/vitest.mjs run tests/integration/presenter-changes.test.ts`: **5/5 PASS**, 903ms. Covers concurrent consent+approval retry, target private manuscript denial, admin audit identity, immutable old/new revisions, ordinary save+submit identity bypass, same-person reordering, credential and draft staleness, policy restriction, pending expired requests, rollback, and acceptance floor older than the direct source revision. File references use synthetic ready asset metadata and real nonprivileged PostgreSQL RLS/persistence, not an additional byte/scanner verification (actual scan separately covered by files suite).
+
+Initial PG failure exposed PostgreSQL FOR UPDATE applying owner-only UPDATE RLS to admin reads and hiding terminal request rows on retries. Fixed by relying on existing exclusive access fence for all workflow mutations and reading domain state without an UPDATE lock until narrow trusted owner persistence; no RLS broadening. Required tests retained and pass.
+
+`tests/e2e/presenter-changes.spec.ts` authored: three real local accounts via Mailpit, owner request dropdown, target consent, admin approval, denied target manuscript request, immutable revision assertions. Main integration must run it; not yet claimed passing. Typecheck and targeted ESLint passed after test additions.

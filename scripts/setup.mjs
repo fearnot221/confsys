@@ -22,6 +22,9 @@ const pgPort = number("POSTGRES_PORT"),
   mailPort = number("MAILPIT_PORT");
 function authDefaults() {
   return {
+    PRIVATE_STORAGE_ROOT: process.env.PRIVATE_STORAGE_ROOT ?? resolve(".private-storage"),
+    CLAMAV_HOST: "127.0.0.1",
+    CLAMAV_PORT: process.env.CLAMAV_PORT ?? "3310",
     PUBLIC_APP_ORIGIN:
       process.env.PUBLIC_APP_ORIGIN ?? `http://127.0.0.1:${webPort}`,
     CONFERENCE_NAME: process.env.CONFERENCE_NAME ?? "研討會",
@@ -35,7 +38,11 @@ function authDefaults() {
     MAILPIT_URL: `http://127.0.0.1:${mailPort}`,
     MAIL_KEY_VERSION: "v1",
     MAIL_ENCRYPTION_KEY: randomBytes(32).toString("hex"),
+    QR_SIGNING_KEY: randomBytes(32).toString("hex"),
     CSRF_SIGNING_KEY: randomBytes(32).toString("hex"),
+    MAIL_FROM_ADDRESS: "noreply@confsys.invalid",
+    MAIL_REPLY_TO_ADDRESS: "support@confsys.invalid",
+    MAIL_ENVELOPE_FROM: "bounce@confsys.invalid",
     SMTP_HOST: "127.0.0.1",
     SMTP_PORT: String(smtpPort),
   };

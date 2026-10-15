@@ -22,6 +22,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm env:setup
       - run: pnpm infra:up
+      - name: Start and verify real scanner
+        timeout-minutes: 6
+        run: |
+          pnpm compose up -d clamav
+          for attempt in $(seq 1 60); do
+            if node scripts/local-scanner.mjs check; then exit 0; fi
+            sleep 5
+          done
+          pnpm compose logs clamav
+          exit 1
       - run: pnpm db:migrate
       - run: pnpm db:migrate:test
       - run: pnpm exec playwright install --with-deps chromium
@@ -31,6 +41,8 @@ jobs:
       - run: pnpm compose --profile app up -d --no-build --wait api worker web
       - run: pnpm smoke:stack
       - run: pnpm smoke:auth
+      - name: Stop completed smoke stack before two-instance rehearsal
+        run: pnpm compose --profile app stop
       - run: pnpm test:instances
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
