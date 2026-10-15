@@ -25,7 +25,13 @@ export type AssignmentRow = {
   revision_id: string;
   reviewer_id: string;
   form_id: string;
-  state: "invited" | "accepted" | "declined" | "conflicted" | "submitted";
+  state:
+    | "invited"
+    | "accepted"
+    | "declined"
+    | "conflicted"
+    | "submitted"
+    | "revoked";
   version: number;
   anonymous_confirmed: boolean;
   document: unknown;
@@ -570,10 +576,70 @@ export async function roundProgress(db: PoolClient, revisionIds: string[]) {
       submitted: number;
       closed: number;
     }>(
-      `SELECT revision_id AS "revisionId",round,count(*) FILTER(WHERE state IN('invited','accepted'))::int AS pending,count(*) FILTER(WHERE state='submitted')::int AS submitted,count(*) FILTER(WHERE state IN('declined','conflicted'))::int AS closed FROM confsys.review_assignments WHERE revision_id=ANY($1::uuid[]) GROUP BY revision_id,round ORDER BY revision_id,round`,
+      `SELECT revision_id AS "revisionId",round,count(*) FILTER(WHERE state IN('invited','accepted'))::int AS pending,count(*) FILTER(WHERE state='submitted')::int AS submitted,count(*) FILTER(WHERE state IN('declined','conflicted','revoked'))::int AS closed FROM confsys.review_assignments WHERE revision_id=ANY($1::uuid[]) GROUP BY revision_id,round ORDER BY revision_id,round`,
       [revisionIds],
     )
   ).rows;
+}
+
+export async function revocation(db: PoolClient, assignmentId: string) {
+  const r = (
+    await db.query<{
+      id: string;
+      reason: string;
+      created_at: Date;
+      assignment_version: number;
+    }>(
+      "SELECT id,reason,created_at,assignment_version FROM confsys.review_assignment_revocations WHERE assignment_id=$1",
+      [assignmentId],
+    )
+  ).rows[0];
+  return r
+    ? {
+        id: r.id,
+        reason: r.reason,
+        createdAt: r.created_at.toISOString(),
+        version: r.assignment_version,
+      }
+    : null;
+}
+export async function revoke(
+  db: PoolClient,
+  input: {
+    id: string;
+    assignmentId: string;
+    expectedVersion: number;
+    reason: string;
+  },
+  previous: string,
+  actorId: string,
+) {
+  await db.query(
+    "INSERT INTO confsys.review_assignment_revocations(id,assignment_id,assignment_version,previous_state,reason,created_by) VALUES($1,$2,$3,$4,$5,$6)",
+    [
+      input.id,
+      input.assignmentId,
+      input.expectedVersion + 1,
+      previous,
+      input.reason,
+      actorId,
+    ],
+  );
+  await db.query(
+    "UPDATE confsys.review_assignments SET state='revoked',version=version+1,updated_at=now() WHERE id=$1",
+    [input.assignmentId],
+  );
+}
+
+export async function revocationAssignment(db: PoolClient, id: string) {
+  return (
+    (
+      await db.query<{ assignment_id: string }>(
+        "SELECT assignment_id FROM confsys.review_assignment_revocations WHERE id=$1",
+        [id],
+      )
+    ).rows[0]?.assignment_id ?? null
+  );
 }
 
 export async function savePublicationSnapshot(

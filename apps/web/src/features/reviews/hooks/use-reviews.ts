@@ -171,6 +171,16 @@ export function useReviews() {
         await client.screen({ ...input, id: stableId(input) }, signal);
         return "初檢已保存為新版本；既有公開結果未被改寫。";
       }),
+    onRevoke: (assignment: ReviewAssignment, reason: string) =>
+      void perform(async (signal) => {
+        const input = {
+          assignmentId: assignment.id,
+          expectedVersion: assignment.version,
+          reason,
+        };
+        await client.revoke({ ...input, id: stableId(input) }, signal);
+        return "指派已撤銷；原評分表、草稿與原因保留，委員不再可讀稿或評分。";
+      }),
     onExtendDeadline: (
       assignment: ReviewAssignment,
       deadline: string,

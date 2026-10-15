@@ -57,6 +57,8 @@ export function createReviewClient(
     );
   }
   return {
+    revoke: (input: unknown, signal: AbortSignal) =>
+      call(reviewEndpoints.reviewRevoke, input, signal),
     extendDeadline: (input: unknown, signal: AbortSignal) =>
       call(reviewEndpoints.reviewExtendDeadline, input, signal),
     screen: (input: unknown, signal: AbortSignal) =>

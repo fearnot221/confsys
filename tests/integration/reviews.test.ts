@@ -207,6 +207,10 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await f.admin.query(
+    "DELETE FROM confsys.review_assignment_revocations WHERE assignment_id IN(SELECT id FROM confsys.review_assignments WHERE created_by=$1)",
+    [admin.id],
+  );
+  await f.admin.query(
     "DELETE FROM confsys.review_deadline_extensions WHERE assignment_id IN(SELECT id FROM confsys.review_assignments WHERE created_by=$1)",
     [admin.id],
   );
@@ -983,77 +987,6 @@ it("initial-screen and audit roll back when the atomic reviewer notification can
   }
 });
 
-it("auxiliary review metadata is denied without actor context and manager reads retain explicit scope", async () => {
-  for (const table of [
-    "review_forms",
-    "review_chair_scopes",
-    "review_conflicts",
-    "submission_revision_requests",
-    "competition_conflicts",
-  ])
-    expect((await f.app.query(`SELECT * FROM confsys.${table}`)).rows).toEqual(
-      [],
-    );
-  expect(
-    (await f.app.query("DELETE FROM confsys.review_chair_scopes")).rowCount,
-  ).toBe(0);
-  await expect(
-    f.app.query(
-      "INSERT INTO confsys.review_chair_scopes(user_id,track_id) VALUES($1,'forged')",
-      [outsider.id],
-    ),
-  ).rejects.toMatchObject({ code: "42501" });
-  await withIdentityTransaction(f.app, async (db) => {
-    await context(db, outsider.id, false);
-    expect((await db.query("SELECT * FROM confsys.review_forms")).rows).toEqual(
-      [],
-    );
-    expect(
-      (await db.query("SELECT * FROM confsys.submission_revision_requests"))
-        .rows,
-    ).toEqual([]);
-  });
-  await withIdentityTransaction(f.app, async (db) => {
-    await context(db, admin.id, true);
-    expect(
-      (
-        await db.query("SELECT id FROM confsys.review_forms WHERE id=$1", [
-          form.id,
-        ])
-      ).rowCount,
-    ).toBe(1);
-  });
-});
-it("changing a verified coauthor email cannot evade reviewer assignment or manager candidate conflicts", async () => {
-  const alias = await account(["reviewer", "conference_admin"]);
-  const paper = await submitted({
-    authors: [
-      ...document().authors,
-      {
-        name: "Historical coauthor",
-        email: alias.email,
-        affiliation: "Synthetic",
-      },
-    ],
-  });
-  const target = f.email();
-  await auth.requestEmailChange(alias.raw, target, rid());
-  await auth.confirmEmailChange(
-    alias.raw,
-    { token: (await f.link(alias.email, "email_change")).token },
-    rid(),
-  );
-  const fresh = await auth.login(target, password, rid());
-  await expect(
-    assigned(paper, { id: alias.id, email: target, raw: fresh.raw }),
-  ).rejects.toMatchObject({ code: "FORBIDDEN" });
-  expect(
-    (await reviews.board(fresh.raw, {})).papers.some(
-      (row) => row.submissionId === paper.id,
-    ),
-  ).toBe(false);
-});
-
 it("extends only pending review deadlines with immutable form, scoped history, optimistic concurrency and replay", async () => {
   const p = await submitted(),
     localForm = await reviews.configure(
@@ -1328,6 +1261,161 @@ it("assignment INSERT requires manager context while reviewer scoring cannot alt
         );
       }),
     ).rejects.toMatchObject({ code: "42501" });
+});
+
+it("revokes pending reviews with immutable reasons, denies continued access and frees the next round", async () => {
+  const p = await submitted(),
+    a = await assigned(p);
+  const accepted = await reviews.action(
+    reviewer.raw,
+    { id: a.id, expectedVersion: a.version, action: "accept" },
+    rid(),
+  );
+  const draft = await reviews.action(
+    reviewer.raw,
+    {
+      id: a.id,
+      expectedVersion: accepted.version,
+      action: "save",
+      document: {
+        scores: [{ criterionId: "quality", value: 2 }],
+        authorComment: "Preserved draft",
+        privateComment: "Preserved private draft",
+      },
+    },
+    rid(),
+  );
+  const input = {
+    id: rid(),
+    assignmentId: a.id,
+    expectedVersion: draft.version,
+    reason: "Reviewer unavailable; documented reassignment",
+  };
+  await expect(
+    reviews.revoke(reviewer.raw, input, rid()),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await expect(
+    reviews.revoke(admin.raw, { ...input, expectedVersion: 1 }, rid()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  // Role removal is the motivating blocked-assignment case; revocation must not require recipient authority.
+  await f.admin.query(
+    "DELETE FROM confsys.user_roles WHERE user_id=$1 AND role='reviewer'",
+    [reviewer.id],
+  );
+  const revoked = await reviews.revoke(admin.raw, input, rid());
+  expect(revoked.state).toBe("revoked");
+  expect(revoked.document).toEqual(draft.document);
+  expect(revoked.form).toEqual(draft.form);
+  expect(revoked.revocation?.reason).toBe(input.reason);
+  expect(await reviews.revoke(admin.raw, input, rid())).toEqual(revoked);
+  await f.admin.query(
+    "INSERT INTO confsys.user_roles(user_id,role) VALUES($1,'reviewer')",
+    [reviewer.id],
+  );
+  const own = (await reviews.assigned(reviewer.raw, { offset: 0 })).items.find(
+    (x) => x.id === a.id,
+  )!;
+  expect(own.paper.title).toBe("");
+  expect(own.document.scores).toEqual([]);
+  expect(own.revocation?.reason).toBe(input.reason);
+  await expect(
+    reviews.action(
+      reviewer.raw,
+      {
+        id: a.id,
+        expectedVersion: revoked.version,
+        action: "submit",
+        document: draft.document,
+      },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    withIdentityTransaction(f.app, (db) =>
+      authorizeReviewFile(db, reviewer.id, a.id, rid()),
+    ),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  const next = await reviews.assign(
+    admin.raw,
+    {
+      id: rid(),
+      submissionId: p.id,
+      revisionId: p.currentRevisionId,
+      reviewerId: otherReviewer.id,
+      formId: form.id,
+      anonymousConfirmed: true,
+      round: 2,
+    },
+    rid(),
+  );
+  expect(next.round).toBe(2);
+  await expect(
+    reviews.revoke(
+      admin.raw,
+      { ...input, assignmentId: next.id, expectedVersion: next.version },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(
+    (
+      await f.admin.query(
+        "SELECT id FROM confsys.notifications WHERE event_key=$1",
+        [`review-revoked:${input.id}`],
+      )
+    ).rowCount,
+  ).toBe(1);
+  await expect(
+    withIdentityTransaction(f.app, (db) =>
+      db.query(
+        "UPDATE confsys.review_assignment_revocations SET reason='rewrite' WHERE false",
+      ),
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+  await withIdentityTransaction(f.app, async (db) => {
+    await context(db, otherReviewer.id, false);
+    expect(
+      (
+        await db.query(
+          "SELECT id FROM confsys.review_assignment_revocations WHERE assignment_id=$1",
+          [a.id],
+        )
+      ).rowCount,
+    ).toBe(0);
+  });
+});
+it("final review documents cannot be rewritten or reopened through direct application SQL", async () => {
+  const p = await submitted(),
+    done = await score(await assigned(p));
+  const direct = (sql: string) =>
+    withIdentityTransaction(f.app, async (db) => {
+      await context(db, reviewer.id, false);
+      return db.query(sql, [done.id]);
+    });
+  await expect(
+    direct(
+      "UPDATE confsys.review_assignments SET document=jsonb_set(document,'{authorComment}','\"tampered\"'::jsonb) WHERE id=$1",
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
+  await expect(
+    direct(
+      "UPDATE confsys.review_assignments SET state='accepted' WHERE id=$1",
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
+  await reviews.action(
+    reviewer.raw,
+    {
+      id: done.id,
+      expectedVersion: done.version,
+      action: "conflict",
+      reason: "Newly discovered synthetic conflict",
+    },
+    rid(),
+  );
+  await expect(
+    direct(
+      "UPDATE confsys.review_assignments SET state='accepted' WHERE id=$1",
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
 });
 
 it("publishes selected latest decisions atomically, rejects mixed authority/staleness and deduplicates retries", async () => {

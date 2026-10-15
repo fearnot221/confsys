@@ -1439,3 +1439,42 @@ it("participant entry permissions allow requested enrollment and withdrawal but 
     ),
   ).resolves.toMatchObject({ rowCount: 0 });
 });
+
+it("final competition assignment documents cannot be rewritten or reopened but conflicts and cancellation remain legal", async () => {
+  const compId = await competition(),
+    p = await paper(),
+    e = await enroll(compId, p);
+  await approve(e);
+  const a = await assignment(e.id);
+  await submit(a);
+  const direct = (sql: string) =>
+    withIdentityTransaction(f.app, async (db) => {
+      await db.query("SELECT set_config('app.actor_id',$1,true)", [judge.id]);
+      return db.query(sql, [a.id]);
+    });
+  await expect(
+    direct(
+      "UPDATE confsys.competition_assignments SET document=jsonb_set(document,'{comment}','\"tampered\"'::jsonb) WHERE id=$1",
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
+  await expect(
+    direct(
+      "UPDATE confsys.competition_assignments SET state='assigned' WHERE id=$1",
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
+  await svc.conflict(
+    judge.raw,
+    { assignmentId: a.id, reason: "Newly discovered synthetic conflict" },
+    id(),
+  );
+  await svc.cancel(
+    leader.raw,
+    { assignmentId: a.id, reason: "Explicit administrative cancellation" },
+    id(),
+  );
+  await expect(
+    direct(
+      "UPDATE confsys.competition_assignments SET state='assigned' WHERE id=$1",
+    ),
+  ).rejects.toMatchObject({ code: "23514" });
+});

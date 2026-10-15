@@ -38,6 +38,8 @@ export function registerReviewRoutes(
         if (!input.success) throw new AuthError("INVALID_REQUEST");
         const raw = req.cookies[cookiePolicy(config).name];
         switch (name) {
+          case "reviewRevoke":
+            return service.revoke(raw, input.data, req.id);
           case "reviewExtendDeadline":
             return service.extendDeadline(raw, input.data, req.id);
           case "reviewScreen":

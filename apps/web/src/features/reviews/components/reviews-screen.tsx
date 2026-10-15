@@ -35,6 +35,7 @@ type Props = {
     outcome: ReviewScreening["outcome"],
     reason: string,
   ) => void;
+  onRevoke: (assignment: ReviewAssignment, reason: string) => void;
   onExtendDeadline: (
     assignment: ReviewAssignment,
     deadline: string,
@@ -107,6 +108,12 @@ function ScoreForm({
   return (
     <article className="auth-panel">
       <h3>{assignment.paper.title || "已停止的審查指派"}</h3>
+      {assignment.revocation && (
+        <p>
+          撤銷原因（{assignment.revocation.createdAt}）：
+          {assignment.revocation.reason}
+        </p>
+      )}
       <p>
         第 {assignment.round} 輪 · 狀態：{assignment.state} · 評分表版本{" "}
         {assignment.form.version} · 截止 {assignment.effectiveDeadline}
@@ -211,26 +218,28 @@ function ScoreForm({
           )}
         </form>
       )}
-      {assignment.state !== "conflicted" && assignment.state !== "declined" && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onAction(assignment, "conflict", document, reason);
-          }}
-        >
-          <label>
-            利益衝突說明
-            <input
-              required
-              minLength={3}
-              maxLength={1000}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </label>
-          <button disabled={busy}>申報衝突並停止審查</button>
-        </form>
-      )}
+      {assignment.state !== "conflicted" &&
+        assignment.state !== "declined" &&
+        assignment.state !== "revoked" && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              onAction(assignment, "conflict", document, reason);
+            }}
+          >
+            <label>
+              利益衝突說明
+              <input
+                required
+                minLength={3}
+                maxLength={1000}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </label>
+            <button disabled={busy}>申報衝突並停止審查</button>
+          </form>
+        )}
     </article>
   );
 }
@@ -427,6 +436,7 @@ function Manage({
   onScreen,
   onRemind,
   onExtendDeadline,
+  onRevoke,
   onConflict,
   onDecide,
   onPublish,
@@ -439,6 +449,7 @@ function Manage({
   onScreen: Props["onScreen"];
   onRemind: Props["onRemind"];
   onExtendDeadline: Props["onExtendDeadline"];
+  onRevoke: Props["onRevoke"];
   onConflict: Props["onConflict"];
   onDecide: Props["onDecide"];
   onPublish: Props["onPublish"];
@@ -466,7 +477,8 @@ function Manage({
     [screenOutcome, setScreenOutcome] =
       useState<ReviewScreening["outcome"]>("ready"),
     [screenReason, setScreenReason] = useState(""),
-    [reminderReason, setReminderReason] = useState("");
+    [reminderReason, setReminderReason] = useState(""),
+    [revokeReason, setRevokeReason] = useState("");
   const [outcome, setOutcome] =
       useState<ReviewDecision["outcome"]>("accept_oral"),
     [authorMessage, setAuthorMessage] = useState(""),
@@ -664,6 +676,13 @@ function Manage({
           maxLength={2000}
         />
       </label>
+      <label htmlFor="review-revoke-reason">撤銷指派理由（委員可見）</label>
+      <textarea
+        id="review-revoke-reason"
+        value={revokeReason}
+        onChange={(e) => setRevokeReason(e.target.value)}
+        maxLength={2000}
+      />
       <h3>審查進度與評語</h3>
       {board.assignments.length === 0 && <p>此頁沒有可查看的指派。</p>}
       <label htmlFor="review-history-round">歷史指派輪次篩選（此頁）</label>
@@ -718,6 +737,15 @@ function Manage({
             >
               提醒此待審委員
             </button>
+            {a.revocation && <p>已撤銷：{a.revocation.reason}</p>}
+            {["invited", "accepted"].includes(a.state) && (
+              <button
+                disabled={busy || revokeReason.trim().length < 3}
+                onClick={() => onRevoke(a, revokeReason)}
+              >
+                撤銷此待審指派
+              </button>
+            )}
             <ul>
               {a.document.scores.map((s) => (
                 <li key={s.criterionId}>
@@ -923,6 +951,7 @@ export function ReviewsScreen(props: Props) {
           onScreen={props.onScreen}
           onRemind={props.onRemind}
           onExtendDeadline={props.onExtendDeadline}
+          onRevoke={props.onRevoke}
           onConflict={props.onConflict}
           onDecide={props.onDecide}
           onPublish={props.onPublish}

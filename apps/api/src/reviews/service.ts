@@ -69,7 +69,15 @@ async function projection(
 ): Promise<ReviewAssignment> {
   const form = await repo.form(db, row.form_id);
   if (!form) throw new AuthError("CONFLICT");
+  const revocation = await repo.revocation(db, row.id);
   const masked = {
+    revocation: revocation
+      ? {
+          id: revocation.id,
+          reason: revocation.reason,
+          createdAt: revocation.createdAt,
+        }
+      : null,
     id: row.id,
     round: row.round,
     submissionId: row.submission_id,
@@ -89,7 +97,7 @@ async function projection(
     screening: await repo.screeningStatus(db, row.revision_id),
     document: { scores: [], authorComment: "", privateComment: "" },
   };
-  if (!manager && (row.state === "conflicted" || row.state === "declined"))
+  if (!manager && ["conflicted", "declined", "revoked"].includes(row.state))
     return masked;
   const paper = await repo.paper(db, row.revision_id);
   if (!paper || paper.state === "withdrawn") throw new AuthError("FORBIDDEN");
@@ -466,6 +474,49 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
         return saved;
       });
     },
+    async revoke(raw: string | undefined, input: unknown, requestId: string) {
+      const data = reviewEndpoints.reviewRevoke.input.parse(input);
+      return transaction(raw, "reviews.manage", true, async (db, actor) => {
+        const row = await repo.assignment(db, data.assignmentId, true);
+        if (!row) throw new AuthError("NOT_FOUND");
+        const view = await projection(db, row, actor, true);
+        const usedId = await repo.revocationAssignment(db, data.id);
+        if (usedId && usedId !== row.id) throw new AuthError("CONFLICT");
+        const existing = await repo.revocation(db, row.id);
+        if (existing) {
+          if (
+            existing.id !== data.id ||
+            existing.version !== data.expectedVersion + 1 ||
+            existing.reason !== data.reason
+          )
+            throw new AuthError("CONFLICT");
+          return view;
+        }
+        if (
+          row.version !== data.expectedVersion ||
+          !["invited", "accepted"].includes(row.state)
+        )
+          throw new AuthError("CONFLICT");
+        await repo.revoke(db, data, row.state, actor.id);
+        await safeAudit(
+          db,
+          actor,
+          "review.assignment_revoked",
+          data.id,
+          requestId,
+        );
+        await notify(
+          db,
+          row.reviewer_id,
+          `review-revoked:${data.id}`,
+          "審查指派已撤銷 / Review assignment revoked",
+          requestId,
+        );
+        const updated = await repo.assignment(db, row.id);
+        if (!updated) throw new Error("Missing revoked review assignment");
+        return projection(db, updated, actor, true);
+      });
+    },
     async extendDeadline(
       raw: string | undefined,
       input: unknown,
@@ -674,7 +725,8 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
           if (
             row.state === "declined" ||
             row.state === "conflicted" ||
-            row.state === "submitted"
+            row.state === "submitted" ||
+            row.state === "revoked"
           )
             throw new AuthError("CONFLICT");
           if (new Date(detail.effectiveDeadline) <= new Date())
