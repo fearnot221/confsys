@@ -61,6 +61,7 @@ export const reviewDeadlineExtensionInput = z.strictObject({
   reason: z.string().trim().min(3).max(2000),
 });
 export const reviewAssignmentSchema = z.strictObject({
+  round: z.number().int().min(1).max(20),
   effectiveDeadline: z.iso.datetime(),
   deadlineHistory: z.array(reviewDeadlineExtensionSchema).max(50),
   id: z.uuid(),
@@ -75,6 +76,7 @@ export const reviewAssignmentSchema = z.strictObject({
 });
 export type ReviewAssignment = z.infer<typeof reviewAssignmentSchema>;
 export const reviewDecisionSchema = z.strictObject({
+  round: z.number().int().min(1).max(20),
   id: z.uuid(),
   submissionId: z.uuid(),
   revisionId: z.uuid(),
@@ -111,6 +113,15 @@ export const reviewScreenInput = z.strictObject({
   reason: text(2000).min(3),
 });
 export const reviewBoardSchema = z.strictObject({
+  rounds: z.array(
+    z.strictObject({
+      revisionId: z.uuid(),
+      round: z.number().int(),
+      pending: z.number().int(),
+      submitted: z.number().int(),
+      closed: z.number().int(),
+    }),
+  ),
   screenings: z.array(reviewScreeningSchema),
   workload: z.array(
     z.strictObject({
@@ -137,6 +148,7 @@ export const reviewBoardSchema = z.strictObject({
   nextOffset: z.number().int().nullable(),
 });
 export const reviewAssignInput = z.strictObject({
+  round: z.number().int().min(1).max(20).default(1),
   id: z.uuid(),
   submissionId: z.uuid(),
   revisionId: z.uuid(),
@@ -152,6 +164,7 @@ export const reviewAssignmentActionInput = z.strictObject({
   document: reviewScoreDocumentSchema.optional(),
 });
 export const reviewDecisionInput = z.strictObject({
+  round: z.number().int().min(1).max(20).default(1),
   id: z.uuid(),
   submissionId: z.uuid(),
   revisionId: z.uuid(),
@@ -167,6 +180,7 @@ export const reviewDecisionInput = z.strictObject({
   revisionDeadline: z.iso.datetime().nullable(),
 });
 export const reviewAuthorResultSchema = z.strictObject({
+  round: z.number().int().min(1).max(20),
   submissionId: z.uuid(),
   registrationRequirement: submissionRegistrationRequirementSchema.nullable(),
   outcome: z.enum([
