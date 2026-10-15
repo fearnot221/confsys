@@ -6,6 +6,7 @@ import { authFixture, password } from "../helpers/auth.js";
 import { createAuthService } from "../../apps/api/src/auth/service.js";
 import { createRegistrationService } from "../../apps/api/src/registration/service.js";
 import { createActivitiesService } from "../../apps/api/src/activities/service.js";
+import { createOnsiteService } from "../../apps/api/src/onsite/service.js";
 import { createFinanceService } from "../../apps/api/src/finance/service.js";
 import { buildApp } from "../../apps/api/src/app.js";
 import {
@@ -146,6 +147,14 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   const users = [owner?.id, other?.id, admin?.id].filter(Boolean);
+  await f.admin.query(
+    "DELETE FROM confsys.onsite_redemptions WHERE actor_id=ANY($1::uuid[])",
+    [users],
+  );
+  await f.admin.query(
+    "DELETE FROM confsys.onsite_tokens WHERE registration_id IN(SELECT id FROM confsys.registrations WHERE user_id=ANY($1::uuid[]))",
+    [users],
+  );
   await f.admin.query(
     "DELETE FROM confsys.refunds WHERE created_by=ANY($1::uuid[])",
     [users],
@@ -385,6 +394,247 @@ it("paginates more than100 allocations independently from order pages, filters s
     (await finance.dashboard(owner.raw, "own", 0, 100, ownerOrder))
       .allocations[0]?.refunded,
   ).toBe("1");
+});
+it("payment RLS denies participant reconciliation and forged verified inserts while finance transitions stay terminal", async () => {
+  const payment = await finance.submit(
+    owner.raw,
+    {
+      idempotencyKey: rid(),
+      amount: "1",
+      currency: "TWD",
+      reference: rid(),
+      evidenceFileId: null,
+    },
+    rid(),
+  );
+  for (const actor of [null, owner.id, other.id])
+    await withIdentityTransaction(f.app, async (db) => {
+      await db.query(
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.finance_admin','false',true)",
+        [actor ?? ""],
+      );
+      expect(
+        (
+          await db.query(
+            "UPDATE confsys.payments SET state='verified',verified_by=$2 WHERE id=$1",
+            [payment.id, owner.id],
+          )
+        ).rowCount,
+      ).toBe(0);
+    });
+  for (const state of ["verified", "rejected"])
+    await expect(
+      withIdentityTransaction(f.app, async (db) => {
+        await db.query(
+          "SELECT set_config('app.actor_id',$1,true),set_config('app.finance_admin','false',true)",
+          [owner.id],
+        );
+        await db.query(
+          "INSERT INTO confsys.payments(id,payer_id,state,amount,currency,reference,idempotency_key,request_hash,verified_by) VALUES($1,$2,$3,1,'TWD',$4,$5,'forged',$2)",
+          [rid(), owner.id, state, rid(), rid()],
+        );
+      }),
+    ).rejects.toMatchObject({ code: "42501" });
+  expect(
+    (
+      await post(owner.raw, "/api/finance/verify", {
+        id: payment.id,
+        action: "verify",
+        reason: "Forbidden self reconciliation",
+      })
+    ).statusCode,
+  ).toBe(403);
+  expect(
+    (
+      await finance.verify(
+        admin.raw,
+        {
+          id: payment.id,
+          action: "verify",
+          reason: "Authorized reconciliation",
+        },
+        rid(),
+      )
+    ).state,
+  ).toBe("verified");
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await db.query(
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.finance_admin','true',true)",
+        [admin.id],
+      );
+      await db.query(
+        "UPDATE confsys.payments SET state='submitted',verified_by=NULL WHERE id=$1",
+        [payment.id],
+      );
+    }),
+  ).rejects.toMatchObject({
+    code: "23514",
+    constraint: "payment_verification_transition",
+  });
+});
+it("replacement money settles a refunded open order without recycling original money and concurrent excess rolls back", async () => {
+  async function paid(amount: string) {
+    const p = await finance.submit(
+      other.raw,
+      {
+        idempotencyKey: rid(),
+        amount,
+        currency: "TWD",
+        reference: rid(),
+        evidenceFileId: null,
+      },
+      rid(),
+    );
+    await finance.verify(
+      admin.raw,
+      { id: p.id, action: "verify", reason: "Synthetic settlement transfer" },
+      rid(),
+    );
+    return p;
+  }
+  const original = await paid("200"),
+    allocate = (paymentId: string, amount: string) =>
+      finance.allocate(
+        admin.raw,
+        {
+          idempotencyKey: rid(),
+          paymentId,
+          orderId: otherOrder,
+          amount,
+          reason: "Synthetic settlement allocation",
+        },
+        rid(),
+      );
+  const allocation = await allocate(original.id, "200");
+  await finance.refund(
+    admin.raw,
+    {
+      idempotencyKey: rid(),
+      allocationId: allocation.id,
+      amount: "40",
+      reference: rid(),
+      reason: "Synthetic partial refund",
+    },
+    rid(),
+  );
+  await expect(allocate(original.id, "1")).rejects.toMatchObject({
+    code: "CONFLICT",
+  });
+  const replacement = await paid("80");
+  const attempts = await Promise.allSettled([
+    allocate(replacement.id, "40"),
+    allocate(replacement.id, "40"),
+  ]);
+  expect(attempts.filter((x) => x.status === "fulfilled")).toHaveLength(1);
+  expect(attempts.filter((x) => x.status === "rejected")).toHaveLength(1);
+  const order = (await reg.mine(other.raw, 0)).items[0]!.order!;
+  expect(order.paid).toBe("240");
+  expect(order.refunded).toBe("40");
+  const rows = (
+    await f.admin.query(
+      "SELECT id FROM confsys.payment_allocations WHERE payment_id=$1",
+      [replacement.id],
+    )
+  ).rows;
+  expect(rows).toHaveLength(1);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT id FROM confsys.auth_audit WHERE event='payment.allocated' AND after_value=$1",
+        [rows[0].id],
+      )
+    ).rowCount,
+  ).toBe(1);
+});
+it("duplicate booking and redeemed cancellation return HTTP409 and leave orders and history intact", async () => {
+  const input = {
+    activityId,
+    version: 1,
+    registrationId: otherRegistration,
+    quantity: 1,
+    mealType: "vegetarian",
+    idempotencyKey: rid(),
+  };
+  const booking = await activities.book(other.raw, input, rid());
+  const count = async () =>
+    Number(
+      (
+        await f.admin.query(
+          "SELECT count(*) FROM confsys.orders WHERE user_id=$1",
+          [other.id],
+        )
+      ).rows[0].count,
+    );
+  const before = await count();
+  const duplicate = await post(other.raw, "/api/activities/book", {
+    ...input,
+    idempotencyKey: rid(),
+  });
+  expect(duplicate.statusCode, duplicate.body).toBe(409);
+  expect(duplicate.json().error.code).toBe("CONFLICT");
+  expect(await count()).toBe(before);
+  const payment = await finance.submit(
+    other.raw,
+    {
+      idempotencyKey: rid(),
+      amount: "10",
+      currency: "TWD",
+      reference: rid(),
+      evidenceFileId: null,
+    },
+    rid(),
+  );
+  await finance.verify(
+    admin.raw,
+    { id: payment.id, action: "verify", reason: "Meal paid" },
+    rid(),
+  );
+  await finance.allocate(
+    admin.raw,
+    {
+      idempotencyKey: rid(),
+      paymentId: payment.id,
+      orderId: booking.orderId,
+      amount: "10",
+      reason: "Meal settled",
+    },
+    rid(),
+  );
+  const onsite = createOnsiteService(f.app, f.config),
+    pass = await onsite.pass(
+      other.raw,
+      { registrationId: otherRegistration },
+      rid(),
+    );
+  await onsite.redeem(
+    admin.raw,
+    {
+      token: pass.token,
+      bookingId: booking.id,
+      quantity: 1,
+      idempotencyKey: rid(),
+    },
+    rid(),
+  );
+  for (const raw of [other.raw, admin.raw])
+    for (const [url, id] of [
+      ["/api/activities/cancel", booking.id],
+      ["/api/registration/cancel", otherRegistration],
+    ]) {
+      const response = await post(raw, url!, {
+        id,
+        reason: "Redeemed cancellation rejected",
+      });
+      expect(response.statusCode, response.body).toBe(409);
+      expect(response.json().error.code).toBe("CONFLICT");
+    }
+  expect((await activities.mine(other.raw, 0)).items[0]?.state).toBe(
+    "reserved",
+  );
+  expect((await reg.mine(other.raw, 0)).items[0]?.state).toBe("confirmed");
+  expect((await reg.history(other.raw, otherRegistration)).items).toEqual([]);
+  expect(await count()).toBe(before);
 });
 it("activity and registration HTTP cancellation share deadline policy; admin cascade is audited and atomic", async () => {
   const booking = await activities.book(

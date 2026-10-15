@@ -12,8 +12,9 @@ import {context,lockConfiguration} from '../registration/repository.js';
 import {effectivePublicSite} from '../site/branding.js';
 import * as repo from './repository.js';
 import {assertActivityCancellationAllowed} from './cancellation.js';
+import {translateActivityConflict} from './conflicts.js';
 export function createActivitiesService(pool:Pool,config:ApiConfig){
- const authorized=<T>(raw:string|undefined,permission:Permission|null,work:(db:PoolClient,actor:string,admin:boolean)=>Promise<T>)=>withIdentityTransaction(pool,async db=>{await lockAccessShared(db);const actor=await sessionActor(db,raw,config,new Date(),true),roles=await rolesFor(db,actor.id),admin=permissionsFor(roles).includes('registration.manage');if(permission){requirePermission(roles,permission);if(permission==='registration.configure')assertRecentPassword(actor.passwordVerifiedAt,new Date());}await context(db,actor.id,admin);await lockConfiguration(db);return work(db,actor.id,admin);});
+ const authorized=<T>(raw:string|undefined,permission:Permission|null,work:(db:PoolClient,actor:string,admin:boolean)=>Promise<T>)=>withIdentityTransaction(pool,async db=>{await lockAccessShared(db);const actor=await sessionActor(db,raw,config,new Date(),true),roles=await rolesFor(db,actor.id),admin=permissionsFor(roles).includes('registration.manage');if(permission){requirePermission(roles,permission);if(permission==='registration.configure')assertRecentPassword(actor.passwordVerifiedAt,new Date());}await context(db,actor.id,admin);await lockConfiguration(db);try{return await work(db,actor.id,admin);}catch(error){translateActivityConflict(error);}});
  const audit=(db:PoolClient,actor:string,event:string,id:string,reason:string,requestId:string)=>recordAccess(db,{action:event,targetId:actor,actorId:actor,source:'session',reason,before:'',after:id,requestId});
  return {
  catalog:()=>repo.catalog(pool),
