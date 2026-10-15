@@ -693,6 +693,40 @@ it("pins approved presenter identity to each public schedule without granting ma
       ).rows,
     ).toEqual([{ slot_id: slot.id }]);
   });
+  const pendingBasis = id();
+  await f.admin.query(
+    `INSERT INTO confsys.presenter_change_requests(id,submission_id,source_revision_id,expected_submission_version,config_version,requester_id,target_user_id,target_author_index,target_email,projection,reason,expires_at)
+    VALUES($1,$2,$3,1,0,$4,$5,1,$6,'{}','Pending consent fixture',now()+interval '1 day')`,
+    [pendingBasis, saved.id, replacement, author.id, target.id, target.email],
+  );
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await db.query(
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.program_publish','true',true)",
+        [leader.id],
+      );
+      await db.query(
+        "INSERT INTO confsys.program_publication_slots(publication_id,slot_id,submission_id,revision_id,presenter_user_id,presenter_change_id) VALUES($1,$2,$3,$4,$5,$6)",
+        [
+          first.publicationId,
+          id(),
+          saved.id,
+          replacement,
+          target.id,
+          pendingBasis,
+        ],
+      );
+    }),
+  ).rejects.toMatchObject({ code: "23514" });
+  await f.admin.query(
+    "DELETE FROM confsys.presenter_change_requests WHERE id=$1",
+    [pendingBasis],
+  );
+  await expect(
+    f.app.query(
+      "UPDATE confsys.program_publication_slots SET presenter_user_id=null WHERE false",
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
   const laterRevision = await approveChange(replacement, laterTarget, 2);
   expect(await visible(target.raw)).toBe(true);
   expect(await visible(laterTarget.raw)).toBe(false);
