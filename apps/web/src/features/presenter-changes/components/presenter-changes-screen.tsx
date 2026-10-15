@@ -66,9 +66,10 @@ function RequestCard({ row, props }: { row: PresenterChange; props: Props }) {
       )}
       {active && (
         <fieldset disabled={props.busy} className="space-y-2">
-          <label className="block">
+          <label className="block" htmlFor={`presenter-reason-${row.id}`}>
             處理理由（至少 3 字）
             <textarea
+              id={`presenter-reason-${row.id}`}
               required
               minLength={3}
               maxLength={300}
@@ -192,9 +193,10 @@ export function PresenterChangesScreen(props: Props) {
                 aria-describedby="presenter-help"
                 className="grid gap-3"
               >
-                <label>
+                <label htmlFor="presenter-submission">
                   選擇投稿
                   <select
+                    id="presenter-submission"
                     required
                     value={draft.submissionId}
                     onChange={(e) => {
@@ -249,9 +251,10 @@ export function PresenterChangesScreen(props: Props) {
                     下一頁投稿
                   </button>
                 </div>
-                <label>
+                <label htmlFor="presenter-target">
                   新報告者
                   <select
+                    id="presenter-target"
                     required
                     value={draft.targetAuthorIndex}
                     onChange={(e) =>
@@ -271,9 +274,10 @@ export function PresenterChangesScreen(props: Props) {
                       ))}
                   </select>
                 </label>
-                <label>
+                <label htmlFor="presenter-request-reason">
                   申請理由
                   <textarea
+                    id="presenter-request-reason"
                     required
                     minLength={3}
                     maxLength={300}
