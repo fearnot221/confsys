@@ -1,0 +1,83 @@
+# Overlay for ../demo/compose.yaml; Compose >= 2.24.4 (!override).
+x-public-env: &public-env
+  NODE_ENV: production
+  PUBLIC_APP_ORIGIN: https://${DEMO_DOMAIN:?Set DEMO_DOMAIN}
+x-image: &image
+  image: confsys:https-demo
+services:
+  postgres:
+    restart: unless-stopped
+  redis:
+    restart: unless-stopped
+  mailpit:
+    restart: unless-stopped
+    ports: !override
+      - "127.0.0.1:${DEMO_MAIL_PORT:-18025}:8025"
+  clamav:
+    restart: unless-stopped
+  migrate:
+    <<: *image
+  runtime-secrets:
+    image: postgres:17.11-alpine
+    entrypoint: ["/bin/sh", "/etc/confsys/provision-runtime.sh"]
+    volumes:
+      - demo-secrets:/secrets:ro
+      - api-runtime:/runtime-api
+      - worker-runtime:/runtime-worker
+      - ../https-demo/provision-runtime.sh:/etc/confsys/provision-runtime.sh:ro
+    depends_on:
+      secrets: { condition: service_completed_successfully }
+    restart: "no"
+  worker:
+    <<: *image
+    restart: unless-stopped
+    environment:
+      <<: *public-env
+      LOAD_SECRETS: 'set -eu; set -a; . /runtime/runtime.env; set +a'
+    volumes: !override
+      - worker-runtime:/runtime:ro
+    depends_on:
+      runtime-secrets: { condition: service_completed_successfully }
+  api:
+    <<: *image
+    restart: unless-stopped
+    environment:
+      <<: *public-env
+      LOAD_SECRETS: 'set -eu; set -a; . /runtime/runtime.env; set +a'
+    volumes: !override
+      - api-runtime:/runtime:ro
+      - private-storage:/data/private
+    depends_on:
+      runtime-secrets: { condition: service_completed_successfully }
+  web:
+    <<: *image
+    restart: unless-stopped
+    environment: *public-env
+    ports: !reset []
+    volumes: !reset []
+  seed:
+    <<: *image
+    environment:
+      <<: *public-env
+      DEMO_ADMIN_EMAIL: admin@demo.invalid
+  proxy:
+    # Caddy 2.11.7-alpine, verified multi-platform manifest on 2026-10-16.
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DEMO_DOMAIN: ${DEMO_DOMAIN:?Set DEMO_DOMAIN}
+    volumes:
+      - ../https-demo/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web: { condition: service_healthy }
+    mem_limit: 256m
+volumes:
+  api-runtime:
+  worker-runtime:
+  caddy-data:
+  caddy-config:

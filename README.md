@@ -12,6 +12,10 @@ GitHub 主線統一為 `main`；原分支完整歷史與驗證限制見 [分支�
 
 只需 Docker（Compose v2）：`./deploy/demo/demo.sh up` 會建置、啟動完整實例並填入合成示範資料（管理員帳號與已發布的雙語官網），完成後印出網址與隨機產生的登入密碼。說明、設定與限制見 [deploy/demo](deploy/demo/README.md)。這是本機 demo，不是正式部署。
 
+## 網域 HTTPS Demo
+
+`confsys.fearnot.tw` 已設定 Cloudflare 灰雲指向伺服器時，在該伺服器執行 `DEMO_DOMAIN=confsys.fearnot.tw ./deploy/https-demo/demo.sh up`。需 Docker Compose >=2.24.4、curl 及開放 TCP 80／443；Caddy 自動管理憑證，Mailpit 保持私有。完整指令、設定與限制見 [HTTPS demo](deploy/https-demo/README.md)。
+
 ## 本地啟動
 
 使用 Docker Compose v2、Node **24.21.0** 與 pnpm **10.34.7**。先選未使用的 ports；不得停止其他專案服務。
