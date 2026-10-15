@@ -1,3 +1,5 @@
+import { createFinanceReminderService } from "./finance-reminders/service.js";
+import { registerFinanceReminderRoutes } from "./finance-reminders/routes.js";
 import { createPresenterChangesService } from "./presenter-changes/service.js";
 import { registerPresenterChangesRoutes } from "./presenter-changes/routes.js";
 import {assertPrivateStorage} from "./files/storage.js";
@@ -106,6 +108,7 @@ registerSubmissionRoutes(
   createSubmissionService(pool, config, submissionDependencies),
 );
 registerPresenterChangesRoutes(app, config, createPresenterChangesService(pool, config, submissionDependencies));
+registerFinanceReminderRoutes(app, config, createFinanceReminderService(pool, config));
 registerFinanceRoutes(
   app,
   config,

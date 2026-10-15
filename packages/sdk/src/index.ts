@@ -66,6 +66,5 @@ export { createExportJobsClient } from './export-jobs.js';
 export { createBadgeTemplateClient } from "./badge-template.js";
 
 export * from "./presenter-changes.js";
-export { createFinanceClient } from "./finance.js";
 
 export { createFinanceReminderClient } from './finance-reminders.js';

@@ -61,6 +61,7 @@ const managementLinks: readonly {
     title: "報名與候補管理",
     href: "/admin/registration",
   },
+  { permission: "finance.reconcile", title: "未繳費提醒", href: "/finance/reminders" },
   {
     permission: "finance.read",
     title: "人工核帳、團體分配與退款",

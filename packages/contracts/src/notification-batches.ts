@@ -69,6 +69,7 @@ export const notificationBatchInput = z.strictObject({
   scheduledAt: z.iso.datetime().nullable().default(null),
 });
 export const notificationBatch = z.strictObject({
+  kind: z.enum(["general", "payment_reminder"]),
   id: z.uuid(),
   retryOf: z.uuid().nullable(),
   retriedAs: z.uuid().nullable(),

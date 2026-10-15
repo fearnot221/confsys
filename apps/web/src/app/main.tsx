@@ -9,6 +9,7 @@ const AuthApp=lazy(()=>import("../features/auth/entry.js").then(module=>({defaul
 const AccessApp=lazy(()=>import("../features/access/entry.js").then(module=>({default:module.AccessApp})));
 const SiteApp=lazy(()=>import("../features/site/entry.js").then(module=>({default:module.SiteApp})));
 const SubmissionsApp=lazy(()=>import("../features/submissions/entry.js").then(module=>({default:module.SubmissionsApp})));
+const FinanceRemindersApp=lazy(()=>import("../features/finance-reminders/entry.js"));
 const FinanceApp=lazy(()=>import("../features/finance/entry.js").then(module=>({default:module.FinanceApp})));
 const FilesApp=lazy(()=>import("../features/files/entry.js").then(module=>({default:module.FilesApp})));
 const RegistrationApp=lazy(()=>import("../features/registration/entry.js").then(module=>({default:module.RegistrationApp})));
@@ -74,6 +75,7 @@ const pages:Record<string,ReactNode>={
  "/admin/program":<ProgramApp/>,
  "/program":<PublicProgramApp/>,
  "/finance":<FinanceApp/>,
+ "/finance/reminders":<FinanceRemindersApp/>,
  "/admin/finance":<FinanceApp admin/>,
  "/submissions":<SubmissionsApp/>,
  "/admin/submissions":<SubmissionsApp admin/>,

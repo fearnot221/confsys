@@ -1,3 +1,5 @@
+import { financeReminderEndpoints } from "./finance-reminders.js";
+export * from "./finance-reminders.js";
 import { presenterChangeEndpoints } from "./presenter-change.js";
 import {downloadPaths} from "./download-paths.js";
 import {badgeTemplateEndpoints} from "./badge-template.js";
@@ -94,6 +96,7 @@ export function openApiDocument() {
       ...modulePaths(registrationEndpoints),
       ...modulePaths(reviewEndpoints),
       ...modulePaths(financeEndpoints),
+      ...modulePaths(financeReminderEndpoints),
       ...modulePaths(receiptEndpoints),
       ...modulePaths(programEndpoints),
       ...modulePaths(activityEndpoints),
