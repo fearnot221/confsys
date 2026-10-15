@@ -1,7 +1,7 @@
 import {
   DeadlineHistory,
   DeadlineExtension,
-} from "../../../components/deadline-extension.js";
+} from "@confsys/ui";
 import { RegistrationRequirement } from "../../submissions/components/registration-requirement.js";
 import { useState } from "react";
 import type {

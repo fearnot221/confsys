@@ -26,7 +26,7 @@ export async function assertRuntimeRole(
   if (result.rows[0]?.safe !== true)
     throw new Error("Unsafe database runtime role");
 }
-export const REQUIRED_SCHEMA_VERSION = "0055_payment_reminders.sql";
+export const REQUIRED_SCHEMA_VERSION = "0057_reminder_finance_write_policies.sql";
 export async function databaseReady(
   pool: pg.Pool,
   role: "confsys_app" | "confsys_worker",

@@ -1,7 +1,7 @@
 import {
   DeadlineHistory,
   DeadlineExtension,
-} from "../../../components/deadline-extension.js";
+} from "@confsys/ui";
 import { useState } from "react";
 import type {
   CompetitionAdmin,
