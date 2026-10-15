@@ -1,3 +1,4 @@
+import { createServer, type Socket } from "node:net";
 import { Redis } from "ioredis";
 import { buildApp } from "../../apps/api/src/app.js";
 import { registerAuthRoutes } from "../../apps/api/src/auth/routes.js";
@@ -101,6 +102,72 @@ afterAll(async () => {
   );
   await f.cleanup();
   if (root) await rm(root, { recursive: true, force: true });
+});
+it("concurrent scan loser returns committed state without a false transition audit", async () => {
+  const upload = await pending.upload(
+    owner.raw,
+    { purpose: "manuscript", name: "scan-race.png", content: png },
+    rid(),
+  );
+  expect(upload.status).toBe("quarantined");
+  let socket: Socket | undefined;
+  let received!: () => void;
+  const connected = new Promise<void>((resolve) => {
+    received = resolve;
+  });
+  // A real TCP endpoint controls only the unavailable response. Clean detection
+  // still uses the actual local ClamAV instance and real stored file bytes.
+  const server = createServer((client) => {
+    socket = client;
+    client.on("data", () => received());
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing scanner fixture port");
+  const delayed = createFilesService(f.app, f.config, {
+    root,
+    scannerHost: "127.0.0.1",
+    scannerPort: address.port,
+  });
+  const loserRequest = rid(),
+    winnerRequest = rid();
+  let loser: ReturnType<typeof delayed.retry> | undefined;
+  try {
+    loser = delayed.retry(owner.raw, upload.id, loserRequest);
+    await Promise.race([
+      connected,
+      loser.then(() => {
+        throw new Error("Delayed scan unexpectedly finished before release");
+      }),
+    ]);
+    expect(
+      (await files.retry(owner.raw, upload.id, winnerRequest)).status,
+    ).toBe("ready");
+    socket!.end("stream: synthetic unavailable ERROR\0");
+    expect((await loser).status).toBe("ready");
+    const events = (
+      await f.admin.query<{ event: string; request_id: string }>(
+        "SELECT event,request_id FROM confsys.auth_audit WHERE request_id=ANY($1::uuid[]) ORDER BY event",
+        [[loserRequest, winnerRequest]],
+      )
+    ).rows;
+    expect(events).toEqual([
+      { event: "file.scan_ready", request_id: winnerRequest },
+    ]);
+    expect(
+      (await files.download(owner.raw, upload.id, rid())).bytes.length,
+    ).toBeGreaterThan(0);
+  } finally {
+    socket?.destroy();
+    await loser?.catch(() => undefined);
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
 });
 it("real local ClamAV detects EICAR; unavailable scanner quarantines files, retry checks content before release", async () => {
   const eicar = Buffer.from(

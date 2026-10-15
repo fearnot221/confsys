@@ -64,8 +64,9 @@ export function createFilesService(
           : result === "infected"
             ? "rejected"
             : "quarantined";
-      await repo.setStatus(db, id, status);
-      await repo.auditFile(db, actor, id, `file.scan_${status}`, requestId);
+      const changed = await repo.setStatus(db, id, status);
+      if (changed)
+        await repo.auditFile(db, actor, id, `file.scan_${status}`, requestId);
       return repo.projectFile(await repo.findFile(db, row.id));
     });
   };

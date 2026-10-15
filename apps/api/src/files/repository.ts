@@ -92,10 +92,11 @@ export async function setStatus(
   id: string,
   status: FileAsset["status"],
 ) {
-  await db.query(
-    "UPDATE confsys.file_assets SET status=$2 WHERE id=$1 AND status IN ('uploading','quarantined')",
+  const changed = await db.query(
+    "UPDATE confsys.file_assets SET status=$2 WHERE id=$1 AND status IN ('uploading','quarantined') AND status IS DISTINCT FROM $2",
     [id, status],
   );
+  return changed.rowCount === 1;
 }
 export async function auditFile(
   db: PoolClient,
