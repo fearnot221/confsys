@@ -1173,3 +1173,125 @@ it("extends only pending review deadlines with immutable form, scoped history, o
     }),
   ).rejects.toMatchObject({ code: "23514" });
 });
+
+it("pins explicit review rounds and publishes only selected-round comments without rewriting prior scores", async () => {
+  const p = await submitted(),
+    first = await assigned(p);
+  const nextInput = {
+    id: rid(),
+    submissionId: p.id,
+    revisionId: p.currentRevisionId,
+    reviewerId: reviewer.id,
+    formId: form.id,
+    anonymousConfirmed: true,
+    round: 2,
+  };
+  await expect(
+    reviews.assign(admin.raw, nextInput, rid()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const scoredFirst = await score(first);
+  const initial = await decision(p, { round: 1 });
+  await reviews.publish(chair.raw, { id: initial.id }, rid());
+  const firstSnapshot = (
+    await f.admin.query(
+      "SELECT author_comments FROM confsys.review_publication_snapshots WHERE decision_id=$1",
+      [initial.id],
+    )
+  ).rows[0].author_comments;
+  const secondForm = await reviews.configure(
+    admin.raw,
+    {
+      ...form.document,
+      name: "Second round immutable rubric",
+      criteria: [{ id: "quality", label: "Revised quality", max: 10 }],
+    },
+    rid(),
+  );
+  const second = await reviews.assign(
+    admin.raw,
+    { ...nextInput, formId: secondForm.id },
+    rid(),
+  );
+  expect(second.round).toBe(2);
+  expect(second.form.id).toBe(secondForm.id);
+  expect(second.document.scores).toEqual([]);
+  await expect(
+    reviews.assign(
+      admin.raw,
+      { ...nextInput, id: rid(), round: 1, reviewerId: otherReviewer.id },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    reviews.assign(admin.raw, { ...nextInput, id: rid() }, rid()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    decision(p, { round: 3, expectedVersion: initial.version }),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const accepted = await reviews.action(
+    reviewer.raw,
+    { id: second.id, expectedVersion: second.version, action: "accept" },
+    rid(),
+  );
+  await reviews.action(
+    reviewer.raw,
+    {
+      id: accepted.id,
+      expectedVersion: accepted.version,
+      action: "submit",
+      document: {
+        scores: [{ criterionId: "quality", value: 8 }],
+        authorComment: "SECOND_ROUND_COMMENT",
+        privateComment: "SECOND_ROUND_PRIVATE",
+      },
+    },
+    rid(),
+  );
+  const final = await decision(p, {
+    round: 2,
+    expectedVersion: initial.version,
+  });
+  await reviews.publish(chair.raw, { id: final.id }, rid());
+  const published = (
+    await reviews.authorResults(author.raw, { offset: 0 })
+  ).items.find((r) => r.submissionId === p.id)!;
+  expect(published.round).toBe(2);
+  expect(published.authorComments).toEqual(["SECOND_ROUND_COMMENT"]);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT author_comments FROM confsys.review_publication_snapshots WHERE decision_id=$1",
+        [initial.id],
+      )
+    ).rows[0].author_comments,
+  ).toEqual(firstSnapshot);
+  const old = (await reviews.assigned(reviewer.raw, { offset: 0 })).items.find(
+    (a) => a.id === first.id,
+  )!;
+  expect(old.document).toEqual(scoredFirst.document);
+  expect(old.form.id).toBe(form.id);
+  const board = await reviews.board(admin.raw, { offset: 0 });
+  expect(
+    board.rounds.filter((r) => r.revisionId === p.currentRevisionId),
+  ).toEqual([
+    {
+      revisionId: p.currentRevisionId,
+      round: 1,
+      pending: 0,
+      submitted: 1,
+      closed: 0,
+    },
+    {
+      revisionId: p.currentRevisionId,
+      round: 2,
+      pending: 0,
+      submitted: 1,
+      closed: 0,
+    },
+  ]);
+  await expect(
+    withIdentityTransaction(f.app, (db) =>
+      db.query("UPDATE confsys.review_assignments SET round=1 WHERE false"),
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+});

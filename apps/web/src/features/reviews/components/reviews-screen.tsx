@@ -1,7 +1,4 @@
-import {
-  DeadlineHistory,
-  DeadlineExtension,
-} from "@confsys/ui";
+import { DeadlineHistory, DeadlineExtension } from "@confsys/ui";
 import { RegistrationRequirement } from "../../submissions/components/registration-requirement.js";
 import { useState } from "react";
 import type {
@@ -52,6 +49,7 @@ type Props = {
     reviewerId: string,
     formId: string,
     anonymousConfirmed: boolean,
+    round: number,
   ) => void;
   onAction: (
     assignment: ReviewAssignment,
@@ -66,6 +64,7 @@ type Props = {
     authorMessage: string,
     internalReason: string,
     revisionDeadline: string | null,
+    round: number,
   ) => void;
   onPublish: (id: string) => void;
   onDownload: (assignmentId: string, fileId: string) => void;
@@ -108,8 +107,8 @@ function ScoreForm({
     <article className="auth-panel">
       <h3>{assignment.paper.title || "已停止的審查指派"}</h3>
       <p>
-        狀態：{assignment.state} · 評分表版本 {assignment.form.version} · 截止{" "}
-        {assignment.effectiveDeadline}
+        第 {assignment.round} 輪 · 狀態：{assignment.state} · 評分表版本{" "}
+        {assignment.form.version} · 截止 {assignment.effectiveDeadline}
       </p>
       <DeadlineHistory
         original={assignment.form.document.closesAt}
@@ -442,6 +441,9 @@ function Manage({
   onDecide: Props["onDecide"];
   onPublish: Props["onPublish"];
 }) {
+  const [assignRound, setAssignRound] = useState(1),
+    [decisionRound, setDecisionRound] = useState(1),
+    [historyRound, setHistoryRound] = useState("all");
   const [paperId, setPaperId] = useState(""),
     [reviewerId, setReviewerId] = useState(""),
     [formId, setFormId] = useState(""),
@@ -456,6 +458,12 @@ function Manage({
     [internalReason, setInternalReason] = useState(""),
     [deadline, setDeadline] = useState("");
   const paper = board.papers.find((p) => p.submissionId === paperId);
+  const rounds = board.rounds.filter((r) => r.revisionId === paper?.revisionId);
+  const latestRound = rounds.at(-1)?.round ?? 1;
+  const nextAllowed =
+    rounds.length > 0 &&
+    latestRound < 20 &&
+    rounds.every((r) => r.pending === 0);
   return (
     <section className="auth-panel">
       <h2>指派與決議</h2>
@@ -465,6 +473,14 @@ function Manage({
         value={paperId}
         onChange={(e) => {
           setPaperId(e.target.value);
+          const revision = board.papers.find(
+            (p) => p.submissionId === e.target.value,
+          )?.revisionId;
+          const latest =
+            board.rounds.filter((r) => r.revisionId === revision).at(-1)
+              ?.round ?? 1;
+          setAssignRound(latest);
+          setDecisionRound(latest);
           setAnonymous(false);
         }}
       >
@@ -485,9 +501,30 @@ function Manage({
               reviewerId,
               formId,
               anonymous,
+              assignRound,
             );
         }}
       >
+        <label htmlFor="review-round">指派審查輪次</label>
+        <select
+          id="review-round"
+          value={assignRound}
+          onChange={(e) => setAssignRound(Number(e.target.value))}
+        >
+          <option value={latestRound}>第 {latestRound} 輪</option>
+          {nextAllowed && (
+            <option value={latestRound + 1}>新增第 {latestRound + 1} 輪</option>
+          )}
+        </select>
+        <p>
+          新輪次須等前輪所有指派結束；同一委員可再次指派，先前評分表與評語保持原樣。
+        </p>
+        {rounds.map((r) => (
+          <p key={r.round}>
+            第 {r.round} 輪：待完成 {r.pending}、已提交 {r.submitted}、已停止{" "}
+            {r.closed}
+          </p>
+        ))}
         <label htmlFor="review-reviewer">審查委員</label>
         <select
           id="review-reviewer"
@@ -614,54 +651,73 @@ function Manage({
       </label>
       <h3>審查進度與評語</h3>
       {board.assignments.length === 0 && <p>此頁沒有可查看的指派。</p>}
-      {board.assignments.map((a) => (
-        <details key={a.id}>
-          <summary>
-            {a.paper.title} · {a.state} · 委員{" "}
-            {board.reviewers.find((r) => r.id === a.reviewerId)?.email ??
-              a.reviewerId}
-          </summary>
-          <DeadlineHistory
-            original={a.form.document.closesAt}
-            effective={a.effectiveDeadline}
-            history={a.deadlineHistory}
-          />
-          {["invited", "accepted"].includes(a.state) && (
-            <DeadlineExtension
-              busy={busy}
-              onExtend={(deadline, reason) =>
-                onExtendDeadline(a, deadline, reason)
-              }
+      <label htmlFor="review-history-round">歷史指派輪次篩選（此頁）</label>
+      <select
+        id="review-history-round"
+        value={historyRound}
+        onChange={(e) => setHistoryRound(e.target.value)}
+      >
+        <option value="all">全部輪次</option>
+        {[...new Set(board.assignments.map((a) => a.round))]
+          .sort((a, b) => a - b)
+          .map((r) => (
+            <option key={r} value={r}>
+              第 {r} 輪
+            </option>
+          ))}
+      </select>
+      {board.assignments
+        .filter(
+          (a) => historyRound === "all" || a.round === Number(historyRound),
+        )
+        .map((a) => (
+          <details key={a.id}>
+            <summary>
+              {a.paper.title} · 第 {a.round} 輪 · {a.state} · 委員{" "}
+              {board.reviewers.find((r) => r.id === a.reviewerId)?.email ??
+                a.reviewerId}
+            </summary>
+            <DeadlineHistory
+              original={a.form.document.closesAt}
+              effective={a.effectiveDeadline}
+              history={a.deadlineHistory}
             />
-          )}
-          <p>
-            版本 {a.revisionId} · 初檢 {a.screening}
-          </p>
-          <button
-            disabled={
-              busy ||
-              reminderReason.trim().length < 3 ||
-              !["invited", "accepted"].includes(a.state)
-            }
-            onClick={() => onRemind(a.id, reminderReason)}
-          >
-            提醒此待審委員
-          </button>
-          <ul>
-            {a.document.scores.map((s) => (
-              <li key={s.criterionId}>
-                {
-                  a.form.document.criteria.find((c) => c.id === s.criterionId)
-                    ?.label
+            {["invited", "accepted"].includes(a.state) && (
+              <DeadlineExtension
+                busy={busy}
+                onExtend={(deadline, reason) =>
+                  onExtendDeadline(a, deadline, reason)
                 }
-                : {s.value}
-              </li>
-            ))}
-          </ul>
-          <p>給作者：{a.document.authorComment}</p>
-          <p>內部：{a.document.privateComment}</p>
-        </details>
-      ))}
+              />
+            )}
+            <p>
+              版本 {a.revisionId} · 初檢 {a.screening}
+            </p>
+            <button
+              disabled={
+                busy ||
+                reminderReason.trim().length < 3 ||
+                !["invited", "accepted"].includes(a.state)
+              }
+              onClick={() => onRemind(a.id, reminderReason)}
+            >
+              提醒此待審委員
+            </button>
+            <ul>
+              {a.document.scores.map((s) => (
+                <li key={s.criterionId}>
+                  {
+                    a.form.document.criteria.find((c) => c.id === s.criterionId)
+                      ?.label
+                  }
+                  : {s.value}
+                </li>
+              ))}
+            </ul>
+            <p>給作者：{a.document.authorComment}</p>
+            <p>內部：{a.document.privateComment}</p>
+          </details>
+        ))}
       {canDecide && (
         <form
           onSubmit={(e) => {
@@ -676,10 +732,24 @@ function Manage({
                 outcome === "revision_requested"
                   ? new Date(deadline).toISOString()
                   : null,
+                decisionRound,
               );
           }}
         >
           <h3>主席決議草稿</h3>
+          <label htmlFor="review-decision-round">決議依據輪次</label>
+          <select
+            id="review-decision-round"
+            value={decisionRound}
+            onChange={(e) => setDecisionRound(Number(e.target.value))}
+          >
+            {(rounds.length ? rounds.map((r) => r.round) : [1]).map((r) => (
+              <option key={r} value={r}>
+                第 {r} 輪
+              </option>
+            ))}
+          </select>
+          <p>發布只擷取所選輪次已正式提交的作者評語；不混入其他輪次。</p>
           <label htmlFor="review-outcome">決議</label>
           <select
             id="review-outcome"
@@ -757,7 +827,7 @@ function Manage({
           <p>
             {board.papers.find((p) => p.submissionId === d.submissionId)
               ?.title ?? d.submissionId}{" "}
-            · 決議 v{d.version} · {d.outcome} ·{" "}
+            · 第 {d.round} 輪 · 決議 v{d.version} · {d.outcome} ·{" "}
             {d.published ? "目前已發布" : "草稿／歷史版本"}
           </p>
           <p>{d.authorMessage}</p>
@@ -837,7 +907,7 @@ export function ReviewsScreen(props: Props) {
             <article key={r.submissionId}>
               <h3>投稿 {r.submissionId}</h3>
               <p>
-                {r.outcome} · 發布 {r.publishedAt}
+                第 {r.round} 輪 · {r.outcome} · 發布 {r.publishedAt}
               </p>
               <p>{r.authorMessage}</p>
               <RegistrationRequirement

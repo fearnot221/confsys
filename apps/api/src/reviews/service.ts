@@ -71,6 +71,7 @@ async function projection(
   if (!form) throw new AuthError("CONFLICT");
   const masked = {
     id: row.id,
+    round: row.round,
     submissionId: row.submission_id,
     revisionId: row.revision_id,
     state: row.state,
@@ -231,6 +232,13 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
         }
         return {
           screenings,
+          rounds: await repo.roundProgress(db, [
+            ...new Set([
+              ...papers.slice(0, 20).map((p) => p.revisionId),
+              ...items.map((a) => a.revisionId),
+              ...visibleDecisions.map((d) => d.revisionId),
+            ]),
+          ]),
           workload: await repo.workload(
             db,
             reviewers.slice(0, 20).map((r) => r.id),
@@ -560,16 +568,26 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
             existing.submission_id !== data.submissionId ||
             existing.revision_id !== data.revisionId ||
             existing.reviewer_id !== data.reviewerId ||
-            existing.form_id !== data.formId
+            existing.form_id !== data.formId ||
+            existing.round !== data.round
           )
             throw new AuthError("CONFLICT");
           return projection(db, existing, actor, true);
         }
         const duplicate = await db.query(
-          "SELECT 1 FROM confsys.review_assignments WHERE revision_id=$1 AND reviewer_id=$2",
-          [data.revisionId, data.reviewerId],
+          "SELECT 1 FROM confsys.review_assignments WHERE revision_id=$1 AND reviewer_id=$2 AND round=$3",
+          [data.revisionId, data.reviewerId, data.round],
         );
         if (duplicate.rowCount) throw new AuthError("CONFLICT");
+        const rounds = await repo.roundProgress(db, [data.revisionId]);
+        const latest = rounds.at(-1)?.round ?? 0;
+        if (
+          (latest === 0 && data.round !== 1) ||
+          data.round < latest ||
+          data.round > latest + 1 ||
+          (data.round > latest && rounds.some((r) => r.pending > 0))
+        )
+          throw new AuthError("CONFLICT");
         await repo.createAssignment(db, data, actor.id);
         const row = await repo.assignment(db, data.id);
         if (!row) throw new Error("Missing assignment");
@@ -694,6 +712,7 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
           if (
             prior.submission_id !== data.submissionId ||
             prior.revision_id !== data.revisionId ||
+            prior.round !== data.round ||
             prior.outcome !== data.outcome ||
             prior.author_message !== data.authorMessage ||
             prior.internal_reason !== data.internalReason ||
@@ -706,6 +725,13 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
         if (
           (await repo.decisionVersion(db, data.submissionId)) !==
           data.expectedVersion
+        )
+          throw new AuthError("CONFLICT");
+        if (
+          data.round > 1 &&
+          !(await repo.roundProgress(db, [data.revisionId])).some(
+            (r) => r.round === data.round,
+          )
         )
           throw new AuthError("CONFLICT");
         await repo.createDecision(db, data, actor.id);
@@ -750,8 +776,8 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
         if (row.revision_deadline && row.revision_deadline <= new Date())
           throw new AuthError("CONFLICT");
         await db.query(
-          `INSERT INTO confsys.review_publication_snapshots(decision_id,author_comments) SELECT $1,coalesce(jsonb_agg(a.document->>'authorComment' ORDER BY a.id),'[]'::jsonb) FROM confsys.review_assignments a WHERE a.revision_id=$2 AND a.state='submitted' ON CONFLICT(decision_id) DO NOTHING`,
-          [row.id, row.revision_id],
+          `INSERT INTO confsys.review_publication_snapshots(decision_id,author_comments) SELECT $1,coalesce(jsonb_agg(a.document->>'authorComment' ORDER BY a.id),'[]'::jsonb) FROM confsys.review_assignments a WHERE a.revision_id=$2 AND a.round=$3 AND a.state='submitted' ON CONFLICT(decision_id) DO NOTHING`,
+          [row.id, row.revision_id, row.round],
         );
         await repo.publishDecision(db, row, actor.id);
         if (row.outcome === "revision_requested")

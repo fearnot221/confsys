@@ -216,6 +216,7 @@ export function useReviews() {
       reviewerId: string,
       formId: string,
       anonymousConfirmed: boolean,
+      round: number,
     ) =>
       void perform(async (signal) => {
         const input = {
@@ -224,6 +225,7 @@ export function useReviews() {
           reviewerId,
           formId,
           anonymousConfirmed,
+          round,
         };
         await client.assign({ ...input, id: stableId(input) }, signal);
         return "已指派不可變投稿版本並排入通知。";
@@ -256,6 +258,7 @@ export function useReviews() {
       authorMessage: string,
       internalReason: string,
       revisionDeadline: string | null,
+      round: number,
     ) =>
       void perform(async (signal) => {
         const expectedVersion = Math.max(
@@ -271,6 +274,7 @@ export function useReviews() {
           authorMessage,
           internalReason,
           revisionDeadline,
+          round,
           expectedVersion,
         };
         await client.decide({ ...input, id: stableId(input) }, signal);

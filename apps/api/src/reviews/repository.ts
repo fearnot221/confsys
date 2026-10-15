@@ -19,6 +19,7 @@ export type PaperRow = {
   current_revision_id: string | null;
 };
 export type AssignmentRow = {
+  round: number;
   id: string;
   submission_id: string;
   revision_id: string;
@@ -30,6 +31,7 @@ export type AssignmentRow = {
   document: unknown;
 };
 export type DecisionRow = {
+  round: number;
   id: string;
   submission_id: string;
   revision_id: string;
@@ -196,11 +198,12 @@ export async function createAssignment(
     reviewerId: string;
     formId: string;
     anonymousConfirmed: boolean;
+    round: number;
   },
   actorId: string,
 ) {
   await db.query(
-    `INSERT INTO confsys.review_assignments(id,submission_id,revision_id,reviewer_id,form_id,state,anonymous_confirmed,created_by) VALUES ($1,$2,$3,$4,$5,'invited',$6,$7)`,
+    `INSERT INTO confsys.review_assignments(id,submission_id,revision_id,reviewer_id,form_id,state,anonymous_confirmed,created_by,round) VALUES ($1,$2,$3,$4,$5,'invited',$6,$7,$8)`,
     [
       input.id,
       input.submissionId,
@@ -209,6 +212,7 @@ export async function createAssignment(
       input.formId,
       input.anonymousConfirmed,
       actorId,
+      input.round,
     ],
   );
 }
@@ -241,6 +245,7 @@ export async function decision(db: PoolClient, id: string) {
 export function decisionDto(row: DecisionRow): ReviewDecision {
   return {
     id: row.id,
+    round: row.round,
     submissionId: row.submission_id,
     revisionId: row.revision_id,
     version: row.version,
@@ -284,11 +289,12 @@ export async function createDecision(
     authorMessage: string;
     internalReason: string;
     revisionDeadline: string | null;
+    round: number;
   },
   actorId: string,
 ) {
   await db.query(
-    `INSERT INTO confsys.review_decisions(id,submission_id,revision_id,version,outcome,author_message,internal_reason,revision_deadline,decided_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    `INSERT INTO confsys.review_decisions(id,submission_id,revision_id,version,outcome,author_message,internal_reason,revision_deadline,decided_by,round) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
     [
       input.id,
       input.submissionId,
@@ -299,6 +305,7 @@ export async function createDecision(
       input.internalReason,
       input.revisionDeadline,
       actorId,
+      input.round,
     ],
   );
 }
@@ -321,13 +328,14 @@ export async function authorResults(
     await db.query<{
       submissionId: string;
       revisionId: string;
+      round: number;
       outcome: ReviewDecision["outcome"];
       authorMessage: string;
       revisionDeadline: Date | null;
       publishedAt: Date;
       authorComments: string[];
     }>(
-      `SELECT revision_id AS "revisionId",submission_id AS "submissionId",outcome,author_message AS "authorMessage",revision_deadline AS "revisionDeadline",published_at AS "publishedAt",author_comments AS "authorComments" FROM confsys.review_author_results ORDER BY published_at DESC,submission_id LIMIT 21 OFFSET $1`,
+      `SELECT round,revision_id AS "revisionId",submission_id AS "submissionId",outcome,author_message AS "authorMessage",revision_deadline AS "revisionDeadline",published_at AS "publishedAt",author_comments AS "authorComments" FROM confsys.review_author_results ORDER BY published_at DESC,submission_id LIMIT 21 OFFSET $1`,
       [offset],
     )
   ).rows;
@@ -553,4 +561,19 @@ export async function deadlineExtensionAllowed(
       )
     ).rows[0]?.allowed === true
   );
+}
+
+export async function roundProgress(db: PoolClient, revisionIds: string[]) {
+  return (
+    await db.query<{
+      revisionId: string;
+      round: number;
+      pending: number;
+      submitted: number;
+      closed: number;
+    }>(
+      `SELECT revision_id AS "revisionId",round,count(*) FILTER(WHERE state IN('invited','accepted'))::int AS pending,count(*) FILTER(WHERE state='submitted')::int AS submitted,count(*) FILTER(WHERE state IN('declined','conflicted'))::int AS closed FROM confsys.review_assignments WHERE revision_id=ANY($1::uuid[]) GROUP BY revision_id,round ORDER BY revision_id,round`,
+      [revisionIds],
+    )
+  ).rows;
 }
