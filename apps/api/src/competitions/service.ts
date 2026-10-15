@@ -321,6 +321,61 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
         return repo.admin(db);
       });
     },
+    extendDeadline: (
+      raw: string | undefined,
+      input: unknown,
+      requestId: string,
+    ) => {
+      const d =
+        competitionEndpoints.competitionExtendDeadline.input.parse(input);
+      return authorized(raw, "competitions.manage", true, async (db, actor) => {
+        const a = await repo.assignment(db, d.assignmentId, true);
+        await repo.assertLatestEntry(db, a.entryId);
+        const prior = await repo.extensionById(db, d.id);
+        if (prior) {
+          if (
+            prior.assignment_id !== a.id ||
+            prior.assignment_version !== d.expectedVersion + 1 ||
+            prior.deadline.toISOString() !== d.deadline ||
+            prior.reason !== d.reason
+          )
+            throw new AuthError("CONFLICT");
+          return a;
+        }
+        verifyVersion(a.version, d.expectedVersion);
+        if (
+          a.state !== "assigned" ||
+          a.deadlineHistory.length >= 50 ||
+          Date.parse(d.deadline) <= Date.parse(a.effectiveDeadline) ||
+          !(await repo.deadlineExtensionAllowed(db, d.deadline))
+        )
+          throw new AuthError("CONFLICT");
+        const e = await repo.entry(db, a.entryId);
+        if (e.state !== "approved" || !(await repo.judgingEligible(db, a.id)))
+          throw new AuthError("CONFLICT");
+        await eligible(db, e.revisionId, a.config);
+        await repo.actorEmail(db, a.judgeId);
+        requirePermission(await rolesFor(db, a.judgeId), "competitions.score");
+        await repo.extendDeadline(db, d, a.effectiveDeadline, actor);
+        await repo.bump(db, a.competitionId, a.entryId, a.id);
+        await repo.audit(
+          db,
+          actor,
+          "competition.deadline_extended",
+          d.id,
+          requestId,
+          d.reason,
+        );
+        await notify(
+          db,
+          a.judgeId,
+          `competition-deadline:${d.id}`,
+          "競賽評分期限已展延",
+          requestId,
+        );
+        return repo.assignment(db, a.id);
+      });
+    },
     remind: (raw: string | undefined, input: unknown, requestId: string) => {
       const d = competitionEndpoints.competitionRemind.input.parse(input);
       return authorized(raw, "competitions.manage", true, async (db, actor) => {
@@ -329,7 +384,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
         const e = await repo.entry(db, a.entryId);
         if (e.state !== "approved") throw new AuthError("CONFLICT");
         await eligible(db, e.revisionId, a.config);
-        beforeDeadline(a.config.judgingClosesAt);
+        beforeDeadline(a.effectiveDeadline);
         requirePermission(await rolesFor(db, a.judgeId), "competitions.score");
         await notify(
           db,
@@ -404,7 +459,7 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
         verifyVersion(a.version, d.expectedVersion);
         if (a.state !== "assigned" || !(await repo.judgingEligible(db, a.id)))
           throw new AuthError("FORBIDDEN");
-        beforeDeadline(a.config.judgingClosesAt);
+        beforeDeadline(a.effectiveDeadline);
         await repo.score(
           db,
           a.id,

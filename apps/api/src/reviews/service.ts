@@ -35,7 +35,7 @@ type Actor = { id: string; email: string };
 async function noConflict(db: PoolClient, paper: repo.PaperRow, actor: Actor) {
   if (
     paper.owner_id === actor.id ||
-    (await isRevisionAuthorAccount(db,paper.id,actor.id)) ||
+    (await isRevisionAuthorAccount(db, paper.id, actor.id)) ||
     (await repo.hasConflict(db, paper.submission_id, actor.id))
   )
     throw new AuthError("FORBIDDEN");
@@ -84,6 +84,7 @@ async function projection(
       authors: [],
     },
     form,
+    ...(await repo.deadlineHistory(db, row.id, form.document.closesAt)),
     screening: await repo.screeningStatus(db, row.revision_id),
     document: { scores: [], authorComment: "", privateComment: "" },
   };
@@ -414,6 +415,65 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
         return saved;
       });
     },
+    async extendDeadline(
+      raw: string | undefined,
+      input: unknown,
+      requestId: string,
+    ) {
+      const data = reviewEndpoints.reviewExtendDeadline.input.parse(input);
+      return transaction(raw, "reviews.manage", true, async (db, actor) => {
+        const row = await repo.assignment(db, data.assignmentId, true);
+        if (!row) throw new AuthError("NOT_FOUND");
+        const view = await projection(db, row, actor, true);
+        const prior = await repo.extensionById(db, data.id);
+        if (prior) {
+          if (
+            prior.assignment_id !== row.id ||
+            prior.assignment_version !== data.expectedVersion + 1 ||
+            prior.deadline.toISOString() !== data.deadline ||
+            prior.reason !== data.reason
+          )
+            throw new AuthError("CONFLICT");
+          return view;
+        }
+        if (
+          row.version !== data.expectedVersion ||
+          !["invited", "accepted"].includes(row.state) ||
+          view.deadlineHistory.length >= 50 ||
+          Date.parse(data.deadline) <= Date.parse(view.effectiveDeadline) ||
+          !(await repo.deadlineExtensionAllowed(db, data.deadline))
+        )
+          throw new AuthError("CONFLICT");
+        const reviewer = await accountById(db, row.reviewer_id);
+        if (
+          reviewer.state !== "active" ||
+          !reviewer.verified ||
+          !permissionsFor(reviewer.roles).includes("reviews.assigned")
+        )
+          throw new AuthError("CONFLICT");
+        const paper = await repo.paper(db, row.revision_id);
+        if (!paper) throw new AuthError("NOT_FOUND");
+        await noConflict(db, paper, { id: reviewer.id, email: reviewer.email });
+        await repo.extendDeadline(db, data, view.effectiveDeadline, actor.id);
+        await safeAudit(
+          db,
+          actor,
+          "review.deadline_extended",
+          data.id,
+          requestId,
+        );
+        await notify(
+          db,
+          reviewer.id,
+          `review-deadline:${data.id}`,
+          "審查期限已展延 / Review deadline extended",
+          requestId,
+        );
+        const updated = await repo.assignment(db, row.id);
+        if (!updated) throw new Error("Missing extended assignment");
+        return projection(db, updated, actor, true);
+      });
+    },
     async remind(raw: string | undefined, input: unknown, requestId: string) {
       const data = reviewEndpoints.reviewRemind.input.parse(input);
       return transaction(raw, "reviews.manage", true, async (db, actor) => {
@@ -427,7 +487,7 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
           row.revision_id,
           view.form.document.requireScreening,
         );
-        if (Date.parse(view.form.document.closesAt) <= Date.now())
+        if (Date.parse(view.effectiveDeadline) <= Date.now())
           throw new AuthError("CONFLICT");
         const reviewer = await accountById(db, row.reviewer_id);
         if (
@@ -556,7 +616,7 @@ export function createReviewService(pool: Pool, config: ApiConfig) {
             row.state === "submitted"
           )
             throw new AuthError("CONFLICT");
-          if (new Date(detail.form.document.closesAt) <= new Date())
+          if (new Date(detail.effectiveDeadline) <= new Date())
             throw new AuthError("CONFLICT");
           if (data.action === "accept" || data.action === "decline") {
             if (row.state !== "invited") throw new AuthError("CONFLICT");

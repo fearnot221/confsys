@@ -206,6 +206,10 @@ beforeAll(async () => {
   );
 });
 afterAll(async () => {
+  await f.admin.query(
+    "DELETE FROM confsys.review_deadline_extensions WHERE assignment_id IN(SELECT id FROM confsys.review_assignments WHERE created_by=$1)",
+    [admin.id],
+  );
   const ids = (
     await f.admin.query<{ id: string }>(
       "SELECT id FROM confsys.users WHERE email LIKE $1",
@@ -1048,4 +1052,124 @@ it("changing a verified coauthor email cannot evade reviewer assignment or manag
       (row) => row.submissionId === paper.id,
     ),
   ).toBe(false);
+});
+
+it("extends only pending review deadlines with immutable form, scoped history, optimistic concurrency and replay", async () => {
+  const p = await submitted(),
+    localForm = await reviews.configure(
+      admin.raw,
+      {
+        name: "Deadline fixture",
+        mode: "single_blind",
+        closesAt: new Date(Date.now() + 60000).toISOString(),
+        criteria: [{ id: "quality", label: "Quality", max: 5 }],
+      },
+      rid(),
+    );
+  let a = await assigned(p, reviewer, localForm.id);
+  // Operator-only fixture simulates the pinned form having elapsed without waiting.
+  const expired = new Date(Date.now() - 60000).toISOString();
+  await f.admin.query(
+    "UPDATE confsys.review_forms SET document=jsonb_set(document,'{closesAt}',to_jsonb($2::text)) WHERE id=$1",
+    [localForm.id, expired],
+  );
+  await expect(score(a)).rejects.toMatchObject({ code: "CONFLICT" });
+  const input = {
+    id: rid(),
+    assignmentId: a.id,
+    expectedVersion: a.version,
+    deadline: new Date(Date.now() + 7200000).toISOString(),
+    reason: "Explicit synthetic extension",
+  };
+  await expect(
+    reviews.extendDeadline(reviewer.raw, input, rid()),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  const extended = await reviews.extendDeadline(admin.raw, input, rid());
+  expect(extended.form.document.closesAt).toBe(expired);
+  expect(extended.effectiveDeadline).toBe(input.deadline);
+  expect(extended.deadlineHistory).toHaveLength(1);
+  expect(JSON.stringify(extended.deadlineHistory)).not.toContain(admin.id);
+  expect(await reviews.extendDeadline(admin.raw, input, rid())).toEqual(
+    extended,
+  );
+  await expect(
+    reviews.extendDeadline(
+      admin.raw,
+      { ...input, reason: "Different replay reason" },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await expect(
+    reviews.extendDeadline(admin.raw, { ...input, id: rid() }, rid()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const requests = [0, 1].map(() => ({
+    ...input,
+    id: rid(),
+    expectedVersion: extended.version,
+    deadline: new Date(Date.now() + 10800000).toISOString(),
+  }));
+  const raced = await Promise.allSettled(
+    requests.map((d) => reviews.extendDeadline(admin.raw, d, rid())),
+  );
+  expect(raced.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  a = (await reviews.assigned(reviewer.raw, { offset: 0 })).items.find(
+    (x) => x.id === a.id,
+  )!;
+  expect(a.deadlineHistory).toHaveLength(2);
+  await reviews.remind(
+    admin.raw,
+    {
+      assignmentId: a.id,
+      idempotencyKey: rid(),
+      reason: "Extended pending assignment",
+    },
+    rid(),
+  );
+  const done = await score(a);
+  await expect(
+    reviews.extendDeadline(
+      admin.raw,
+      {
+        ...input,
+        id: rid(),
+        expectedVersion: done.version,
+        deadline: new Date(Date.now() + 14400000).toISOString(),
+      },
+      rid(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await withIdentityTransaction(f.app, async (db) => {
+    await context(db, otherReviewer.id, false);
+    expect(
+      (
+        await db.query(
+          "SELECT id FROM confsys.review_deadline_extensions WHERE assignment_id=$1",
+          [a.id],
+        )
+      ).rowCount,
+    ).toBe(0);
+  });
+  await expect(
+    withIdentityTransaction(f.app, (db) =>
+      db.query(
+        "UPDATE confsys.review_deadline_extensions SET reason='rewritten' WHERE false",
+      ),
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await context(db, admin.id, true);
+      return db.query(
+        "INSERT INTO confsys.review_deadline_extensions(id,assignment_id,assignment_version,previous_deadline,deadline,reason,created_by) VALUES($1,$2,$3,$4,$5,'Forged basis',$6)",
+        [
+          rid(),
+          a.id,
+          done.version + 1,
+          expired,
+          new Date(Date.now() + 14400000),
+          admin.id,
+        ],
+      );
+    }),
+  ).rejects.toMatchObject({ code: "23514" });
 });

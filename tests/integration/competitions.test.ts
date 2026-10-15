@@ -209,6 +209,10 @@ beforeAll(async () => {
   );
 });
 afterAll(async () => {
+  await f.admin.query(
+    "DELETE FROM confsys.competition_deadline_extensions WHERE assignment_id IN(SELECT id FROM confsys.competition_assignments WHERE competition_id=ANY($1::uuid[]))",
+    [competitionIds],
+  );
   if (leader) {
     await f.admin.query(
       "UPDATE confsys.competitions SET active_publication_id=null,current_rubric_id=null WHERE id=ANY($1::uuid[])",
@@ -1216,4 +1220,114 @@ it("isolates competition drafts and rubric/publication history while preserving 
     ]);
   });
   expect((await current(c)).version).toBe(before + 1);
+});
+
+it("extends pending competition assignments without replacing the pinned rubric or allowing stale writes", async () => {
+  const compId = await competition(),
+    p = await paper(),
+    e = await enroll(compId, p);
+  await approve(e);
+  let a = await assignment(e.id);
+  const original = new Date(Date.now() - 60000).toISOString();
+  await f.admin.query(
+    "UPDATE confsys.competition_rubrics SET document=jsonb_set(document,'{judgingClosesAt}',to_jsonb($2::text)) WHERE id=$1",
+    [a.rubricId, original],
+  );
+  await expect(submit(a)).rejects.toMatchObject({ code: "CONFLICT" });
+  const input = {
+    id: id(),
+    assignmentId: a.id,
+    expectedVersion: a.version,
+    deadline: new Date(Date.now() + 7200000).toISOString(),
+    reason: "Synthetic deadline extension",
+  };
+  await expect(
+    svc.extendDeadline(judge.raw, input, id()),
+  ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  const extended = await svc.extendDeadline(leader.raw, input, id());
+  expect(extended.config.judgingClosesAt).toBe(original);
+  expect(extended.effectiveDeadline).toBe(input.deadline);
+  expect(extended.deadlineHistory).toHaveLength(1);
+  expect(await svc.extendDeadline(leader.raw, input, id())).toEqual(extended);
+  await expect(
+    svc.extendDeadline(leader.raw, { ...input, id: id() }, id()),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  const raced = await Promise.allSettled(
+    [0, 1].map(() =>
+      svc.extendDeadline(
+        leader.raw,
+        {
+          ...input,
+          id: id(),
+          expectedVersion: extended.version,
+          deadline: new Date(Date.now() + 10800000).toISOString(),
+        },
+        id(),
+      ),
+    ),
+  );
+  expect(raced.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  a = (await svc.judging(judge.raw)).assignments.find((x) => x.id === a.id)!;
+  expect(a.deadlineHistory).toHaveLength(2);
+  await svc.remind(
+    leader.raw,
+    {
+      assignmentId: a.id,
+      idempotencyKey: id(),
+      reason: "Extended pending deadline",
+    },
+    id(),
+  );
+  await submit(a);
+  await expect(
+    svc.extendDeadline(
+      leader.raw,
+      {
+        ...input,
+        id: id(),
+        expectedVersion: a.version + 1,
+        deadline: new Date(Date.now() + 14400000).toISOString(),
+      },
+      id(),
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  await withIdentityTransaction(f.app, async (db) => {
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [
+      otherJudge.id,
+    ]);
+    expect(
+      (
+        await db.query(
+          "SELECT id FROM confsys.competition_deadline_extensions WHERE assignment_id=$1",
+          [a.id],
+        )
+      ).rowCount,
+    ).toBe(0);
+  });
+  await expect(
+    withIdentityTransaction(f.app, (db) =>
+      db.query(
+        "UPDATE confsys.competition_deadline_extensions SET reason='rewrite' WHERE false",
+      ),
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await db.query(
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.competitions_manage','true',true)",
+        [leader.id],
+      );
+      return db.query(
+        "INSERT INTO confsys.competition_deadline_extensions(id,assignment_id,assignment_version,previous_deadline,deadline,reason,created_by) VALUES($1,$2,$3,$4,$5,'Forged basis',$6)",
+        [
+          id(),
+          a.id,
+          a.version + 2,
+          original,
+          new Date(Date.now() + 14400000),
+          leader.id,
+        ],
+      );
+    }),
+  ).rejects.toMatchObject({ code: "23514" });
 });

@@ -34,6 +34,8 @@ export function registerCompetitionRoutes(
         if ("input" in spec && !spec.input.safeParse(input).success)
           throw new AuthError("INVALID_REQUEST");
         switch (name) {
+          case "competitionExtendDeadline":
+            return service.extendDeadline(raw, input, req.id);
           case "competitionPublic":
             return service.public();
           case "competitionCatalog":

@@ -1,3 +1,7 @@
+import {
+  DeadlineHistory,
+  DeadlineExtension,
+} from "../../../components/deadline-extension.js";
 import { RegistrationRequirement } from "../../submissions/components/registration-requirement.js";
 import { useState } from "react";
 import type {
@@ -32,6 +36,11 @@ type Props = {
     submissionId: string,
     revisionId: string,
     outcome: ReviewScreening["outcome"],
+    reason: string,
+  ) => void;
+  onExtendDeadline: (
+    assignment: ReviewAssignment,
+    deadline: string,
     reason: string,
   ) => void;
   onRemind: (assignmentId: string, reason: string) => void;
@@ -100,8 +109,13 @@ function ScoreForm({
       <h3>{assignment.paper.title || "已停止的審查指派"}</h3>
       <p>
         狀態：{assignment.state} · 評分表版本 {assignment.form.version} · 截止{" "}
-        {assignment.form.document.closesAt}
+        {assignment.effectiveDeadline}
       </p>
+      <DeadlineHistory
+        original={assignment.form.document.closesAt}
+        effective={assignment.effectiveDeadline}
+        history={assignment.deadlineHistory}
+      />
       <p>
         行政初檢：{assignment.screening}
         {blocked ? "；目前停止接受與評分，仍可婉拒或申報衝突。" : ""}
@@ -412,6 +426,7 @@ function Manage({
   onAssign,
   onScreen,
   onRemind,
+  onExtendDeadline,
   onConflict,
   onDecide,
   onPublish,
@@ -422,6 +437,7 @@ function Manage({
   onAssign: Props["onAssign"];
   onScreen: Props["onScreen"];
   onRemind: Props["onRemind"];
+  onExtendDeadline: Props["onExtendDeadline"];
   onConflict: Props["onConflict"];
   onDecide: Props["onDecide"];
   onPublish: Props["onPublish"];
@@ -605,6 +621,19 @@ function Manage({
             {board.reviewers.find((r) => r.id === a.reviewerId)?.email ??
               a.reviewerId}
           </summary>
+          <DeadlineHistory
+            original={a.form.document.closesAt}
+            effective={a.effectiveDeadline}
+            history={a.deadlineHistory}
+          />
+          {["invited", "accepted"].includes(a.state) && (
+            <DeadlineExtension
+              busy={busy}
+              onExtend={(deadline, reason) =>
+                onExtendDeadline(a, deadline, reason)
+              }
+            />
+          )}
           <p>
             版本 {a.revisionId} · 初檢 {a.screening}
           </p>
@@ -777,6 +806,7 @@ export function ReviewsScreen(props: Props) {
           onAssign={props.onAssign}
           onScreen={props.onScreen}
           onRemind={props.onRemind}
+          onExtendDeadline={props.onExtendDeadline}
           onConflict={props.onConflict}
           onDecide={props.onDecide}
           onPublish={props.onPublish}

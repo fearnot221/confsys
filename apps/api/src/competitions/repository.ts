@@ -244,7 +244,10 @@ export async function assignment(db: PoolClient, id: string, lock = false) {
     )
   ).rows[0];
   if (!r) throw new AuthError("NOT_FOUND");
-  return competitionAssignmentSchema.parse(r);
+  return competitionAssignmentSchema.parse({
+    ...r,
+    ...(await deadlineHistory(db, r.id, r.config.judgingClosesAt)),
+  });
 }
 export async function assignments(
   db: PoolClient,
@@ -258,10 +261,16 @@ export async function assignments(
       [judgeId, entryIds, offset, judgeId ? 21 : 401],
     )
   ).rows;
+  const items = [];
+  for (const r of rows.slice(0, judgeId ? 20 : 400))
+    items.push(
+      competitionAssignmentSchema.parse({
+        ...r,
+        ...(await deadlineHistory(db, r.id, r.config.judgingClosesAt)),
+      }),
+    );
   return {
-    assignments: rows
-      .slice(0, judgeId ? 20 : 400)
-      .map((r) => competitionAssignmentSchema.parse(r)),
+    assignments: items,
     nextOffset:
       rows.length > (judgeId ? 20 : 400) ? offset + (judgeId ? 20 : 400) : null,
   };
@@ -554,4 +563,90 @@ export async function assertLatestEntry(db: PoolClient, entryId: string) {
     [entryId],
   );
   if (!r.rows[0]?.current) throw new AuthError("CONFLICT");
+}
+
+// One deadline projection per domain keeps scoring, reminders and assignment views aligned.
+export async function deadlineHistory(
+  db: PoolClient,
+  assignmentId: string,
+  original: string,
+) {
+  const rows = (
+    await db.query<{
+      id: string;
+      previous_deadline: Date;
+      deadline: Date;
+      reason: string;
+      created_at: Date;
+    }>(
+      "SELECT id,previous_deadline,deadline,reason,created_at FROM confsys.competition_deadline_extensions WHERE assignment_id=$1 ORDER BY assignment_version LIMIT 50",
+      [assignmentId],
+    )
+  ).rows;
+  const deadlineHistory = rows.map((r) => ({
+    id: r.id,
+    previousDeadline: r.previous_deadline.toISOString(),
+    deadline: r.deadline.toISOString(),
+    reason: r.reason,
+    createdAt: r.created_at.toISOString(),
+  }));
+  return {
+    effectiveDeadline: deadlineHistory.at(-1)?.deadline ?? original,
+    deadlineHistory,
+  };
+}
+export async function extensionById(db: PoolClient, id: string) {
+  return (
+    await db.query<{
+      assignment_id: string;
+      assignment_version: number;
+      deadline: Date;
+      reason: string;
+    }>(
+      "SELECT assignment_id,assignment_version,deadline,reason FROM confsys.competition_deadline_extensions WHERE id=$1",
+      [id],
+    )
+  ).rows[0];
+}
+export async function extendDeadline(
+  db: PoolClient,
+  input: {
+    id: string;
+    assignmentId: string;
+    expectedVersion: number;
+    deadline: string;
+    reason: string;
+  },
+  previous: string,
+  actorId: string,
+) {
+  await db.query(
+    "INSERT INTO confsys.competition_deadline_extensions(id,assignment_id,assignment_version,previous_deadline,deadline,reason,created_by) VALUES($1,$2,$3,$4,$5,$6,$7)",
+    [
+      input.id,
+      input.assignmentId,
+      input.expectedVersion + 1,
+      previous,
+      input.deadline,
+      input.reason,
+      actorId,
+    ],
+  );
+  await db.query(
+    "UPDATE confsys.competition_assignments SET version=version+1 WHERE id=$1",
+    [input.assignmentId],
+  );
+}
+export async function deadlineExtensionAllowed(
+  db: PoolClient,
+  deadline: string,
+) {
+  return (
+    (
+      await db.query<{ allowed: boolean }>(
+        "SELECT $1::timestamptz>clock_timestamp() AND $1::timestamptz<=clock_timestamp()+interval '365 days' AS allowed",
+        [deadline],
+      )
+    ).rows[0]?.allowed === true
+  );
 }

@@ -171,6 +171,21 @@ export function useReviews() {
         await client.screen({ ...input, id: stableId(input) }, signal);
         return "初檢已保存為新版本；既有公開結果未被改寫。";
       }),
+    onExtendDeadline: (
+      assignment: ReviewAssignment,
+      deadline: string,
+      reason: string,
+    ) =>
+      void perform(async (signal) => {
+        const input = {
+          assignmentId: assignment.id,
+          expectedVersion: assignment.version,
+          deadline,
+          reason,
+        };
+        await client.extendDeadline({ ...input, id: stableId(input) }, signal);
+        return "已展延期限並保留原評分表與歷史；通知已排入寄送。";
+      }),
     onRemind: (assignmentId: string, reason: string) =>
       void perform(async (signal) => {
         const input = { assignmentId, reason };

@@ -1,3 +1,7 @@
+import {
+  DeadlineHistory,
+  DeadlineExtension,
+} from "../../../components/deadline-extension.js";
 import { useState } from "react";
 import type {
   CompetitionAdmin,
@@ -494,6 +498,25 @@ export function CompetitionsScreen(p: Props) {
                 .filter((a) => a.entryId === e.id)
                 .map((a) => (
                   <div key={a.id}>
+                    <DeadlineHistory
+                      original={a.config.judgingClosesAt}
+                      effective={a.effectiveDeadline}
+                      history={a.deadlineHistory}
+                    />
+                    {a.state === "assigned" && (
+                      <DeadlineExtension
+                        busy={p.busy}
+                        onExtend={(deadline, reason) =>
+                          p.onAction("competitionExtendDeadline", {
+                            id: p.newId(),
+                            assignmentId: a.id,
+                            expectedVersion: a.version,
+                            deadline,
+                            reason,
+                          })
+                        }
+                      />
+                    )}
                     <p>
                       評審 {a.judgeId}：{a.state}
                     </p>
@@ -734,8 +757,9 @@ function ScoreForm({
       <h2>{a.title}</h2>
       <p>
         {a.presenterName} · {a.config.name} · {a.state} · 截止{" "}
-        {a.config.judgingClosesAt}
+        {a.effectiveDeadline}
       </p>
+      <DeadlineHistory original={a.config.judgingClosesAt} effective={a.effectiveDeadline} history={a.deadlineHistory} />
       <fieldset disabled={busy || a.state !== "assigned"}>
         {a.config.criteria.map((c) => (
           <label key={c.id}>

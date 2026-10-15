@@ -463,8 +463,94 @@ export async function workload(
       submitted: number;
       overdue: number;
     }>(
-      `SELECT a.reviewer_id AS "reviewerId",count(*) FILTER(WHERE a.state='invited')::int AS invited,count(*) FILTER(WHERE a.state='accepted')::int AS accepted,count(*) FILTER(WHERE a.state='submitted')::int AS submitted,count(*) FILTER(WHERE a.state IN('invited','accepted') AND (f.document->>'closesAt')::timestamptz<=now())::int AS overdue FROM confsys.review_assignments a JOIN confsys.submission_revisions r ON r.id=a.revision_id JOIN confsys.submissions s ON s.id=a.submission_id JOIN confsys.review_forms f ON f.id=a.form_id WHERE a.reviewer_id=ANY($1::uuid[]) AND s.state<>'withdrawn' AND s.owner_id<>$2 AND NOT EXISTS(SELECT 1 FROM confsys.submission_author_conflicts conflict WHERE conflict.revision_id=r.id AND conflict.user_id=$2) AND NOT EXISTS(SELECT 1 FROM confsys.review_conflicts c WHERE c.submission_id=s.id AND c.user_id=$2) AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM confsys.review_chair_scopes scope WHERE scope.user_id=$3 AND scope.track_id=r.document->>'trackId')) GROUP BY a.reviewer_id`,
+      `SELECT a.reviewer_id AS "reviewerId",count(*) FILTER(WHERE a.state='invited')::int AS invited,count(*) FILTER(WHERE a.state='accepted')::int AS accepted,count(*) FILTER(WHERE a.state='submitted')::int AS submitted,count(*) FILTER(WHERE a.state IN('invited','accepted') AND coalesce((SELECT x.deadline FROM confsys.review_deadline_extensions x WHERE x.assignment_id=a.id ORDER BY x.assignment_version DESC LIMIT 1),(f.document->>'closesAt')::timestamptz)<=now())::int AS overdue FROM confsys.review_assignments a JOIN confsys.submission_revisions r ON r.id=a.revision_id JOIN confsys.submissions s ON s.id=a.submission_id JOIN confsys.review_forms f ON f.id=a.form_id WHERE a.reviewer_id=ANY($1::uuid[]) AND s.state<>'withdrawn' AND s.owner_id<>$2 AND NOT EXISTS(SELECT 1 FROM confsys.submission_author_conflicts conflict WHERE conflict.revision_id=r.id AND conflict.user_id=$2) AND NOT EXISTS(SELECT 1 FROM confsys.review_conflicts c WHERE c.submission_id=s.id AND c.user_id=$2) AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM confsys.review_chair_scopes scope WHERE scope.user_id=$3 AND scope.track_id=r.document->>'trackId')) GROUP BY a.reviewer_id`,
       [reviewerIds, actor.id, chairId],
     )
   ).rows;
+}
+
+// One deadline projection per domain keeps scoring, reminders and assignment views aligned.
+export async function deadlineHistory(
+  db: PoolClient,
+  assignmentId: string,
+  original: string,
+) {
+  const rows = (
+    await db.query<{
+      id: string;
+      previous_deadline: Date;
+      deadline: Date;
+      reason: string;
+      created_at: Date;
+    }>(
+      "SELECT id,previous_deadline,deadline,reason,created_at FROM confsys.review_deadline_extensions WHERE assignment_id=$1 ORDER BY assignment_version LIMIT 50",
+      [assignmentId],
+    )
+  ).rows;
+  const deadlineHistory = rows.map((r) => ({
+    id: r.id,
+    previousDeadline: r.previous_deadline.toISOString(),
+    deadline: r.deadline.toISOString(),
+    reason: r.reason,
+    createdAt: r.created_at.toISOString(),
+  }));
+  return {
+    effectiveDeadline: deadlineHistory.at(-1)?.deadline ?? original,
+    deadlineHistory,
+  };
+}
+export async function extensionById(db: PoolClient, id: string) {
+  return (
+    await db.query<{
+      assignment_id: string;
+      assignment_version: number;
+      deadline: Date;
+      reason: string;
+    }>(
+      "SELECT assignment_id,assignment_version,deadline,reason FROM confsys.review_deadline_extensions WHERE id=$1",
+      [id],
+    )
+  ).rows[0];
+}
+export async function extendDeadline(
+  db: PoolClient,
+  input: {
+    id: string;
+    assignmentId: string;
+    expectedVersion: number;
+    deadline: string;
+    reason: string;
+  },
+  previous: string,
+  actorId: string,
+) {
+  await db.query(
+    "INSERT INTO confsys.review_deadline_extensions(id,assignment_id,assignment_version,previous_deadline,deadline,reason,created_by) VALUES($1,$2,$3,$4,$5,$6,$7)",
+    [
+      input.id,
+      input.assignmentId,
+      input.expectedVersion + 1,
+      previous,
+      input.deadline,
+      input.reason,
+      actorId,
+    ],
+  );
+  await db.query(
+    "UPDATE confsys.review_assignments SET version=version+1 WHERE id=$1",
+    [input.assignmentId],
+  );
+}
+export async function deadlineExtensionAllowed(
+  db: PoolClient,
+  deadline: string,
+) {
+  return (
+    (
+      await db.query<{ allowed: boolean }>(
+        "SELECT $1::timestamptz>clock_timestamp() AND $1::timestamptz<=clock_timestamp()+interval '365 days' AS allowed",
+        [deadline],
+      )
+    ).rows[0]?.allowed === true
+  );
 }
