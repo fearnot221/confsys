@@ -1385,7 +1385,17 @@ it("revokes pending reviews with immutable reasons, denies continued access and 
   );
   const own = (await reviews.assigned(reviewer.raw, { offset: 0 })).items.find(
     (x) => x.id === a.id,
-  )!;
+  );
+  expect(own).toBeDefined();
+  if (!own) throw new Error("Revoked assignment missing from masked history");
+  // Listing the revocation must not restore direct access to its private manuscript.
+  await withIdentityTransaction(f.app, async (db) => {
+    await context(db, reviewer.id, false);
+    expect((await db.query(
+      "SELECT id FROM confsys.submission_revisions WHERE id=$1",
+      [p.currentRevisionId],
+    )).rows).toEqual([]);
+  });
   expect(own.paper.title).toBe("");
   expect(own.document.scores).toEqual([]);
   expect(own.revocation?.reason).toBe(input.reason);
@@ -1406,13 +1416,15 @@ it("revokes pending reviews with immutable reasons, denies continued access and 
       authorizeReviewFile(db, reviewer.id, a.id, rid()),
     ),
   ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  // A prior revocation test disables the shared otherReviewer; use an independent replacement.
+  const replacement = await account(["reviewer"]);
   const next = await reviews.assign(
     admin.raw,
     {
       id: rid(),
       submissionId: p.id,
       revisionId: p.currentRevisionId,
-      reviewerId: otherReviewer.id,
+      reviewerId: replacement.id,
       formId: form.id,
       anonymousConfirmed: true,
       round: 2,

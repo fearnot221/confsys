@@ -17,6 +17,7 @@ import { registerPublicRoutes } from "../../apps/api/src/site/public-routes.js";
 import { processNotification } from "@confsys/notifications/worker";
 import { createRateLimiter } from "../../apps/api/src/auth/rate-limit.js";
 import { Redis } from "ioredis";
+import { createPool } from "@confsys/db";
 const f = authFixture(),
   auth = createAuthService(f.app, f.config),
   site = createSiteService(f.app, f.config),
@@ -274,38 +275,54 @@ it("queued publisher rechecks permission, disabled state and revoked session aft
     );
     target.raw = (await auth.login(target.email, password, rid())).raw;
     const blocker = await f.admin.connect();
-    await blocker.query("BEGIN");
-    await blocker.query("SELECT * FROM confsys.access_control FOR UPDATE");
-    const revocation = access.mutate(
-      leader.raw,
-      target.id,
-      {
-        action,
-        reason: "synthetic race",
-        ...(action === "revoke" ? { role: "conference_admin" } : {}),
-      },
-      rid(),
-    );
-    // Observe an actual PostgreSQL lock waiter before enqueueing publication; no sleep-based race assumption.
-    await expect
-      .poll(async () =>
-        Number(
-          (
-            await f.app.query(
-              "SELECT count(*) FROM pg_stat_activity WHERE usename='confsys_app' AND wait_event_type='Lock'",
-            )
-          ).rows[0].count,
-        ),
-      )
-      .toBeGreaterThan(0);
-    const publishing = site.publish(target.raw, { expectedVersion: 4 }, rid());
-    const rejected = expect(publishing).rejects.toMatchObject({
-      code: "SESSION_EXPIRED",
-    });
-    await blocker.query("COMMIT");
-    blocker.release();
-    await revocation;
-    await rejected;
+    const mutationPool = createPool(f.config.DATABASE_URL, 1);
+    const publicationPool = createPool(f.config.DATABASE_URL, 1);
+    const mutationPid = (await mutationPool.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    const publicationPid = (await publicationPool.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    const blockerPid = (await blocker.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    const operations: Promise<unknown>[] = [];
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SELECT * FROM confsys.access_control FOR UPDATE");
+      const revocation = createAccessService(mutationPool, f.config).mutate(
+        leader.raw,
+        target.id,
+        {
+          action,
+          reason: "synthetic race",
+          ...(action === "revoke" ? { role: "conference_admin" } : {}),
+        },
+        rid(),
+      );
+      operations.push(revocation);
+      // Observe this transaction, in this database, blocked by our exact fence holder.
+      // A cluster-wide waiter count can see unrelated locks before revocation queues.
+      await expect.poll(async () => (await f.app.query(
+        "SELECT $2::int = ANY(pg_blocking_pids($1)) AS waiting",
+        [mutationPid, blockerPid],
+      )).rows[0].waiting).toBe(true);
+      const publishing = createSiteService(publicationPool, f.config).publish(
+        target.raw, { expectedVersion: 4 }, rid(),
+      );
+      // Settle immediately so an assertion failure cannot become an unhandled rejection.
+      const result = publishing.then(
+        value => ({ value, error: null }),
+        (error: unknown) => ({ value: null, error }),
+      );
+      operations.push(result);
+      await expect.poll(async () => (await f.app.query(
+        "SELECT cardinality(pg_blocking_pids($1)) > 0 AS waiting",
+        [publicationPid],
+      )).rows[0].waiting).toBe(true);
+      await blocker.query("COMMIT");
+      await revocation;
+      expect((await result).error).toMatchObject({ code: "SESSION_EXPIRED" });
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      await Promise.allSettled(operations);
+      await Promise.all([mutationPool.end(), publicationPool.end()]);
+    }
     await expect(site.preview(target.raw, 4)).rejects.toMatchObject({
       code: "SESSION_EXPIRED",
     });

@@ -67,7 +67,7 @@ function command(args: string[], env: NodeJS.ProcessEnv = process.env) {
 }
 const instances = await Promise.all(
   ["a", "b"].map(async (letter) => {
-    const ports = await Promise.all(Array.from({ length: 5 }, reservePort));
+    const ports = await Promise.all(Array.from({ length: options["native-scanner"] ? 5 : 6 }, reservePort));
     const file = `${directory}/${letter}.env`;
     const origin = `http://${letter}-${run}.localhost:${ports[0]!.port}`;
     command(
@@ -80,7 +80,7 @@ const instances = await Promise.all(
         PUBLIC_APP_ORIGIN: origin,
         CONFERENCE_NAME: `Synthetic Conference ${letter.toUpperCase()}`,
         PRIVATE_STORAGE_ROOT: resolve(directory, `${letter}-private`),
-        CLAMAV_PORT: String(scannerPort),
+        CLAMAV_PORT: String(options["native-scanner"] ? scannerPort : ports[5]!.port),
         WEB_PORT: String(ports[0]!.port),
         POSTGRES_PORT: String(ports[1]!.port),
         REDIS_PORT: String(ports[2]!.port),

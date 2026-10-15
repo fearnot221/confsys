@@ -188,9 +188,11 @@ export async function assignmentRows(
   reviewerId: string | null,
   chairId: string | null,
 ) {
+  // Closed assignments stay visible as masked history even when revision RLS denies the paper.
+  // Chair scope still requires a visible revision and its persisted track.
   return (
     await db.query<AssignmentRow>(
-      `SELECT a.* FROM confsys.review_assignments a JOIN confsys.submission_revisions r ON r.id=a.revision_id WHERE ($2::uuid IS NULL OR a.reviewer_id=$2) AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM confsys.review_chair_scopes c WHERE c.user_id=$3 AND c.track_id=r.document->>'trackId')) ORDER BY a.created_at DESC,a.id DESC LIMIT 21 OFFSET $1`,
+      `SELECT a.* FROM confsys.review_assignments a LEFT JOIN confsys.submission_revisions r ON r.id=a.revision_id WHERE ($2::uuid IS NULL OR a.reviewer_id=$2) AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM confsys.review_chair_scopes c WHERE c.user_id=$3 AND c.track_id=r.document->>'trackId')) ORDER BY a.created_at DESC,a.id DESC LIMIT 21 OFFSET $1`,
       [offset, reviewerId, chairId],
     )
   ).rows;
