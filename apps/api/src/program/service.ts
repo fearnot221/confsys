@@ -101,7 +101,7 @@ export function createProgramService(pool: Pool, config: ApiConfig) {
         await lockAccessShared(db);
         const actor = await sessionActor(db, raw, config, new Date(), true);
         await db.query("SELECT set_config('app.actor_id',$1,true)", [actor.id]);
-        return repo.personalProgram(db, actor.id);
+        return repo.personalProgram(db);
       }),
     draft: (raw: string | undefined) =>
       authorized(raw, false, (db) => repo.draft(db), false),
@@ -269,6 +269,8 @@ export function createProgramService(pool: Pool, config: ApiConfig) {
             const revision = await accepted(db, slot.revisionId);
             if (revision.kind !== slot.kind) throw new AuthError("CONFLICT");
             recipients.add(revision.ownerId);
+            const presenter = await repo.approvedPresenter(db, slot.revisionId);
+            if (presenter) recipients.add(presenter);
           }
         const sessions: PublicProgram["sessions"] = d.sessions.map((s) => {
           const room = d.rooms.find((r) => r.id === s.roomId);

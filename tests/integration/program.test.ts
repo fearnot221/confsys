@@ -157,6 +157,10 @@ afterAll(async () => {
     [author.id],
   );
   await f.admin.query(
+    "DELETE FROM confsys.presenter_change_requests WHERE submission_id=ANY($1::uuid[])",
+    [paperIds],
+  );
+  await f.admin.query(
     "DELETE FROM confsys.submission_revisions WHERE owner_id=$1",
     [author.id],
   );
@@ -299,9 +303,12 @@ it("concurrent edits cannot overwrite; direct app-role exclusion blocks overlapp
     reason: { code: "CONFLICT" },
   });
   await expect(
-    withIdentityTransaction(f.app,async db=>{
+    withIdentityTransaction(f.app, async (db) => {
       await db.query("SELECT set_config('app.program_manage','true',true)");
-      return db.query("INSERT INTO confsys.program_room_bookings(id,room_id,kind,starts_at,ends_at) VALUES($1,$2,'blocked',$3,$4)",[id(),r.id,first.startsAt,first.endsAt]);
+      return db.query(
+        "INSERT INTO confsys.program_room_bookings(id,room_id,kind,starts_at,ends_at) VALUES($1,$2,'blocked',$3,$4)",
+        [id(), r.id, first.startsAt, first.endsAt],
+      );
     }),
   ).rejects.toMatchObject({ code: "23P01" });
 });
@@ -474,6 +481,255 @@ it("treats verified address history as a conservative scheduling conflict withou
       )
     ).publicationId,
   ).not.toBe(published.publicationId);
+});
+it("pins approved presenter identity to each public schedule without granting manuscript access or changing historical mappings", async () => {
+  const target = await account(),
+    laterTarget = await account();
+  const configuration = await submissions.config(leader.raw);
+  await submissions.configure(
+    leader.raw,
+    {
+      ...configuration,
+      opensAt: new Date(Date.now() - 60000).toISOString(),
+      closesAt: new Date(Date.now() + 3600000).toISOString(),
+      requireRegistration: false,
+      requireAttachment: false,
+      tracks: [{ id: "science", name: "Science", topics: [] }],
+    },
+    id(),
+  );
+  const document: SubmissionDocument = {
+    title: "Pinned presenter schedule",
+    abstract: "Private abstract must stay private",
+    keywords: [],
+    correspondingAuthorIndex: 0,
+    trackId: "science",
+    topicIds: [],
+    authors: [
+      { name: "Owner", email: author.email, affiliation: "Institute" },
+      {
+        name: "Explicit presenter",
+        email: target.email,
+        affiliation: "Institute",
+      },
+      {
+        name: "Later presenter",
+        email: laterTarget.email,
+        affiliation: "Institute",
+      },
+    ],
+    presenterIndex: 0,
+    presentationPreference: "oral",
+    competition: false,
+    attachmentIds: [],
+    slidesFileId: null,
+    videoUrl: "",
+  };
+  const saved = await submissions.save(
+    author.raw,
+    { id: id(), expectedVersion: 0, document },
+    id(),
+  );
+  const submitted = await submissions.transition(
+    author.raw,
+    { id: saved.id, expectedVersion: saved.version, action: "submit" },
+    id(),
+  );
+  let decisionVersion = 0;
+  const accept = async (revisionId: string) => {
+    const decision = id();
+    await f.admin.query(
+      "INSERT INTO confsys.review_decisions(id,submission_id,revision_id,version,outcome,author_message,internal_reason,decided_by) VALUES($1,$2,$3,$4,'accept_oral','Accepted','Synthetic presenter mapping',$5)",
+      [decision, saved.id, revisionId, ++decisionVersion, leader.id],
+    );
+    await f.admin.query(
+      "INSERT INTO confsys.review_publications(submission_id,decision_id,published_by) VALUES($1,$2,$3) ON CONFLICT(submission_id) DO UPDATE SET decision_id=excluded.decision_id",
+      [saved.id, decision, leader.id],
+    );
+  };
+  await accept(submitted.currentRevisionId!);
+  const r = await room(),
+    sessionItem = await session(
+      r.id,
+      "2042-01-01T01:00:00Z",
+      "2042-01-01T02:00:00Z",
+    );
+  const slot = {
+    ...invited(sessionItem),
+    kind: "oral",
+    revisionId: submitted.currentRevisionId,
+    invitedTitle: "",
+    invitedSpeaker: "",
+    invitedAffiliation: "",
+    invitedEmail: "",
+  };
+  await program.slot(
+    leader.raw,
+    { expectedVersion: await version(), item: slot },
+    id(),
+  );
+  const initial = await program.publish(
+    leader.raw,
+    { expectedVersion: await version() },
+    id(),
+  );
+  const visible = async (raw: string) =>
+    (await program.mine(raw)).sessions
+      .flatMap((s) => s.slots)
+      .some((s) => s.id === slot.id);
+  expect(await visible(author.raw)).toBe(true);
+  expect(await visible(target.raw)).toBe(false);
+  const approveChange = async (
+    sourceRevision: string,
+    selected: typeof target,
+    index: number,
+  ) => {
+    const source = (
+      await f.admin.query(
+        "SELECT * FROM confsys.submission_revisions WHERE id=$1",
+        [sourceRevision],
+      )
+    ).rows[0];
+    const revision = id(),
+      change = id();
+    await f.admin.query(
+      "INSERT INTO confsys.submission_revisions(id,submission_id,owner_id,version,document,config_snapshot) VALUES($1,$2,$3,$4,$5,$6)",
+      [
+        revision,
+        saved.id,
+        author.id,
+        source.version + 1,
+        { ...source.document, presenterIndex: index },
+        source.config_snapshot,
+      ],
+    );
+    await f.admin.query(
+      "UPDATE confsys.submissions SET current_revision_id=$2,submitted_version=$3,version=version+1,document=$4 WHERE id=$1",
+      [
+        saved.id,
+        revision,
+        source.version + 1,
+        { ...source.document, presenterIndex: index },
+      ],
+    );
+    await f.admin.query(
+      `INSERT INTO confsys.presenter_change_requests(id,submission_id,source_revision_id,expected_submission_version,config_version,requester_id,target_user_id,target_author_index,target_email,projection,reason,state,consent_credential_version,consented_at,decision_actor,decision_reason,decided_at,new_revision_id,expires_at)
+      VALUES($1,$2,$3,1,0,$4,$5,$6,$7,'{}','Explicit synthetic consent','approved',1,now(),$8,'Approved fixture',now(),$9,now()+interval '1 day')`,
+      [
+        change,
+        saved.id,
+        sourceRevision,
+        author.id,
+        selected.id,
+        index,
+        selected.email,
+        leader.id,
+        revision,
+      ],
+    );
+    await accept(revision);
+    return revision;
+  };
+  const replacement = await approveChange(
+    submitted.currentRevisionId!,
+    target,
+    1,
+  );
+  expect(await visible(target.raw)).toBe(false);
+  expect(await program.public()).toEqual(initial);
+  await program.slot(
+    leader.raw,
+    {
+      expectedVersion: await version(),
+      item: { ...slot, revisionId: replacement },
+    },
+    id(),
+  );
+  const first = await program.publish(
+    leader.raw,
+    { expectedVersion: await version() },
+    id(),
+  );
+  expect(await visible(author.raw)).toBe(true);
+  expect(await visible(target.raw)).toBe(true);
+  expect(await visible(laterTarget.raw)).toBe(false);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT user_id FROM confsys.notifications WHERE event_key LIKE $1",
+        [`program:${first.publicationId}:%`],
+      )
+    ).rows
+      .map((row) => row.user_id)
+      .sort(),
+  ).toEqual([author.id, target.id].sort());
+  await withIdentityTransaction(f.app, async (db) => {
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [target.id]);
+    expect(
+      (
+        await db.query("SELECT id FROM confsys.submissions WHERE id=$1", [
+          saved.id,
+        ])
+      ).rows,
+    ).toEqual([]);
+    expect(
+      (
+        await db.query(
+          "SELECT * FROM confsys.program_publication_slots WHERE publication_id=$1",
+          [first.publicationId],
+        )
+      ).rows,
+    ).toEqual([]);
+    expect(
+      (await db.query("SELECT * FROM confsys.program_revision_presenters"))
+        .rows,
+    ).toEqual([]);
+    expect(
+      (
+        await db.query(
+          "SELECT slot_id FROM confsys.personal_program_slots WHERE publication_id=$1",
+          [first.publicationId],
+        )
+      ).rows,
+    ).toEqual([{ slot_id: slot.id }]);
+  });
+  const laterRevision = await approveChange(replacement, laterTarget, 2);
+  expect(await visible(target.raw)).toBe(true);
+  expect(await visible(laterTarget.raw)).toBe(false);
+  expect(await program.public()).toEqual(first);
+  await program.slot(
+    leader.raw,
+    {
+      expectedVersion: await version(),
+      item: { ...slot, revisionId: laterRevision },
+    },
+    id(),
+  );
+  await program.publish(leader.raw, { expectedVersion: await version() }, id());
+  expect(await visible(target.raw)).toBe(false);
+  expect(await visible(laterTarget.raw)).toBe(true);
+  expect(await visible(author.raw)).toBe(true);
+  expect(
+    (
+      await f.admin.query(
+        "SELECT presenter_user_id FROM confsys.program_publication_slots WHERE publication_id=$1 AND slot_id=$2",
+        [first.publicationId, slot.id],
+      )
+    ).rows[0],
+  ).toEqual({ presenter_user_id: target.id });
+  expect(
+    (
+      await f.admin.query(
+        "SELECT presenter_user_id FROM confsys.program_publication_slots WHERE publication_id=$1 AND slot_id=$2",
+        [initial.publicationId, slot.id],
+      )
+    ).rows[0],
+  ).toEqual({ presenter_user_id: null });
+  await program.remove(
+    leader.raw,
+    { expectedVersion: await version(), kind: "slot", id: slot.id },
+    id(),
+  );
 });
 it("only exact published accepted revision can be scheduled; draft outcomes and withdrawn manuscripts cannot publish", async () => {
   const c = await submissions.config(leader.raw);

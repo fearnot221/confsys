@@ -261,7 +261,7 @@ export async function publish(
     [id, version, JSON.stringify(document), actor],
   );
   await db.query(
-    "INSERT INTO confsys.program_publication_slots(publication_id,slot_id,submission_id,revision_id) SELECT $1,id,submission_id,revision_id FROM confsys.program_slots WHERE submission_id IS NOT NULL AND revision_id IS NOT NULL",
+    "INSERT INTO confsys.program_publication_slots(publication_id,slot_id,submission_id,revision_id,presenter_user_id,presenter_change_id) SELECT $1,slot.id,slot.submission_id,slot.revision_id,presenter.presenter_user_id,presenter.presenter_change_id FROM confsys.program_slots slot LEFT JOIN confsys.program_revision_presenters presenter ON presenter.revision_id=slot.revision_id WHERE slot.submission_id IS NOT NULL AND slot.revision_id IS NOT NULL",
     [id],
   );
   await db.query(
@@ -279,13 +279,13 @@ export async function publishedFor(db: PoolClient, version: number) {
   ).rows[0]?.id;
 }
 
-export async function personalProgram(db: PoolClient, actorId: string) {
+export async function personalProgram(db: PoolClient) {
   const publication = await publicProgram(db);
   if (!publication.publicationId) return publication;
-  // Explicit owner check remains required even if another role broadens submission RLS.
+  // Explicit actor-only projection preserves ownership and pinned consent identity even if another role broadens raw submission access.
   const rows = await db.query<{ slot_id: string }>(
-    "SELECT mapping.slot_id FROM confsys.program_publication_slots mapping JOIN confsys.submissions s ON s.id=mapping.submission_id WHERE mapping.publication_id=$1 AND s.owner_id=$2",
-    [publication.publicationId, actorId],
+    "SELECT slot_id FROM confsys.personal_program_slots WHERE publication_id=$1",
+    [publication.publicationId],
   );
   const owned = new Set(rows.rows.map((row) => row.slot_id));
   return {
@@ -309,4 +309,12 @@ export async function hasVerifiedAliasConflict(
     [sourceId],
   );
   return !!r.rowCount;
+}
+
+export async function approvedPresenter(db: PoolClient, revisionId: string) {
+  const r = await db.query<{ presenter_user_id: string }>(
+    "SELECT presenter_user_id FROM confsys.program_revision_presenters WHERE revision_id=$1",
+    [revisionId],
+  );
+  return r.rows[0]?.presenter_user_id ?? null;
 }
