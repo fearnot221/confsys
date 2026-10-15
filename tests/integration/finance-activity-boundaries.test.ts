@@ -444,6 +444,18 @@ it("payment RLS denies participant reconciliation and forged verified inserts wh
       })
     ).statusCode,
   ).toBe(403);
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await db.query(
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.finance_admin','true',true)",
+        [admin.id],
+      );
+      await db.query(
+        "UPDATE confsys.payments SET state='verified',verified_by=$2 WHERE id=$1",
+        [payment.id, owner.id],
+      );
+    }),
+  ).rejects.toMatchObject({ code: "42501" });
   expect(
     (
       await finance.verify(
