@@ -34,6 +34,10 @@ test.afterAll(async () => {
     "DELETE FROM confsys.review_publication_snapshots WHERE decision_id IN(SELECT id FROM confsys.review_decisions WHERE submission_id=ANY($1::uuid[]))",
     [papers],
   );
+  await f.admin.query(
+    "DELETE FROM confsys.review_deadline_extensions WHERE assignment_id IN(SELECT id FROM confsys.review_assignments WHERE submission_id=ANY($1::uuid[]))",
+    [papers],
+  );
   for (const table of [
     "review_screenings",
     "review_publications",
@@ -158,7 +162,9 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
   await login(page, adminEmail);
   await page.goto("/reviews");
   await page.getByLabel("評分表名稱").fill("Synthetic E2E review");
-  await page.getByLabel("審查截止（本機時區）").fill("2099-01-01T12:00");
+  await page
+    .getByLabel("審查截止（本機時區）")
+    .fill(new Date(Date.now() + 86400000).toISOString().slice(0, 16));
   await page.getByLabel("指派前須通過行政初檢", { exact: true }).check();
   await page.getByRole("button", { name: "建立評分表新版本" }).click();
   await expect(page.getByRole("status")).toContainText("已建立新的評分表版本");
@@ -195,6 +201,23 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
     .check();
   await page.getByRole("button", { name: "指派此不可變版本" }).click();
   await expect(page.getByRole("status")).toContainText("已指派不可變投稿版本");
+  const progress = page
+    .locator("details")
+    .filter({
+      has: page.locator("summary", { hasText: paper.document.title }),
+    });
+  await progress.locator("summary").click();
+  const extendedDeadline = new Date(Date.now() + 7 * 86400000).toISOString();
+  await progress
+    .getByLabel("展延後截止時間（含時區）", { exact: true })
+    .fill(extendedDeadline);
+  await progress
+    .getByLabel("展延理由（評審可見）", { exact: true })
+    .fill("Synthetic browser deadline extension");
+  await progress
+    .getByRole("button", { name: "展延此指派期限", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("已展延期限");
   const reviewerContext = await browser.newContext({
       baseURL: process.env.PUBLIC_APP_ORIGIN!,
     }),
@@ -220,6 +243,9 @@ test("real UI assigns a blind revision, reviewer submits, chair publishes and au
     await expect(reviewerPage.getByRole("status")).toContainText(
       "審查狀態已更新",
     );
+    await expect(
+      reviewerPage.getByText(extendedDeadline, { exact: false }).first(),
+    ).toBeVisible();
     await reviewerPage.getByLabel("研究品質（0–5）").fill("4");
     await reviewerPage
       .getByLabel("給作者的評語", { exact: true })

@@ -759,7 +759,11 @@ function ScoreForm({
         {a.presenterName} · {a.config.name} · {a.state} · 截止{" "}
         {a.effectiveDeadline}
       </p>
-      <DeadlineHistory original={a.config.judgingClosesAt} effective={a.effectiveDeadline} history={a.deadlineHistory} />
+      <DeadlineHistory
+        original={a.config.judgingClosesAt}
+        effective={a.effectiveDeadline}
+        history={a.deadlineHistory}
+      />
       <fieldset disabled={busy || a.state !== "assigned"}>
         {a.config.criteria.map((c) => (
           <label key={c.id}>

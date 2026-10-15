@@ -8,6 +8,10 @@ const f = authFixture(),
   paperIds: string[] = [];
 test.afterAll(async () => {
   await f.admin.query(
+    "DELETE FROM confsys.competition_deadline_extensions WHERE assignment_id IN(SELECT id FROM confsys.competition_assignments WHERE competition_id=ANY($1::uuid[]))",
+    [competitionIds],
+  );
+  await f.admin.query(
     "UPDATE confsys.competitions SET current_rubric_id=null,active_publication_id=null WHERE id=ANY($1::uuid[])",
     [competitionIds],
   );
@@ -204,7 +208,21 @@ test("author applies; administrator qualifies and assigns; judge submits locked 
   await page.getByLabel("評審帳號 ID").fill(judgeId);
   await page.getByRole("button", { name: "指派評審", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("操作已完成");
+  const extendedDeadline = new Date(Date.now() + 7 * 86400000).toISOString();
+  await page
+    .getByLabel("展延後截止時間（含時區）", { exact: true })
+    .fill(extendedDeadline);
+  await page
+    .getByLabel("展延理由（評審可見）", { exact: true })
+    .fill("Synthetic competition deadline extension");
+  await page
+    .getByRole("button", { name: "展延此指派期限", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("操作已完成");
   await judge.goto("/judging");
+  await expect(
+    judge.getByText(extendedDeadline, { exact: false }).first(),
+  ).toBeVisible();
   await expect(
     judge.getByRole("heading", { name: document.title }),
   ).toBeVisible();
