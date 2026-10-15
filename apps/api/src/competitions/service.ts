@@ -351,9 +351,14 @@ export function createCompetitionService(pool: Pool, config: ApiConfig) {
         )
           throw new AuthError("CONFLICT");
         const e = await repo.entry(db, a.entryId);
-        if (e.state !== "approved" || !(await repo.judgingEligible(db, a.id)))
-          throw new AuthError("CONFLICT");
-        await eligible(db, e.revisionId, a.config);
+        if (e.state !== "approved") throw new AuthError("CONFLICT");
+        const accepted = await eligible(db, e.revisionId, a.config);
+        if (
+          accepted.ownerId === a.judgeId ||
+          (await isRevisionAuthorAccount(db, e.revisionId, a.judgeId)) ||
+          (await repo.hasConflict(db, e.id, a.judgeId))
+        )
+          throw new AuthError("FORBIDDEN");
         await repo.actorEmail(db, a.judgeId);
         requirePermission(await rolesFor(db, a.judgeId), "competitions.score");
         await repo.extendDeadline(db, d, a.effectiveDeadline, actor);
