@@ -405,6 +405,17 @@ it("treats verified address history as a conservative scheduling conflict withou
     "INSERT INTO confsys.verified_email_history(user_id,email) VALUES($1,$2)",
     [laterPerson.id, laterAlias],
   );
+  // The old address may now belong to a different verified local account.
+  // Keep the collision conservative without granting schedule/paper ownership.
+  await auth.requestMail("register", laterAlias, id());
+  await auth.consume(
+    "verify",
+    (await f.link(laterAlias)).token,
+    password,
+    id(),
+  );
+  const reusedAddressAccount = await auth.login(laterAlias, password, id());
+  expect((await program.mine(reusedAddressAccount.raw)).sessions).toEqual([]);
   await expect(
     program.publish(leader.raw, { expectedVersion: await version() }, id()),
   ).rejects.toMatchObject({ code: "CONFLICT" });
