@@ -1331,3 +1331,111 @@ it("extends pending competition assignments without replacing the pinned rubric 
     }),
   ).rejects.toMatchObject({ code: "23514" });
 });
+
+it("judges cannot self-create assignments or change their immutable entry/rubric basis", async () => {
+  const compId = await competition(),
+    p = await paper(),
+    e = await enroll(compId, p);
+  await approve(e);
+  const c = await current(compId);
+  const direct = (actorId: string | null) =>
+    withIdentityTransaction(f.app, async (db) => {
+      if (actorId)
+        await db.query("SELECT set_config('app.actor_id',$1,true)", [actorId]);
+      return db.query(
+        "INSERT INTO confsys.competition_assignments(id,competition_id,entry_id,judge_id,rubric_id) VALUES($1,$2,$3,$4,$5)",
+        [id(), compId, e.id, judge.id, c.currentRubricId],
+      );
+    });
+  await expect(direct(judge.id)).rejects.toMatchObject({ code: "42501" });
+  await expect(direct(null)).rejects.toMatchObject({ code: "42501" });
+  const a = await assignment(e.id);
+  await submit(a);
+  for (const column of ["competition_id", "entry_id", "judge_id", "rubric_id"])
+    await expect(
+      withIdentityTransaction(f.app, async (db) => {
+        await db.query("SELECT set_config('app.actor_id',$1,true)", [judge.id]);
+        return db.query(
+          `UPDATE confsys.competition_assignments SET ${column}=${column} WHERE id=$1`,
+          [a.id],
+        );
+      }),
+    ).rejects.toMatchObject({ code: "42501" });
+});
+
+it("participant entry permissions allow requested enrollment and withdrawal but never self-qualification", async () => {
+  const compId = await competition(),
+    p = await paper(),
+    e = await enroll(compId, p);
+  const ownerTransaction = <T>(
+    work: (db: import("pg").PoolClient) => Promise<T>,
+  ) =>
+    withIdentityTransaction(f.app, async (db) => {
+      await db.query("SELECT set_config('app.actor_id',$1,true)", [author.id]);
+      return work(db);
+    });
+  await expect(
+    ownerTransaction((db) =>
+      db.query(
+        "UPDATE confsys.competition_entries SET state='approved' WHERE id=$1",
+        [e.id],
+      ),
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+  await expect(
+    ownerTransaction((db) =>
+      db.query(
+        "INSERT INTO confsys.competition_entries(id,competition_id,submission_id,revision_id,owner_id,state,title,presenter_name) VALUES($1,$2,$3,$4,$5,'approved','Forged title','Forged presenter')",
+        [id(), compId, p.id, p.currentRevisionId, author.id],
+      ),
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+  await approve(e);
+  const a = await assignment(e.id);
+  await withIdentityTransaction(f.app, async (db) => {
+    await db.query("SELECT set_config('app.actor_id',$1,true)", [judge.id]);
+    expect(
+      (
+        await db.query(
+          "UPDATE confsys.competition_entries SET state='withdrawn' WHERE id=$1",
+          [e.id],
+        )
+      ).rowCount,
+    ).toBe(0);
+  });
+  await expect(
+    withIdentityTransaction(f.app, async (db) => {
+      await db.query(
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.competitions_manage','true',true)",
+        [leader.id],
+      );
+      return db.query(
+        "UPDATE confsys.competition_entries SET state='requested' WHERE id=$1",
+        [e.id],
+      );
+    }),
+  ).rejects.toMatchObject({ code: "23514" });
+  const currentEntry = (await svc.catalog(author.raw)).entries.find(
+    (x) => x.id === e.id,
+  )!;
+  const withdrawn = await svc.entry(
+    author.raw,
+    {
+      id: e.id,
+      expectedVersion: currentEntry.version,
+      action: "withdraw",
+      reason: "Owner voluntary withdrawal",
+    },
+    id(),
+  );
+  expect(withdrawn.state).toBe("withdrawn");
+  await expect(submit(a)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  await expect(
+    ownerTransaction((db) =>
+      db.query(
+        "UPDATE confsys.competition_entries SET state='approved' WHERE id=$1",
+        [e.id],
+      ),
+    ),
+  ).resolves.toMatchObject({ rowCount: 0 });
+});

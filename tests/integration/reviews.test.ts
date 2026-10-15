@@ -1295,3 +1295,37 @@ it("pins explicit review rounds and publishes only selected-round comments witho
     ),
   ).rejects.toMatchObject({ code: "42501" });
 });
+
+it("assignment INSERT requires manager context while reviewer scoring cannot alter the immutable basis", async () => {
+  const p = await submitted();
+  const direct = (actorId: string | null, manage = false) =>
+    withIdentityTransaction(f.app, async (db) => {
+      if (actorId) await context(db, actorId, manage);
+      return db.query(
+        "INSERT INTO confsys.review_assignments(id,submission_id,revision_id,reviewer_id,form_id,state,anonymous_confirmed,created_by) VALUES($1,$2,$3,$4,$5,'invited',true,$4)",
+        [rid(), p.id, p.currentRevisionId, reviewer.id, form.id],
+      );
+    });
+  await expect(direct(reviewer.id)).rejects.toMatchObject({ code: "42501" });
+  await expect(direct(null)).rejects.toMatchObject({ code: "42501" });
+  const a = await assigned(p);
+  expect((await score(a)).state).toBe("submitted");
+  for (const column of [
+    "submission_id",
+    "revision_id",
+    "reviewer_id",
+    "form_id",
+    "anonymous_confirmed",
+    "created_by",
+    "round",
+  ])
+    await expect(
+      withIdentityTransaction(f.app, async (db) => {
+        await context(db, reviewer.id, false);
+        return db.query(
+          `UPDATE confsys.review_assignments SET ${column}=${column} WHERE id=$1`,
+          [a.id],
+        );
+      }),
+    ).rejects.toMatchObject({ code: "42501" });
+});
