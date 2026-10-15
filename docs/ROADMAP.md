@@ -125,3 +125,7 @@ Docker Desktop resource pressure killed this run's B API/worker at07:48 after th
 
 ## 08:16 verification update
 Competition private-table exposure was repaired by0049 and passed12 scoped PG cases plus the08:01 full173-case integration run. Presenter workflow now passed the original owner/target/admin browser scenario08:15;0052 publication mapping passed8 program cases. Payment own-row verification gap repaired0053 and8 focused cases passed. Notification audience paging beyond100 has actual PG2 and browser1 evidence. Immutable deadline amendment54 and payment reminders55 remain in progress; automatic deadline detection remains unfinished. Do not treat historical pending statuses above as current absences or unverified proposals as complete.
+
+## 08:30 focused review and verification
+
+Full gate at593bab1 passed70 unit/190 integration/16 contract/27 browser tests. Deadline extensions54, review rounds56 and finance reminders55/57 now have current integration/browser evidence. Assignment creation/competition qualification direct app-role weaknesses are repaired by forward0058 with32 scoped PG cases passed; new browser lifecycle and round2 coverage are running. Pending-assignment administrative revocation is an evidenced gap: disabled reviewers can leave pending rounds unresolved. A minimal immutable revocation workflow is being implemented within Phase4; no completion claim until verified. Populated backup/restore passed6e7a3772 (PDF/CSV/QR/envelope), while latest-image rehearsal remains pending.

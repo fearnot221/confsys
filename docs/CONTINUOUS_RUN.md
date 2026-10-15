@@ -6,7 +6,7 @@ Baseline: 9642a62, verified descendant of d4c0788. Branch: codex/phase-1-4-to-6-
 ## Plan and ownership
 Main: private files/media then registration/finance and dependent workflow; owns migrations/contracts/permissions/lockfile. Separate invitation agent owns invitation-specific source/tests, proposing central changes for main review. Existing stack and access fences retained. No provider credentials required: local storage and Mailpit only.
 
-## Current scope status — 08:16 Taipei
+## Current scope status — 08:30 Taipei
 
 All rows describe implemented source plus actual verification; none imply production readiness or completion of every SPEC requirement.
 
@@ -26,6 +26,14 @@ Pinned Node24.21.0/pnpm10.34.7 at /tmp/confsys-tools/node_modules/.bin. Own proj
 Latest full `pnpm check` at07:13–15 passed lint/typecheck/unit48/integration128/contract15/build/E2E19. Later `pnpm build && pnpm test:e2e` passed22 browser flows at07:24; current scoped unit55, contract16 and lint/typecheck passed. Newer feature changes require the next full regression; do not combine these into a claimed full current-suite pass.
 
 Latest source checkpoint: d0b85ca (08:01); migrations through0051 integrated. The08:01 full pnpm check passed lint/typecheck, 66 unit, 173 integration, 16 contract tests and build, then24/25 browser cases passed; presenter label failure was repaired and original browser case passed08:15. This is not a new full-suite pass. Subsequent scoped static/unit67/contract16 checks passed, plus program8, finance boundaries8, notification paging2 PG cases and notification later-page browser1. Proposed0052 pins approved presenter identity in personal program publications; proposed0053 closes direct payer verification writes and repairs refund replacement settlement. Agent branches remain independent; only reviewed changes are integrated.
+
+## Latest verified checkpoint — 08:30 Taipei
+
+At source593bab1, `pnpm check` passed lint/import boundaries, typecheck,70 unit tests,190 real integration tests,16 contract tests, clean build and27 Chromium browser tests (5.2minutes). This includes immutable deadline extensions, payment reminders, explicit review rounds, presenter approval, all existing user flows and recovery regressions. New commits6040367/f325215/be4fc32 and0058 are subsequent changes: scoped review/competition actual-PG32/32 passed08:29; new whole-lifecycle and round2 browser cases are currently running and not yet verified.
+
+Two-instance run25868fe4 passed using imageconfsys:p6-881b7181 (schema through0053): real account/session/mail/file/scanner isolation and unchanged second-instance snapshot; populated source contains badge PDF, CSV, QR and pending encrypted mail. Restore6e7a3772 passed08:20: exact table/sequence/migration equality,1 file/reference,2 generated artifacts,1 encrypted envelope and1 valid QR. Actual app/worker role, job-owner/foreign/no-context/pooled-context and forged worker-claim checks passed. Both source and restored projects are stopped; volumes retained. Newer migrations54–58 are not covered by that image rehearsal.
+
+Read-only rendered PDF review08:24–26 confirmed legible Traditional Chinese, unclipped receipt lineage and credit-card/large badges; latest synthetic QR badge was rendered from main output and visually checked. No production-provider or WCAG claim.
 
 ## Focused baseline review
 Reviewed existing session/access locks, site service/repository, runtime role/transaction helper, contract registry, scripts/migrations and CI. Preserve post-lock actor checks and explicit permissions. No evidenced inherited blocker so far. Existing MFA/TLS/retention/backup/provider debt remains in ROADMAP. New file safety must fail closed and cannot claim a stub scanner is verified.
