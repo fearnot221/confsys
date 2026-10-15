@@ -75,7 +75,12 @@ it("pages beyond 100 without duplicate or omitted eligible accounts and keeps ea
   expect(new Set(all.map((r) => r.id)).size).toBe(all.length);
   expect(all).toHaveLength(first.total);
   for (const id of ids) expect(all.some((r) => r.id === id)).toBe(true);
-  expect(all.map((r) => r.email)).toEqual(all.map((r) => r.email).sort());
+  const expected = (
+    await f.admin.query<{ id: string; email: string }>(
+      "SELECT u.id,u.email FROM confsys.users u JOIN confsys.user_roles r ON r.user_id=u.id WHERE r.role='onsite' AND u.state='active' AND u.verified_at IS NOT NULL ORDER BY u.email,u.id",
+    )
+  ).rows;
+  expect(all).toEqual(expected);
   const second = await service.preview(raw, { ...filters, offset: 100 });
   expect(second.items.length).toBeGreaterThan(0);
   const batch = await service.create(
