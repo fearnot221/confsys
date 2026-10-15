@@ -1,4 +1,3 @@
-import {withIdentityTransaction} from "@confsys/db";
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
 import { authFixture, password } from "../helpers/auth.js";
