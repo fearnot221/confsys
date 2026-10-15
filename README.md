@@ -6,6 +6,10 @@
 
 目前開發分支已接上私有檔案／邀請、報名與人工核帳、投稿、審查、議程／競賽及現場／行政作業。這些功能使用真實 PostgreSQL、Redis、worker 與 Mailpit；各項驗證與尚未完成範圍見 [連續開發紀錄](docs/CONTINUOUS_RUN.md)。2026-10-15 本輪明確授權連續推進至 Phase 6，截止台北時間 10:00；不代表已全數驗收或可正式上線。
 
+## 一鍵 Demo
+
+只需 Docker（Compose v2）：`./deploy/demo/demo.sh up` 會建置、啟動完整實例並填入合成示範資料（管理員帳號與已發布的雙語官網），完成後印出網址與隨機產生的登入密碼。說明、設定與限制見 [deploy/demo](deploy/demo/README.md)。這是本機 demo，不是正式部署。
+
 ## 本地啟動
 
 使用 Docker Compose v2、Node **24.21.0** 與 pnpm **10.34.7**。先選未使用的 ports；不得停止其他專案服務。

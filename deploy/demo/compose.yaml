@@ -1,0 +1,240 @@
+# One-command local demo of a single conference instance.
+#
+#   ./deploy/demo/demo.sh up          (recommended: waits, seeds, prints sign-in)
+#   docker compose -f deploy/demo/compose.yaml up -d --build   (plain compose)
+#
+# Everything is synthetic: secrets are generated randomly on first start into
+# the `demo-secrets` volume (never committed, never logged), mail is captured
+# by Mailpit, and no payment provider exists. See deploy/demo/README.md.
+# Not a production deployment: plain HTTP is only accepted for local hosts.
+name: ${DEMO_PROJECT_NAME:-confsys-demo}
+
+x-app: &app
+  image: confsys:demo
+  build:
+    context: ../..
+    dockerfile: Dockerfile
+  volumes:
+    - demo-secrets:/secrets:ro
+  init: true
+  stop_grace_period: 15s
+
+# Shell prologue shared by app containers: export generated secrets, then
+# derive role-specific connection strings.
+x-load-secrets: &load-secrets |
+  set -eu
+  set -a; . /secrets/demo.env; set +a
+  export DATABASE_URL="postgresql://confsys_app:$${APP_PASSWORD}@postgres:5432/confsys"
+  export WORKER_DATABASE_URL="postgresql://confsys_worker:$${WORKER_PASSWORD}@postgres:5432/confsys"
+  export MIGRATION_DATABASE_URL="postgresql://confsys_migrator:$${MIGRATOR_PASSWORD}@postgres:5432/confsys"
+
+x-instance-env: &instance-env
+  NODE_ENV: development
+  CONFERENCE_NAME: ${DEMO_CONFERENCE_NAME:-2027 臺灣計算語言學與人文社會國際研討會}
+  PUBLIC_APP_ORIGIN: ${DEMO_ORIGIN:-http://localhost:8080}
+  MAIL_KEY_VERSION: v1
+  REDIS_URL: redis://redis:6379/0
+
+services:
+  # Generates per-installation random credentials once; idempotent on restart.
+  secrets:
+    image: postgres:17.11-alpine
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        f=/secrets/demo.env
+        if [ -s "$$f" ]; then echo "secrets: existing"; exit 0; fi
+        hex() { head -c "$$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+        umask 022
+        {
+          echo "POSTGRES_PASSWORD=$$(hex 24)"
+          echo "MIGRATOR_PASSWORD=$$(hex 24)"
+          echo "APP_PASSWORD=$$(hex 24)"
+          echo "WORKER_PASSWORD=$$(hex 24)"
+          echo "MAIL_ENCRYPTION_KEY=$$(hex 32)"
+          echo "QR_SIGNING_KEY=$$(hex 32)"
+          echo "CSRF_SIGNING_KEY=$$(hex 32)"
+          echo "DEMO_ADMIN_PASSWORD=demo-$$(hex 12)"
+        } > "$$f.tmp"
+        mv "$$f.tmp" "$$f"
+        echo "secrets: generated"
+    volumes: ["demo-secrets:/secrets"]
+    restart: "no"
+
+  postgres:
+    image: postgres:17.11-alpine
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -a; . /secrets/demo.env; set +a
+        export POSTGRES_USER=postgres
+        exec docker-entrypoint.sh postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../infra/init-db.sh:/docker-entrypoint-initdb.d/01-roles.sh:ro
+      - demo-secrets:/secrets:ro
+    depends_on:
+      secrets: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d confsys"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    mem_limit: 512m
+
+  redis:
+    image: redis:7.4.7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+
+  mailpit:
+    image: axllent/mailpit:v1.29.4
+    ports: ["${DEMO_BIND:-127.0.0.1}:${DEMO_MAIL_PORT:-8025}:8025"]
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: 500
+    volumes: ["mailpit-data:/data"]
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+
+  # Optional real virus scanner (~3 GB RAM, slow first signature download).
+  # Without it, uploads stay quarantined as "scanner unavailable" — truthfully.
+  #   COMPOSE_PROFILES=scanner ./deploy/demo/demo.sh up
+  clamav:
+    profiles: ["scanner"]
+    image: clamav/clamav@sha256:9a96980b265cb2b51a20bdcca921dc80aa55ed0e56cdfb076198ee27a9171927
+    volumes: ["clamav-data:/var/lib/clamav"]
+    environment:
+      CLAMD_CONF_AlertExceedsMax: "yes"
+      CLAMD_CONF_AlertEncrypted: "yes"
+      CLAMD_CONF_MaxThreads: "2"
+      CLAMD_CONF_MaxConnectionQueueLength: "10"
+      CLAMD_CONF_StreamMaxLength: "10M"
+      CLAMD_CONF_MaxScanSize: "40M"
+      CLAMD_CONF_MaxFileSize: "10M"
+      CLAMD_CONF_ConcurrentDatabaseReload: "no"
+    mem_limit: 3g
+
+  migrate:
+    <<: *app
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        eval "$${LOAD_SECRETS}"
+        exec node packages/db/dist/migrate.js
+    environment:
+      LOAD_SECRETS: *load-secrets
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+    mem_limit: 256m
+
+  worker:
+    <<: *app
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        eval "$${LOAD_SECRETS}"
+        exec node apps/worker/dist/main.js
+    environment:
+      <<: *instance-env
+      LOAD_SECRETS: *load-secrets
+      WORKER_HOST: 0.0.0.0
+      MAIL_FROM_ADDRESS: noreply@confsys.invalid
+      MAIL_REPLY_TO_ADDRESS: support@confsys.invalid
+      MAIL_ENVELOPE_FROM: bounce@confsys.invalid
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      mailpit: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:23001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 384m
+
+  api:
+    <<: *app
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        eval "$${LOAD_SECRETS}"
+        exec node apps/api/dist/main.js
+    environment:
+      <<: *instance-env
+      LOAD_SECRETS: *load-secrets
+      WORKER_HEALTH_URL: http://worker:23001
+      PRIVATE_STORAGE_ROOT: /data/private
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      API_HOST: 0.0.0.0
+    volumes:
+      - demo-secrets:/secrets:ro
+      - private-storage:/data/private
+    depends_on:
+      worker: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:23000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 384m
+
+  web:
+    <<: *app
+    command: ["node", "infra/web-server.mjs"]
+    environment:
+      NODE_ENV: development
+      PUBLIC_APP_ORIGIN: ${DEMO_ORIGIN:-http://localhost:8080}
+    ports: ["${DEMO_BIND:-127.0.0.1}:${DEMO_PORT:-8080}:25173"]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('node:http').get('http://127.0.0.1:25173/',{headers:{host:new URL(process.env.PUBLIC_APP_ORIGIN).host}},r=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 256m
+
+  # Creates the synthetic demo administrator and publishes demo site content
+  # through the real HTTP API and bootstrap service. Safe to re-run.
+  seed:
+    <<: *app
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        eval "$${LOAD_SECRETS}"
+        exec node --conditions=development --import tsx scripts/demo-seed.ts
+    environment:
+      <<: *instance-env
+      LOAD_SECRETS: *load-secrets
+      DEMO_API_URL: http://api:23000
+      DEMO_MAILPIT_URL: http://mailpit:8025
+      DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-admin@demo.invalid}
+    depends_on:
+      web: { condition: service_healthy }
+    restart: "no"
+    mem_limit: 384m
+
+volumes:
+  demo-secrets:
+  postgres-data:
+  redis-data:
+  mailpit-data:
+  private-storage:
+  clamav-data:
