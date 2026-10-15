@@ -350,6 +350,66 @@ it("real Redis worker builds private CJK/QR batch; idempotency and token rotatio
     (await jobs.list(staff.raw, 0)).items.find((j) => j.id === retry.id)
       ?.status,
   ).toBe("ready");
+  // Expired claimants cannot finalize, whether rendering succeeds or throws.
+  for (const fails of [false, true]) {
+    const expired = await jobs.create(
+      staff.raw,
+      { registrationIds: [registrationId], idempotencyKey: rid() },
+      rid(),
+    );
+    await processDocumentJob(
+      f.worker,
+      f.workerConfig,
+      expired.id,
+      async (badges, template) => {
+        await f.admin.query(
+          "UPDATE confsys.document_jobs SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1",
+          [expired.id],
+        );
+        if (fails)
+          throw new Error("Synthetic renderer failure after lease expiry");
+        return renderBadges(badges, template);
+      },
+    );
+    const state = async () =>
+      (
+        await f.admin.query(
+          "SELECT status,attempts,pdf,sha256,result_code,completed_at FROM confsys.document_jobs WHERE id=$1",
+          [expired.id],
+        )
+      ).rows[0];
+    expect(await state()).toEqual({
+      status: "processing",
+      attempts: 1,
+      pdf: null,
+      sha256: null,
+      result_code: null,
+      completed_at: null,
+    });
+    await recoverDocumentJobs(f.worker);
+    const recovered = await state();
+    expect(recovered).toEqual({
+      status: "pending",
+      attempts: 1,
+      pdf: null,
+      sha256: null,
+      result_code: "LEASE_EXPIRED",
+      completed_at: null,
+    });
+    await recoverDocumentJobs(f.worker);
+    expect(await state()).toEqual(recovered);
+    await processDocumentJob(f.worker, f.workerConfig, expired.id);
+    expect(await state()).toMatchObject({
+      status: "ready",
+      attempts: 2,
+      result_code: null,
+    });
+    expect(
+      (await jobs.download(staff.raw, expired.id, rid())).bytes
+        .subarray(0, 5)
+        .toString(),
+    ).toBe("%PDF-");
+  }
   const midRender = (
     await jobs.create(
       staff.raw,

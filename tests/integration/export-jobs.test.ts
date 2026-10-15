@@ -63,6 +63,54 @@ afterAll(async () => {
   );
   await f.cleanup();
 });
+it("expired claims cannot finalize either a successful CSV or a failed snapshot hook", async () => {
+  for (const fails of [false, true]) {
+    const job = await make("emails");
+    await processExportJob(f.worker, job.id, async () => {
+      await f.admin.query(
+        "UPDATE confsys.export_jobs SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1",
+        [job.id],
+      );
+      if (fails) throw new Error("Synthetic failure after lease expiry");
+    });
+    const state = async () =>
+      (
+        await f.admin.query(
+          "SELECT status,attempts,csv,sha256,result_code,completed_at FROM confsys.export_jobs WHERE id=$1",
+          [job.id],
+        )
+      ).rows[0];
+    expect(await state()).toEqual({
+      status: "processing",
+      attempts: 1,
+      csv: null,
+      sha256: null,
+      result_code: null,
+      completed_at: null,
+    });
+    await recoverExportJobs(f.worker);
+    const recovered = await state();
+    expect(recovered).toEqual({
+      status: "pending",
+      attempts: 1,
+      csv: null,
+      sha256: null,
+      result_code: "LEASE_EXPIRED",
+      completed_at: null,
+    });
+    await recoverExportJobs(f.worker);
+    expect(await state()).toEqual(recovered);
+    await processExportJob(f.worker, job.id);
+    expect(await state()).toMatchObject({
+      status: "ready",
+      attempts: 2,
+      result_code: null,
+    });
+    const row = await state();
+    expect(row.csv.toString().split("\r\n")[0]).toBe('\uFEFF"user_id","email"');
+    expect(createHash("sha256").update(row.csv).digest("hex")).toBe(row.sha256);
+  }
+});
 it("requires fresh current authority, binds idempotency, scopes jobs and denies worker source rows without a real claim", async () => {
   const data = {
     purpose: "Synthetic operational reconciliation",

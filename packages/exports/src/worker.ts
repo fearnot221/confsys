@@ -4,7 +4,7 @@ import type { Pool, PoolClient } from "pg";
 import { diagnostic, redisOptions, type WorkerConfig } from "@confsys/config";
 import { withIdentityTransaction } from "@confsys/db";
 import { permissionsFor } from "@confsys/policy";
-import { exportJobInput,type ExportJob } from "@confsys/contracts";
+import { exportJobInput, type ExportJob } from "@confsys/contracts";
 import { csvCell, CsvBuffer } from "./csv.js";
 const queueName = "data-exports-v1";
 type Kind = ExportJob["kind"];
@@ -182,7 +182,7 @@ export async function processExportJob(
         ? "EXPORT_TOO_LARGE"
         : "EXPORT_FAILED";
     await pool.query(
-      "UPDATE confsys.export_jobs SET status='failed',result_code=$3,csv=NULL,sha256=NULL,completed_at=now(),lease_until=NULL WHERE id=$1 AND claim_id=$2 AND status='processing'",
+      "UPDATE confsys.export_jobs SET status='failed',result_code=$3,csv=NULL,sha256=NULL,completed_at=now(),lease_until=NULL WHERE id=$1 AND claim_id=$2 AND status='processing' AND lease_until>clock_timestamp() AND expires_at>clock_timestamp()",
       [id, claim.claim_id, code],
     );
   }

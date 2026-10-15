@@ -95,7 +95,7 @@ export async function processDocumentJob(
     await withIdentityTransaction(pool, async (db) => {
       const allowed = await authorized(db, id);
       const changed = await db.query(
-        "UPDATE confsys.document_jobs SET status=$3,result_code=$4,pdf=$5,sha256=$6,completed_at=now(),lease_until=NULL WHERE id=$1 AND claim_id=$2 AND status='processing'",
+        "UPDATE confsys.document_jobs SET status=$3,result_code=$4,pdf=$5,sha256=$6,completed_at=now(),lease_until=NULL WHERE id=$1 AND claim_id=$2 AND status='processing' AND lease_until>clock_timestamp()",
         [
           id,
           claim.claim_id,
@@ -117,7 +117,7 @@ export async function processDocumentJob(
           ? "OUTPUT_TOO_LARGE"
           : "RENDER_FAILED";
     await pool.query(
-      "UPDATE confsys.document_jobs SET status='failed',result_code=$3,completed_at=now(),lease_until=NULL WHERE id=$1 AND claim_id=$2 AND status='processing'",
+      "UPDATE confsys.document_jobs SET status='failed',result_code=$3,completed_at=now(),lease_until=NULL WHERE id=$1 AND claim_id=$2 AND status='processing' AND lease_until>clock_timestamp()",
       [id, claim.claim_id, code],
     );
   }
