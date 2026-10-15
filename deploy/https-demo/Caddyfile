@@ -1,0 +1,16 @@
+{$DEMO_DOMAIN} {
+	# Caddy manages public ACME certificates and redirects HTTP to HTTPS.
+	# Do not enable access logs: URLs may contain personal information.
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+	reverse_proxy web:25173 {
+		# Preserve canonical Host, Origin, cookies and CSRF headers.
+		# The API retains trustProxy=false and its existing source rate limits.
+		header_up -X-Forwarded-For
+		header_up -X-Real-IP
+	}
+}

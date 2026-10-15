@@ -143,3 +143,19 @@ Scope: consolidate all three GitHub branch histories, with no product implementa
 | Evidence | Practical risk | Acceptance criteria / treatment phase |
 | --- | --- | --- |
 | UI PR Actions 38803307612: site E2E logout at tests/e2e/site.spec.ts:233 returned 500 instead of 200; 27 other browser cases passed | Latest UI integration lacks a complete green gate; logout failure cause is unverified | Next maintenance unit: inspect/reproduce the server failure, preserve revocation and late-response assertions, and obtain a complete main CI pass including real-service integration, E2E, smoke and two-instance isolation before release acceptance. No assertion weakening or unsupported flaky-test claim. |
+
+## HTTPS demo focused Phase 0 recheck — 2026-10-16
+
+Authorized work: public synthetic demo ingress/tooling, no new business phase. Reviewed manifests/CI/migrations, local demo seed and canonical Host/Origin/cookie controls; blockers and bounded resolution are in ADR0007. Local HTTP publication is replaced by pinned Caddy HTTPS with private backends, private Mailpit and persisted certificates. Application permissions and schemas remain unchanged.
+
+| Evidence / debt | Practical risk | Acceptance criteria / phase |
+| --- | --- | --- |
+| Local CA exercise cannot reach the owner's server or demonstrate public ACME renewal | DNS/firewall/CAA or lost certificate state can block public HTTPS | Demo deployment acceptance: actual server `up`/`check` succeed with public trust, external browser works, Caddy data persists; monitor renewal before relying on a long-lived demo. |
+| Existing API trustProxy=false and web proxy source collapsing remain | Simultaneous visitors share authentication rate limits | Before larger public trials / production: explicit trusted-proxy model and spoofed-forwarded-header tests; do not blindly enable trustProxy. |
+| No full restored public-demo layout rehearsal | Retained volumes alone do not protect against host loss | Before persistent or real-data use: coordinated DB/private bytes/secrets/certificate backup and restore drill; preserve existing production launch gates. |
+
+Local HTTPS-worktree full gate:72 unit/198 integration/17 contract/build passed; browser27/28. Existing cross-phase browser flow timed out at `participant-lifecycle.spec.ts:370` waiting for the submission title after “new draft”. No app/UI source was changed by this deployment work. Next UI maintenance: reproduce with controlled account/config loading, determine why the editor does not appear, and retain all cross-phase assertions; obtain a complete green gate before release acceptance. Do not infer a root cause or mask this by increasing the timeout. New HTTPS/secret-separation/persistence regression itself passed with real services.
+
+The unchanged participant browser test passed1/1 on a focused rerun (47.7s); the intermittent full-suite failure remains recorded rather than treated as a diagnosed or fixed issue.
+
+Shared-host validation resource risk: local concurrent container build/check exhausted memory and OOM-terminated synthetic PostgreSQL plus the pre-existing local demo API/worker. Both original containers were restored healthy with readiness dependencies up after the new test resources were removed. For demo operations, provision build/runtime memory separately or run checks/builds serially; container project names isolate data, not host resource capacity. No minimum-RAM benchmark is established.
